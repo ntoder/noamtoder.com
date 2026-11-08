@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sail out to sea and catch as many sea creatures as you can in sixty seconds. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Fishing Frenzy · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Fishing <span>Frenzy</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="time">60</b><small>Time</small></div><div class="stat"><b id="caught">0</b><small>Caught</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Fishing Frenzy</h2>
+                <p id="startText">Move your boat with ⬅ ➡ or the mouse. Click or press Space to drop your hook, and again to reel in.<br>Deeper sea creatures are worth more. ⭐ gives +5 seconds.<br>Watch out: 🦈 sharks bite your line and 👢 boots lose points!</p>
+                <button class="btn" id="startBtn">▶ Go fishing</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's Up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Fish again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="drop">🎣</button><button data-k="right">➡</button></div>
+    <p class="hint">Catch 3 in a row without a boot for double points!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, SEA = 110, BEST = "fishBest";
+        const KINDS = [
+            { k: "small", e: "🐟", pts: 10, min: 0.0, max: 0.45, sp: [60, 110], r: 16, w: 30 },
+            { k: "blue", e: "🐠", pts: 25, min: 0.25, max: 0.7, sp: [70, 130], r: 17, w: 22 },
+            { k: "puffer", e: "🐡", pts: 40, min: 0.45, max: 0.85, sp: [40, 70], r: 18, w: 12 },
+            { k: "squid", e: "🦑", pts: 60, min: 0.55, max: 0.95, sp: [50, 90], r: 20, w: 9 },
+            { k: "octo", e: "🐙", pts: 90, min: 0.7, max: 1, sp: [35, 60], r: 22, w: 6 },
+            { k: "crab", e: "🦀", pts: 50, min: 0.95, max: 1, sp: [30, 50], r: 18, w: 6, floor: true },
+            { k: "star", e: "⭐", pts: 150, min: 0.8, max: 1, sp: [20, 30], r: 16, w: 2, bonus: true },
+            { k: "boot", e: "👢", pts: -20, min: 0.3, max: 1, sp: [20, 40], r: 16, w: 6, junk: true },
+            { k: "shark", e: "🦈", pts: 0, min: 0.35, max: 0.9, sp: [120, 170], r: 30, w: 3, shark: true }
+        ];
+        let boat, hook, fish, score, time, caught, state = "ready", t = 0, fx = Kit.particles(), floats = [], bubbles = [], pointerX = null, combo = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function depthY(f) { return SEA + 40 + f * (H - SEA - 80); }
+        function spawnFish(initial) {
+            const total = KINDS.reduce((a, k) => a + k.w, 0); let r = Math.random() * total, K = KINDS[0];
+            for (const k of KINDS) { r -= k.w; if (r <= 0) { K = k; break; } }
+            const dir = Math.random() < 0.5 ? 1 : -1, y = K.floor ? H - 30 : depthY(Kit.rand(K.min, K.max));
+            fish.push({ ...K, x: initial ? Kit.rand(40, W - 40) : dir > 0 ? -40 : W + 40, y, vx: dir * Kit.rand(...K.sp), wob: Math.random() * 6, caught: false });
+        }
+        function reset() {
+            boat = { x: W / 2, vx: 0 }; hook = { y: SEA - 10, state: "up", fish: null }; fish = []; floats = []; score = 0; time = 60; caught = 0; combo = 0;
+            for (let i = 0; i < 12; i++) spawnFish(true);
+            stats();
+        }
+        function stats() { Kit.stat("score", score); Kit.stat("time", Math.ceil(time)); Kit.stat("caught", caught); }
+        function drop() {
+            if (state !== "play") return;
+            if (hook.state === "up") { hook.state = "down"; beep(400, 0.05, "triangle", 0.03, -200); }
+            else if (hook.state === "down") { hook.state = "reel"; beep(300, 0.05, "triangle", 0.03, 200); }
+        }
+        function update(dt) {
+            time -= dt; if (time <= 0) { time = 0; stats(); return end(); }
+            // boat follows keys or your finger, but only while the hook is up top
+            const dir = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0);
+            let target = dir ? boat.x + dir * 400 : pointerX;
+            if (target != null && hook.state === "up") boat.vx += ((Math.max(-280, Math.min(280, (target - boat.x) * 6))) - boat.vx) * Math.min(1, dt * 8); else boat.vx *= Math.pow(0.02, dt);
+            boat.x = Math.max(60, Math.min(W - 60, boat.x + boat.vx * dt));
+            if (hook.state === "down") { hook.y += 300 * dt; if (hook.y >= H - 20) { hook.y = H - 20; hook.state = "reel"; } }
+            if (hook.state === "reel") { hook.y -= (hook.fish ? (hook.fish.k === "octo" ? 150 : 230) : 380) * dt; if (hook.y <= SEA - 10) landed(); }
+            const hx = boat.x, hy = hook.y;
+            for (const f of fish) {
+                if (f.caught) { f.x = hx; f.y = hy + 18; continue; }
+                f.wob += dt * 3; f.x += f.vx * dt; if (!f.floor) f.y += Math.sin(f.wob) * 12 * dt;
+                if ((hook.state === "down" || hook.state === "reel") && !hook.fish && Math.hypot(f.x - hx, f.y - hy) < f.r + 8) {
+                    if (f.shark) { hook.state = "reel"; hook.y = Math.min(hook.y, hy); fx.burst(hx, hy, "#c8ccdf", 12, 3); floats.push({ x: hx, y: hy, s: "Snap! The shark bit your line", t: 1.2, c: "#ff4d6d" }); beep(120, 0.3, "sawtooth", 0.06, -60); combo = 0; continue; }
+                    f.caught = true; hook.fish = f; hook.state = "reel"; beep(f.junk ? 180 : 700, 0.08, "triangle", 0.05);
+                }
+            }
+            fish = fish.filter((f) => f.caught || (f.x > -60 && f.x < W + 60));
+            while (fish.length < 13) spawnFish(false);
+            for (const b of bubbles) { b.y -= 40 * dt; b.x += Math.sin(t * 3 + b.y) * 10 * dt; } bubbles = bubbles.filter((b) => b.y > SEA);
+            if (Math.random() < dt * 3) bubbles.push({ x: Kit.rand(0, W), y: H, r: Kit.rand(2, 5) });
+            for (const f of floats) { f.t -= dt; f.y -= 30 * dt; } floats = floats.filter((f) => f.t > 0);
+            stats();
+        }
+        function landed() {
+            hook.y = SEA - 10; hook.state = "up";
+            const f = hook.fish; if (!f) return; hook.fish = null; fish = fish.filter((x) => x !== f);
+            if (f.junk) { combo = 0; score = Math.max(0, score + f.pts); floats.push({ x: boat.x, y: SEA - 40, s: `Old boot ${f.pts}`, t: 1, c: "#ff4d6d" }); beep(150, 0.2, "square", 0.04); }
+            else {
+                combo++; caught++; const pts = f.pts * (combo >= 3 ? 2 : 1); score += pts;
+                if (f.bonus) time = Math.min(60, time + 5);
+                floats.push({ x: boat.x, y: SEA - 40, s: `${f.e} +${pts}${f.bonus ? " +5s" : ""}${combo >= 3 ? " 🔥" : ""}`, t: 1, c: "#ffc94d" });
+                fx.burst(boat.x, SEA, "#8fd3ff", 14, 3); tune(f.pts >= 60 ? [659, 880, 1100] : [660, 880], 0.05, "triangle", 0.05);
+            }
+            stats();
+        }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `You caught ${caught} sea creatures!<br>${score.toLocaleString()} points · best ${best.toLocaleString()}`;
+            tune([523, 659, 784, 1047], 0.1, "triangle", 0.05); Kit.show("over");
+        }
+        function emoji(e, x, y, size, flip) { ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); ctx.font = `${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(e, 0, 0); ctx.restore(); }
+        function draw() {
+            const sky = ctx.createLinearGradient(0, 0, 0, SEA); sky.addColorStop(0, "#8fd3ff"); sky.addColorStop(1, "#d4f1ff"); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, SEA);
+            ctx.fillStyle = "#ffe37a"; ctx.beginPath(); ctx.arc(W - 90, 46, 26, 0, 7); ctx.fill();
+            const sea = ctx.createLinearGradient(0, SEA, 0, H); sea.addColorStop(0, "#2a8ad6"); sea.addColorStop(1, "#0b2a5a"); ctx.fillStyle = sea; ctx.fillRect(0, SEA, W, H - SEA);
+            ctx.fillStyle = "#c98a4b"; ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W; x += 40) ctx.lineTo(x, H - 14 - Math.sin(x * 0.03) * 8); ctx.lineTo(W, H); ctx.fill();
+            for (let i = 0; i < 9; i++) { const x = 40 + i * 100; ctx.strokeStyle = "#2ee6a0aa"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, H - 10); ctx.quadraticCurveTo(x + Math.sin(t + i) * 14, H - 50, x + Math.sin(t * 1.3 + i) * 8, H - 80 - (i % 3) * 20); ctx.stroke(); }
+            ctx.fillStyle = "#ffffff55"; for (const b of bubbles) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); }
+            for (const f of fish) emoji(f.e, f.x, f.y, f.r * 2.1, f.vx > 0 && !f.caught);
+            // waves
+            ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.moveTo(0, SEA); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, SEA + Math.sin(x * 0.05 + t * 3) * 3); ctx.lineTo(W, SEA + 6); ctx.lineTo(0, SEA + 6); ctx.fill();
+            // line + hook
+            const bx = boat.x, by = SEA - 8 + Math.sin(t * 2) * 2;
+            ctx.strokeStyle = "#eef0ffcc"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx + 26, by - 34); ctx.lineTo(bx, hook.y); ctx.stroke();
+            ctx.strokeStyle = "#c8ccdf"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bx - 5, hook.y + 6, 6, 0, Math.PI); ctx.moveTo(bx, hook.y); ctx.lineTo(bx + 1, hook.y + 6); ctx.stroke();
+            // boat with a fisher
+            ctx.fillStyle = Kit.skin("fishing", "#ff4d6d"); ctx.beginPath(); ctx.moveTo(bx - 56, by - 14); ctx.lineTo(bx + 56, by - 14); ctx.lineTo(bx + 40, by + 8); ctx.lineTo(bx - 40, by + 8); ctx.fill();
+            ctx.fillStyle = "#ffffff"; ctx.fillRect(bx - 50, by - 14, 100, 4);
+            ctx.fillStyle = "#4da3ff"; Kit.rr(ctx, bx - 14, by - 44, 22, 30, 7); ctx.fill(); ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(bx - 3, by - 52, 10, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(bx - 3, by - 60, 14, 5, 0, 0, 7); ctx.fill(); ctx.fillRect(bx - 10, by - 68, 14, 8);
+            ctx.strokeStyle = "#8a5a30"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx + 4, by - 32); ctx.lineTo(bx + 26, by - 34); ctx.stroke();
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.min(1, f.t * 2); Kit.text(ctx, f.s, f.x, f.y, 18, f.c); }
+            ctx.globalAlpha = 1;
+            if (state === "play" && caught === 0 && hook.state === "up") Kit.text(ctx, "Click or press Space to drop your hook", W / 2, SEA + 30, 16, "#ffffff");
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); const p = Kit.point(cv, e); if (hook.state === "up" && Math.abs(p.x - boat.x) > 40) { pointerX = p.x; return; } drop(); });
+        cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" || e.buttons) pointerX = Kit.point(cv, e).x; });
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Space: "drop", ArrowDown: "drop", Enter: "drop" }, (a) => {
+            if (a !== "drop") return; pointerX = null;
+            if (state !== "play") { if (state === "ready" || !$("over").classList.contains("hidden")) start(); return; } drop();
+        });
+        Kit.touchButtons((k) => { if (k === "drop") drop(); });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+        if (window.__test) window.__test.fs = () => ({ hook, fish, boat });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Fishing Frenzy</h2><p>Sail out to sea and catch as many sea creatures as you can in sixty seconds. Move your boat, drop your hook and reel in whatever bites first. Small fish swim near the top, while octopuses, squid and crabs live deep down and are worth more points. A golden star gives extra time. But watch out: sharks snap your line, and nobody wants an old boot!</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ / mouse</td><td>Move the boat</td></tr><tr><td>Click / Space</td><td>Drop the hook, then reel in</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Wait for the deep sea creatures to swim under your boat before dropping.</li><li>Reel in early if you see a shark coming.</li><li>Three good catches in a row double your points.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/Maze/maze">Maze Escape</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Memory/memory">Memory Match</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

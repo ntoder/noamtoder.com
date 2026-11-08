@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Drive your tank around a battlefield of brick and steel walls and protect your base from waves of enemy tanks. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Tank Battle · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Tank <span>Battle</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="left">10</b><small>Enemies</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="840" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Tank Battle</h2>
+                <p id="startText">Arrow keys / WASD to drive, Space to fire.<br>Protect your ⭐ base at the bottom and destroy every enemy tank!<br>Shoot through brick walls. Steel walls need a ⚡ power-up.</p>
+                <button class="btn" id="startBtn">▶ Battle</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button><button data-k="fire">💥</button></div>
+    <p class="hint">Power-ups: ⚡ stronger shots, 🛡 shield, 💥 destroys every enemy, ⏰ freezes them. Hide in the bushes!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, T = 20, GW = W / T, GH = H / T, TS = 34, BEST = "tankBest";
+        const DIRS = { up: [0, -1, -Math.PI / 2], down: [0, 1, Math.PI / 2], left: [-1, 0, Math.PI], right: [1, 0, 0] };
+        let map, me, foes, bullets, base, score, lives, level, toSpawn, spawnT, state = "ready", t = 0, fx = Kit.particles(), pups, freeze = 0, msg = "", msgT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        // 0 empty, 1 brick, 2 steel, 3 water, 4 bush
+        function makeMap(lv) {
+            let seed = lv * 977 + 31; const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+            const m = Array.from({ length: GH }, () => Array(GW).fill(0));
+            for (let by = 3; by < GH - 6; by += 4) for (let bx = 1; bx < GW / 2; bx += 4) {
+                const r = R(), kind = r < 0.55 ? 1 : r < 0.63 ? 2 : r < 0.7 ? 3 : r < 0.8 ? 4 : 0;
+                if (!kind) continue;
+                const w = 2 + Math.floor(R() * 2), h = 2 + Math.floor(R() * 2);
+                for (let y = by; y < by + h && y < GH - 5; y++) for (let x = bx; x < bx + w; x++) { m[y][x] = kind; m[y][GW - 1 - x] = kind; }
+            }
+            // clear spawn spots and the base area
+            for (const sx of [1, GW / 2 - 1, GW - 3]) for (let y = 0; y < 3; y++) for (let x = sx - 1; x < sx + 3; x++) if (m[y] && x >= 0 && x < GW) m[y][x] = 0;
+            for (let y = GH - 6; y < GH; y++) for (let x = 0; x < GW; x++) m[y][x] = 0;
+            const bx = GW / 2 - 1, by = GH - 2;
+            for (let y = by - 2; y < GH; y++) for (let x = bx - 2; x < bx + 4; x++) m[y][x] = 1;
+            for (let y = by; y < GH; y++) for (let x = bx; x < bx + 2; x++) m[y][x] = 0;
+            return m;
+        }
+        function tank(x, y, dir, enemy, kind = "basic") {
+            const K = { basic: { sp: 70, hp: 1, rate: 1.6, col: "#c8ccdf" }, fast: { sp: 120, hp: 1, rate: 1.3, col: "#ffc94d" }, heavy: { sp: 50, hp: 3, rate: 1.9, col: "#ff4d6d" } }[kind];
+            return { x, y, dir, enemy, kind, sp: enemy ? K.sp : 120, hp: enemy ? K.hp : 1, rate: enemy ? K.rate : 0.35, col: enemy ? K.col : Kit.skin("tankbattle", "#2ee6a0"), cd: 0.5, turn: Kit.rand(0.5, 2), shield: enemy ? 0 : 3, tread: 0 };
+        }
+        function startLevel(lv) {
+            map = makeMap(lv); foes = []; bullets = []; pups = []; toSpawn = 8 + lv * 2; spawnT = 1; freeze = 0;
+            base = { x: (GW / 2 - 1) * T, y: (GH - 2) * T, alive: true };
+            me = tank((GW / 2 - 6) * T, (GH - 2) * T - 2, "up", false);
+            msg = `LEVEL ${lv}`; msgT = 1.6; stats();
+        }
+        function reset() { score = 0; lives = 3; level = 1; startLevel(1); }
+        function stats() { Kit.stat("score", score); Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—"); Kit.stat("left", toSpawn + foes.length); Kit.stat("level", level); }
+        function solidAt(px, py) { const x = Math.floor(px / T), y = Math.floor(py / T); if (x < 0 || y < 0 || x >= GW || y >= GH) return true; const v = map[y][x]; return v === 1 || v === 2 || v === 3; }
+        function boxFree(tk, nx, ny) {
+            const pad = 2;
+            for (const [px, py] of [[nx + pad, ny + pad], [nx + TS - pad, ny + pad], [nx + pad, ny + TS - pad], [nx + TS - pad, ny + TS - pad], [nx + TS / 2, ny + pad], [nx + TS / 2, ny + TS - pad], [nx + pad, ny + TS / 2], [nx + TS - pad, ny + TS / 2]]) if (solidAt(px, py)) return false;
+            for (const o of [me, ...foes]) if (o && o !== tk && o.hp > 0 && Math.abs(o.x - nx) < TS - 2 && Math.abs(o.y - ny) < TS - 2) return false;
+            if (Math.abs(base.x - nx) < TS && Math.abs(base.y - ny) < TS + 4 && base.alive) return false;
+            return true;
+        }
+        function move(tk, dir, dt) {
+            tk.dir = dir; const [dx, dy] = DIRS[dir], st = tk.sp * dt;
+            // line up with the grid a little when turning, so tanks fit through gaps
+            if (dx) tk.y += (Math.round(tk.y / (T / 2)) * (T / 2) - tk.y) * 0.3; else tk.x += (Math.round(tk.x / (T / 2)) * (T / 2) - tk.x) * 0.3;
+            const nx = tk.x + dx * st, ny = tk.y + dy * st;
+            if (boxFree(tk, nx, ny)) { tk.x = nx; tk.y = ny; tk.tread += st; return true; }
+            return false;
+        }
+        function shoot(tk) {
+            if (tk.cd > 0) return; if (bullets.filter((b) => b.owner === tk).length >= (tk.enemy ? 1 : 2)) return;
+            const [dx, dy] = DIRS[tk.dir], cx = tk.x + TS / 2 + dx * TS / 2, cy = tk.y + TS / 2 + dy * TS / 2;
+            bullets.push({ x: cx, y: cy, dx, dy, sp: tk.enemy ? 260 : tk.power ? 520 : 400, owner: tk, enemy: tk.enemy, strong: !tk.enemy && tk.power });
+            tk.cd = tk.rate; beep(tk.enemy ? 200 : 320, 0.05, "square", 0.04, -100);
+        }
+        function boom(x, y, big) { fx.burst(x, y, "#ff9d4d", big ? 30 : 10, big ? 5 : 3); fx.burst(x, y, "#ffc94d", big ? 16 : 5, big ? 3 : 2); beep(big ? 70 : 140, big ? 0.4 : 0.1, "sawtooth", big ? 0.08 : 0.04, -40); }
+        function update(dt) {
+            if (msgT > 0) msgT -= dt; if (freeze > 0) freeze -= dt;
+            // you
+            if (me.hp > 0) {
+                const d = Kit.keys.has("up") ? "up" : Kit.keys.has("down") ? "down" : Kit.keys.has("left") ? "left" : Kit.keys.has("right") ? "right" : null;
+                if (d) move(me, d, dt);
+                me.cd -= dt; if (me.shield > 0) me.shield -= dt;
+                if (Kit.keys.has("fire")) shoot(me);
+            } else { me.respawn -= dt; if (me.respawn <= 0 && lives > 0) { me = tank((GW / 2 - 6) * T, (GH - 2) * T - 2, "up", false); } }
+            // spawn enemies
+            spawnT -= dt;
+            if (toSpawn > 0 && spawnT <= 0 && foes.length < 3 + Math.min(3, Math.floor(level / 2))) {
+                const sx = Kit.pick([0, GW / 2 - 2, GW - 4]) * T + 4, kinds = level < 2 ? ["basic"] : level < 4 ? ["basic", "basic", "fast"] : ["basic", "fast", "heavy"];
+                const tk = tank(sx, 2, "down", true, Kit.pick(kinds));
+                if (boxFree(tk, tk.x, tk.y)) { foes.push(tk); toSpawn--; spawnT = Math.max(1.2, 3 - level * 0.2); fx.burst(tk.x + TS / 2, tk.y + TS / 2, "#ffffff", 12, 2); stats(); }
+            }
+            // enemy brains: wander, sometimes head for you or the base, shoot often
+            for (const e of foes) {
+                e.cd -= dt; if (freeze > 0) continue;
+                e.turn -= dt;
+                if (e.turn <= 0 || !move(e, e.dir, dt)) {
+                    e.turn = Kit.rand(0.8, 2.4);
+                    const goal = Math.random() < 0.5 ? base : me;
+                    const opts = [Math.abs(goal.x - e.x) > Math.abs(goal.y - e.y) ? (goal.x > e.x ? "right" : "left") : goal.y > e.y ? "down" : "up", "down", Kit.pick(["left", "right", "up", "down"])];
+                    e.dir = Kit.pick(opts);
+                }
+                const lined = me.hp > 0 && ((Math.abs(me.x - e.x) < 14 && ((e.dir === "down" && me.y > e.y) || (e.dir === "up" && me.y < e.y))) || (Math.abs(me.y - e.y) < 14 && ((e.dir === "right" && me.x > e.x) || (e.dir === "left" && me.x < e.x))));
+                if (lined || Math.random() < dt * 0.9) shoot(e);
+            }
+            // bullets
+            for (const b of bullets) {
+                if (b.dead) continue;
+                for (let s = 0; s < 3 && !b.dead; s++) {
+                    b.x += b.dx * b.sp * dt / 3; b.y += b.dy * b.sp * dt / 3;
+                    if (b.x < 0 || b.y < 0 || b.x > W || b.y > H) { b.dead = true; break; }
+                    const gx = Math.floor(b.x / T), gy = Math.floor(b.y / T), v = map[gy] && map[gy][gx];
+                    if (v === 1 || (v === 2 && b.strong)) {
+                        // knock out the tile and its neighbour across the bullet's path
+                        map[gy][gx] = 0; const ox = b.dy ? (b.x % T < T / 2 ? -1 : 1) : 0, oy = b.dx ? (b.y % T < T / 2 ? -1 : 1) : 0;
+                        if (map[gy + oy] && (map[gy + oy][gx + ox] === 1 || (b.strong && map[gy + oy][gx + ox] === 2))) map[gy + oy][gx + ox] = 0;
+                        b.dead = true; boom(b.x, b.y, false); break;
+                    }
+                    if (v === 2) { b.dead = true; beep(600, 0.03, "square", 0.03); fx.burst(b.x, b.y, "#c8ccdf", 4, 2); break; }
+                    if (base.alive && b.x > base.x && b.x < base.x + T * 2 && b.y > base.y && b.y < base.y + T * 2) { b.dead = true; base.alive = false; boom(base.x + T, base.y + T, true); return gameOver("Your base was destroyed!"); }
+                    for (const o of b.enemy ? [me] : foes) {
+                        if (!o || o.hp <= 0 || b.dead) continue;
+                        if (b.x > o.x && b.x < o.x + TS && b.y > o.y && b.y < o.y + TS) {
+                            b.dead = true;
+                            if (!o.enemy && o.shield > 0) { beep(800, 0.05, "triangle", 0.04); break; }
+                            o.hp--;
+                            if (o.hp <= 0) {
+                                boom(o.x + TS / 2, o.y + TS / 2, true);
+                                if (o.enemy) { const pts = { basic: 100, fast: 200, heavy: 300 }[o.kind]; score += pts; if (Math.random() < 0.18) pups.push({ x: o.x + TS / 2, y: o.y + TS / 2, k: Kit.pick(["star", "shield", "bomb", "clock"]), t: 10 }); }
+                                else { lives--; me.respawn = 1.5; if (lives <= 0) { stats(); return gameOver("Your tank was destroyed!"); } }
+                                stats();
+                            } else beep(400, 0.05, "square", 0.04);
+                        }
+                    }
+                    for (const o of bullets) if (o !== b && !o.dead && o.enemy !== b.enemy && Math.hypot(o.x - b.x, o.y - b.y) < 8) { o.dead = b.dead = true; fx.burst(b.x, b.y, "#ffffff", 6, 2); }
+                }
+            }
+            bullets = bullets.filter((b) => !b.dead); foes = foes.filter((f) => f.hp > 0);
+            for (const p of pups) {
+                p.t -= dt;
+                if (me.hp > 0 && Math.abs(p.x - (me.x + TS / 2)) < 26 && Math.abs(p.y - (me.y + TS / 2)) < 26) {
+                    p.t = 0; tune([784, 988, 1175], 0.05, "square", 0.05); score += 50;
+                    if (p.k === "star") me.power = true; else if (p.k === "shield") me.shield = 10; else if (p.k === "clock") freeze = 8;
+                    else { for (const f of foes) { boom(f.x + TS / 2, f.y + TS / 2, true); score += 100; } foes = []; }
+                    stats();
+                }
+            }
+            pups = pups.filter((p) => p.t > 0);
+            if (!toSpawn && !foes.length && state === "play") { state = "between"; score += 500; tune([523, 659, 784, 1047], 0.1, "square", 0.05); msg = "LEVEL CLEAR!"; msgT = 2; stats(); setTimeout(() => { level++; startLevel(level); state = "play"; }, 2200); }
+        }
+        function gameOver(why) {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            setTimeout(() => { $("overText").innerHTML = `${why}<br>${score.toLocaleString()} points · level ${level} · best ${best.toLocaleString()}`; Kit.show("over"); }, 900);
+        }
+        function drawTank(tk) {
+            if (tk.hp <= 0) return;
+            ctx.save(); ctx.translate(tk.x + TS / 2, tk.y + TS / 2); ctx.rotate(DIRS[tk.dir][2] + Math.PI / 2);
+            ctx.fillStyle = "#1a1d33"; ctx.fillRect(-TS / 2, -TS / 2, 9, TS); ctx.fillRect(TS / 2 - 9, -TS / 2, 9, TS);
+            ctx.fillStyle = "#3a3f5c"; for (let k = 0; k < 5; k++) { const yy = ((k * 8 + tk.tread) % 40) - TS / 2; ctx.fillRect(-TS / 2, yy, 9, 3); ctx.fillRect(TS / 2 - 9, yy, 9, 3); }
+            ctx.fillStyle = tk.col; Kit.rr(ctx, -11, -12, 22, 26, 5); ctx.fill();
+            ctx.fillStyle = "#00000033"; ctx.beginPath(); ctx.arc(0, 2, 7, 0, 7); ctx.fill();
+            ctx.fillStyle = tk.col; ctx.fillRect(-3, -TS / 2 - 3, 6, 18);
+            if (tk.kind === "heavy" && tk.enemy) { ctx.fillStyle = "#fff"; for (let k = 0; k < tk.hp; k++) ctx.fillRect(-8 + k * 6, 8, 4, 3); }
+            ctx.restore();
+            if (!tk.enemy && tk.shield > 0) { ctx.strokeStyle = `rgba(77,163,255,${0.5 + Math.sin(t * 12) * 0.3})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(tk.x + TS / 2, tk.y + TS / 2, TS * 0.7, 0, 7); ctx.stroke(); }
+        }
+        function draw() {
+            ctx.fillStyle = "#14161f"; ctx.fillRect(0, 0, W, H);
+            for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+                const v = map[y][x], px = x * T, py = y * T;
+                if (v === 1) { ctx.fillStyle = "#b5562f"; ctx.fillRect(px, py, T, T); ctx.fillStyle = "#8a3a1a"; ctx.fillRect(px, py + T / 2 - 1, T, 2); ctx.fillRect(px + ((y % 2) ? T / 2 : 0), py, 2, T / 2); ctx.fillRect(px + ((y % 2) ? 0 : T / 2), py + T / 2, 2, T / 2); }
+                else if (v === 2) { ctx.fillStyle = "#9aa0c8"; ctx.fillRect(px, py, T, T); ctx.fillStyle = "#eef0ff"; ctx.fillRect(px + 4, py + 4, T - 8, T - 8); }
+                else if (v === 3) { ctx.fillStyle = "#2a6fdb"; ctx.fillRect(px, py, T, T); ctx.fillStyle = "#8fd3ff55"; ctx.fillRect(px + ((t * 20 + x * 7) % T), py + T / 2, 6, 2); }
+            }
+            if (base.alive) { ctx.fillStyle = "#ffc94d"; Kit.text(ctx, "⭐", base.x + T, base.y + T, 30, "#ffc94d"); }
+            else { ctx.fillStyle = "#3a3f5c"; ctx.fillRect(base.x, base.y, T * 2, T * 2); }
+            for (const p of pups) { if (p.t < 3 && Math.floor(t * 8) % 2) continue; ctx.fillStyle = "#0b0d1acc"; Kit.rr(ctx, p.x - 14, p.y - 14, 28, 28, 7); ctx.fill(); Kit.text(ctx, { star: "⚡", shield: "🛡", bomb: "💥", clock: "⏰" }[p.k], p.x, p.y + 1, 18, "#fff"); }
+            drawTank(me); foes.forEach(drawTank);
+            ctx.fillStyle = "#fff35c"; for (const b of bullets) { ctx.beginPath(); ctx.arc(b.x, b.y, b.strong ? 4.5 : 3.5, 0, 7); ctx.fill(); }
+            // bushes on top so tanks can hide
+            for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (map[y][x] === 4) { ctx.fillStyle = "#2f8a4acc"; ctx.beginPath(); ctx.arc(x * T + 10, y * T + 10, 12, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            if (freeze > 0) Kit.text(ctx, `⏰ ${Math.ceil(freeze)}`, W - 40, 20, 16, "#8fd3ff");
+            if (msgT > 0) Kit.text(ctx, msg, W / 2, H / 2 - 40, 30, "#ffc94d", "center", "'Press Start 2P', monospace", 400);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        Kit.onKeys({ ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Space: "fire", KeyJ: "fire", Enter: "enter" }, (a) => {
+            if ((a === "enter" || a === "fire") && state === "dead" && !$("over").classList.contains("hidden")) start();
+        });
+        Kit.touchButtons();
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([392, 523, 659, 784], 0.08, "square", 0.05); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+        if (window.__test) window.__test.tk = () => ({ me, foes, toSpawn });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Tank Battle</h2><p>Drive your tank around a battlefield of brick and steel walls and protect your base from waves of enemy tanks. Shoot through brick to make new paths, hide in the bushes, and grab power-ups for stronger shots, a shield, a bomb that destroys every enemy, or a clock that freezes them. Fast tanks and heavy armoured tanks join in on later levels. Destroy them all to move on to the next battlefield.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrow keys / WASD</td><td>Drive</td></tr><tr><td>Space</td><td>Fire</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Never leave your base unguarded for too long.</li><li>Line up with enemy tanks and shoot first.</li><li>Save the bomb power-up for when lots of enemies are on screen.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/Fishing/fishing">Fishing Frenzy</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

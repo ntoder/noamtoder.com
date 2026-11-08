@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find all the hidden words in the grid of letters. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Word Search · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.wlist{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center}.wlist span{font:700 15px Inter,sans-serif;letter-spacing:.5px}.wlist span.got{text-decoration:line-through;opacity:.85}.sel{padding:8px 12px;border-radius:999px;border:1px solid #2a3060;background:#171b36;color:#eef0ff;font:600 14px Inter,sans-serif}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Word <span>Search</span></h1>
+        <div class="stats"><div class="stat"><b id="found">0/10</b><small>Found</small></div><div class="stat"><b id="time">0:00</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center"><select id="themeSel" class="sel"></select><span class="seg" id="lv"><button data-l="easy">Easy</button><button data-l="medium">Medium</button><button data-l="hard">Hard</button></span></div>
+            <div class="frame"><canvas id="c" width="560" height="560"></canvas><div class="overlay hidden" id="over"><div><h2>All Found! 🎉</h2><p id="overText"></p><button class="btn" id="againBtn">↻ New puzzle</button></div></div></div></div>
+            <div class="side" style="width:220px;max-width:100%"><div class="panel"><small>Find these words</small><div id="words" class="wlist"></div></div><button class="btn ghost" id="newBtn">↻ New puzzle</button></div>
+        </div>
+    </div>
+    
+    <p class="hint">Drag across the letters to circle a word. Words can go across, down, diagonally, and on Hard even backwards!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, BEST = "searchBest";
+        const THEMES = {
+            "🐾 Animals": "LION TIGER ZEBRA HORSE PANDA KOALA SHARK WHALE EAGLE MOUSE RABBIT MONKEY GIRAFFE TURTLE PENGUIN OTTER CAMEL SNAKE",
+            "🍕 Food": "PIZZA PASTA BREAD APPLE MANGO LEMON CHEESE COOKIE BANANA CARROT TOMATO HONEY SALAD DONUT WAFFLE NOODLE CANDY GRAPE",
+            "⚽ Sports": "SOCCER TENNIS HOCKEY GOLF RUGBY BOXING SKIING KARATE CHESS SURFING ROWING DIVING HOOP GOAL BALL TEAM RACE MEDAL",
+            "🚀 Space": "PLANET COMET ROCKET STAR MOON SATURN MARS EARTH ORBIT GALAXY ALIEN SUN COSMOS METEOR VENUS JUPITER ASTRONAUT NEBULA",
+            "🎨 Colours": "RED BLUE GREEN YELLOW PURPLE ORANGE PINK BLACK WHITE BROWN SILVER GOLD VIOLET INDIGO CORAL BEIGE OLIVE TEAL"
+        };
+        const LV = { easy: { n: 10, words: 8, dirs: [[1, 0], [0, 1]] }, medium: { n: 12, words: 10, dirs: [[1, 0], [0, 1], [1, 1], [1, -1]] }, hard: { n: 13, words: 12, dirs: [[1, 0], [0, 1], [1, 1], [1, -1], [-1, 0], [0, -1], [-1, -1], [-1, 1]] } };
+        let lv = "medium", theme, grid, N, S, words, found, drag = null, time = 0, timer = null, done = false, colors = ["#ff4d8d", "#2ee6c9", "#ffc94d", "#a15cff", "#4da3ff", "#2ee6a0", "#ff9d4d", "#e6ff4d"], t = 0, fx = Kit.particles();
+        try { lv = localStorage.getItem("searchLv") || "medium"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function build() {
+            const L = LV[lv]; N = L.n; S = W / N;
+            for (let tries = 0; tries < 30; tries++) {
+                grid = Array.from({ length: N }, () => Array(N).fill(""));
+                const pool = THEMES[theme].split(" ").filter((w) => w.length <= N).sort(() => Math.random() - 0.5);
+                words = [];
+                for (const w of pool) {
+                    if (words.length >= L.words) break;
+                    for (let k = 0; k < 150; k++) {
+                        const [dx, dy] = Kit.pick(L.dirs), x = Kit.randi(0, N - 1), y = Kit.randi(0, N - 1);
+                        const ex = x + dx * (w.length - 1), ey = y + dy * (w.length - 1);
+                        if (ex < 0 || ey < 0 || ex >= N || ey >= N) continue;
+                        let ok = true; for (let i = 0; i < w.length; i++) { const c = grid[y + dy * i][x + dx * i]; if (c && c !== w[i]) { ok = false; break; } }
+                        if (!ok) continue;
+                        for (let i = 0; i < w.length; i++) grid[y + dy * i][x + dx * i] = w[i];
+                        words.push({ w, x, y, dx, dy, found: false }); break;
+                    }
+                }
+                if (words.length >= L.words) break;
+            }
+            const AB = "ABCDEFGHIJKLMNOPRSTUWY";
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!grid[y][x]) grid[y][x] = AB[Kit.randi(0, AB.length - 1)];
+        }
+        function newGame() {
+            theme = $("themeSel").value || Object.keys(THEMES)[0];
+            build(); found = []; done = false; time = 0;
+            clearInterval(timer); timer = setInterval(() => { if (!done) { time++; Kit.stat("time", fmt(time)); } }, 1000);
+            Kit.stat("time", "0:00"); Kit.stat("found", `0/${words.length}`); renderList(); Kit.hide("over");
+        }
+        const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        function renderList() { $("words").innerHTML = words.slice().sort((a, b) => a.w.localeCompare(b.w)).map((w) => `<span class="${w.found ? "got" : ""}" style="${w.found ? `color:${w.col}` : ""}">${w.w}</span>`).join(""); }
+        function cellAt(e) { const p = Kit.point(cv, e); return [Math.max(0, Math.min(N - 1, Math.floor(p.x / S))), Math.max(0, Math.min(N - 1, Math.floor(p.y / S)))]; }
+        function line(a, b) {
+            // snap the drag to the nearest straight or diagonal line
+            let dx = b[0] - a[0], dy = b[1] - a[1];
+            const len = Math.max(Math.abs(dx), Math.abs(dy));
+            if (!len) return [a];
+            const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+            const sx = Math.round(Math.cos(ang)), sy = Math.round(Math.sin(ang));
+            const out = []; for (let i = 0; i <= len; i++) { const x = a[0] + sx * i, y = a[1] + sy * i; if (x < 0 || y < 0 || x >= N || y >= N) break; out.push([x, y]); }
+            return out;
+        }
+        function check(cells) {
+            const s = cells.map(([x, y]) => grid[y][x]).join(""), r = s.split("").reverse().join("");
+            const w = words.find((w) => !w.found && (w.w === s || w.w === r) && cells.length === w.w.length);
+            if (!w) { if (cells.length > 1) beep(160, 0.06, "square", 0.03); return; }
+            w.found = true; w.col = colors[found.length % colors.length]; w.cells = cells; found.push(w);
+            beep(600 + found.length * 40, 0.08, "triangle", 0.05);
+            const [mx, my] = cells[Math.floor(cells.length / 2)]; fx.burst(mx * S + S / 2, my * S + S / 2, w.col, 18, 3);
+            Kit.stat("found", `${found.length}/${words.length}`); renderList();
+            if (found.length === words.length) win();
+        }
+        function win() {
+            done = true; clearInterval(timer);
+            const base = { easy: 400, medium: 700, hard: 1100 }[lv], sc = base + Math.max(0, 300 - time) * 2;
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `Found all ${words.length} words in ${fmt(time)}<br>${sc.toLocaleString()} points · best ${best.toLocaleString()}`;
+            tune([523, 659, 784, 1047, 1319], 0.09, "triangle", 0.05); setTimeout(() => Kit.show("over"), 600);
+        }
+        function band(cells, col, alpha) {
+            const a = cells[0], b = cells[cells.length - 1];
+            ctx.strokeStyle = col; ctx.globalAlpha = alpha; ctx.lineWidth = S * 0.72; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(a[0] * S + S / 2, a[1] * S + S / 2); ctx.lineTo(b[0] * S + S / 2, b[1] * S + S / 2); ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        function draw() {
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, 0, W, W);
+            for (const w of found) band(w.cells, w.col, 0.45);
+            if (drag) band(drag.cells, "#ffffff", 0.3);
+            ctx.font = `700 ${S * 0.52}px Inter, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { ctx.fillStyle = "#eef0ff"; ctx.fillText(grid[y][x], x * S + S / 2, y * S + S / 2 + 1); }
+            fx.draw(ctx);
+        }
+        const game = Kit.loop((dt) => { t += dt; fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => { if (done) return; e.preventDefault(); const c = cellAt(e); drag = { a: c, cells: [c] }; try { cv.setPointerCapture(e.pointerId); } catch (er) {} });
+        cv.addEventListener("pointermove", (e) => { if (!drag) return; drag.cells = line(drag.a, cellAt(e)); });
+        cv.addEventListener("pointerup", () => { if (!drag) return; check(drag.cells); drag = null; });
+        $("themeSel").innerHTML = Object.keys(THEMES).map((k) => `<option>${k}</option>`).join("");
+        $("themeSel").onchange = newGame;
+        document.querySelectorAll("#lv button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.l === lv);
+            b.onclick = () => { lv = b.dataset.l; try { localStorage.setItem("searchLv", lv); } catch (e) {} document.querySelectorAll("#lv button").forEach((x) => x.classList.toggle("active", x === b)); newGame(); };
+        });
+        $("newBtn").onclick = newGame; $("againBtn").onclick = newGame;
+        newGame(); game.start();
+        if (window.__test) window.__test.ws = () => ({ words, N });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Word Search</h2><p>Find all the hidden words in the grid of letters. Words can run across, down and diagonally, and on hard they can even be written backwards. Drag across a word to circle it, and it gets crossed off your list. Choose a theme like animals, food, sports, space or colours, and try to find every word as fast as you can for a bigger time bonus.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag across letters</td><td>Circle a word</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Look for unusual letters first, like Z, X or Q.</li><li>Scan one row at a time for the first letter of a word.</li><li>On hard, remember to check backwards too.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/FlagQuiz/flagquiz">Flag Quiz</a><a href="/IdleBakery/idlebakery">Idle Bakery</a><a href="/Fishing/fishing">Fishing Frenzy</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

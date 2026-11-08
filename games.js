@@ -39,16 +39,26 @@ export const GAMES = {
     gemswap:      { name: "Gem Swap",      path: "/GemSwap/gemswap",           img: "/thumbs/gemswap.png",      tags: ["puzzle"],           desc: "Swap gems to match three and set off chains." },
     skyclimber:   { name: "Sky Climber",   path: "/SkyClimber/skyclimber",     img: "/thumbs/skyclimber.png",   tags: ["arcade", "platformer"], desc: "Bounce up from cloud to cloud into space." },
     fruitslash:   { name: "Fruit Slash",   path: "/FruitSlash/fruitslash",     img: "/thumbs/fruitslash.png",   tags: ["arcade"],           desc: "Swipe to slice the fruit. Never the bombs!" },
-    headerhero:   { name: "Header Hero",   path: "/HeaderHero/headerhero",     img: "/thumbs/headerhero.png",   tags: ["sports"],           desc: "Head the crosses into the goal past the keeper.", isNew: true },
-    fiveaside:    { name: "5-a-Side",      path: "/FiveASide/fiveaside",       img: "/thumbs/fiveaside.png",    tags: ["sports"],           desc: "A full football match: pass, dribble and shoot.", isNew: true },
-    checkers:     { name: "Checkers",      path: "/Checkers/checkers",         img: "/thumbs/checkers.png",     tags: ["puzzle", "brain"],  desc: "Jump and capture to beat the computer.", isNew: true },
-    sudoku:       { name: "Sudoku",        path: "/Sudoku/sudoku",             img: "/thumbs/sudoku.png",       tags: ["puzzle", "brain"],  desc: "Fill the grid so every row, column and box has 1 to 9.", isNew: true },
-    solitaire:    { name: "Solitaire",     path: "/Solitaire/solitaire",       img: "/thumbs/solitaire.png",    tags: ["puzzle"],           desc: "The classic card game. Build each suit from A to K.", isNew: true },
-    seabattle:    { name: "Sea Battle",    path: "/SeaBattle/seabattle",       img: "/thumbs/seabattle.png",    tags: ["puzzle", "brain"],  desc: "Find and sink the computer's hidden fleet.", isNew: true }
+    headerhero:   { name: "Header Hero",   path: "/HeaderHero/headerhero",     img: "/thumbs/headerhero.png",   tags: ["sports"],           desc: "Head the crosses into the goal past the keeper." },
+    fiveaside:    { name: "5-a-Side",      path: "/FiveASide/fiveaside",       img: "/thumbs/fiveaside.png",    tags: ["sports"],           desc: "A full football match: pass, dribble and shoot." },
+    checkers:     { name: "Checkers",      path: "/Checkers/checkers",         img: "/thumbs/checkers.png",     tags: ["puzzle", "brain"],  desc: "Jump and capture to beat the computer." },
+    sudoku:       { name: "Sudoku",        path: "/Sudoku/sudoku",             img: "/thumbs/sudoku.png",       tags: ["puzzle", "brain"],  desc: "Fill the grid so every row, column and box has 1 to 9." },
+    solitaire:    { name: "Solitaire",     path: "/Solitaire/solitaire",       img: "/thumbs/solitaire.png",    tags: ["puzzle"],           desc: "The classic card game. Build each suit from A to K." },
+    seabattle:    { name: "Sea Battle",    path: "/SeaBattle/seabattle",       img: "/thumbs/seabattle.png",    tags: ["puzzle", "brain"],  desc: "Find and sink the computer's hidden fleet." },
+    castledefense:{ name: "Castle Defense", path: "/CastleDefense/castledefense", img: "/thumbs/castledefense.png", tags: ["strategy", "brain"], desc: "Build towers and stop 20 waves of invaders.", isNew: true },
+    wordguess:    { name: "Word Guess",    path: "/WordGuess/wordguess",       img: "/thumbs/wordguess.png",    tags: ["word", "brain"],    desc: "Find the secret 5-letter word in 6 tries.", isNew: true },
+    wordsearch:   { name: "Word Search",   path: "/WordSearch/wordsearch",     img: "/thumbs/wordsearch.png",   tags: ["word", "puzzle"],   desc: "Find every hidden word in the letter grid.", isNew: true },
+    flagquiz:     { name: "Flag Quiz",     path: "/FlagQuiz/flagquiz",         img: "/thumbs/flagquiz.png",     tags: ["brain"],            desc: "Countries, flags and capitals of the world.", isNew: true },
+    rhythmtap:    { name: "Rhythm Tap",    path: "/RhythmTap/rhythmtap",       img: "/thumbs/rhythmtap.png",    tags: ["arcade"],           desc: "Hit the falling notes right on the beat.", isNew: true },
+    idlebakery:   { name: "Idle Bakery",   path: "/IdleBakery/idlebakery",     img: "/thumbs/idlebakery.png",   tags: ["strategy"],         desc: "Bake cupcakes, hire helpers, grow your bakery.", isNew: true },
+    pixelpaint:   { name: "Pixel Paint",   path: "/PixelPaint/pixelpaint",     img: "/thumbs/pixelpaint.png",   tags: ["creative"],         desc: "Draw pixel art and save your picture.", isNew: true },
+    tankbattle:   { name: "Tank Battle",   path: "/TankBattle/tankbattle",     img: "/thumbs/tankbattle.png",   tags: ["arcade"],           desc: "Defend your base from waves of enemy tanks.", isNew: true },
+    fishing:      { name: "Fishing Frenzy", path: "/Fishing/fishing",          img: "/thumbs/fishing.png",      tags: ["arcade"],           desc: "Cast your line and catch the rarest fish.", isNew: true },
+    maze:         { name: "Maze Escape",   path: "/Maze/maze",                 img: "/thumbs/maze.png",         tags: ["puzzle", "brain"],  desc: "Find the exit of a brand new maze every time.", isNew: true }
 };
 
 // Games that only count plays (no score)
-export const PLAY_ONLY = ["chess", "tictactoe"];
+export const PLAY_ONLY = ["chess", "tictactoe", "pixelpaint"];
 
 // Used until you save your own choice on the admin page (stored in Firestore: settings/games)
 export const DEFAULT_PREMIUM = ["spaceshooter", "game2048", "mario", "bubblebobble", "chess", "spacerocks", "typingrain"];

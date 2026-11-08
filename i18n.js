@@ -26,7 +26,9 @@ const NAMES = {
     "Motor Racing": "מרוץ אופנועים", "Soccer": "כדורגל",
     "Penalty Shootout": "דו־קרב פנדלים", "Keepy Uppy": "ג'אגלינג", "Mini Golf": "מיני גולף", "Bowling": "באולינג", "Tennis": "טניס",
     "Air Hockey": "הוקי אוויר", "Hoop Shot": "קליעה לסל", "Gem Swap": "החלפת יהלומים", "Sky Climber": "מטפס השמיים", "Fruit Slash": "חיתוך פירות",
-    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי"
+    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
+    "Castle Defense": "הגנת הטירה", "Word Guess": "נחשו את המילה", "Word Search": "תפזורת", "Flag Quiz": "חידון דגלים", "Rhythm Tap": "קצב",
+    "Idle Bakery": "המאפייה", "Pixel Paint": "ציור פיקסלים", "Tank Battle": "קרב טנקים", "Fishing Frenzy": "טירוף דיג", "Maze Escape": "בריחה מהמבוך"
 };
 const gn = (n) => NAMES[n] || n;
 const UNITS = { points: "נקודות", pipes: "צינורות", goals: "גולים" };
@@ -88,7 +90,7 @@ const TEXT = {
     "▶ Browse games": "▶ לכל המשחקים", "Try Noametry": "לנסות את נועמטרי", "DAILY CHALLENGE": "האתגר היומי", "▶ Play": "▶ לשחק", "🕹️ Continue playing": "🕹️ להמשיך לשחק",
     "❤️ Your favorites": "❤️ המועדפים שלך", "A fun and challenging puzzle game where you solve geometric puzzles to progress through levels.": "משחק מאתגר וכיפי שבו פותרים חידות גאומטריות כדי לעבור שלבים.",
     "▶ Play Noametry": "▶ לשחק בנועמטרי", "All Games": "כל המשחקים", "All": "הכול", "Arcade": "ארקייד", "Puzzle": "חשיבה", "Runner": "ריצה", "Platformer": "פלטפורמה",
-    "Sports": "ספורט", "❤️ Favorites": "❤️ מועדפים", "Original": "מקורי", "New": "חדש", "runner": "ריצה", "arcade": "ארקייד", "puzzle": "חשיבה", "platformer": "פלטפורמה", "sports": "ספורט", "🧠 Brain": "🧠 מוח", "brain": "מוח",
+    "Sports": "ספורט", "❤️ Favorites": "❤️ מועדפים", "Original": "מקורי", "New": "חדש", "runner": "ריצה", "arcade": "ארקייד", "puzzle": "חשיבה", "platformer": "פלטפורמה", "sports": "ספורט", "🧠 Brain": "🧠 מוח", "brain": "מוח", "strategy": "אסטרטגיה", "word": "מילים", "creative": "יצירה",
     "🚀 Early access": "🚀 גישה מוקדמת",
     "Jump and dodge your way through geometric levels.": "קופצים ומתחמקים בשלבים גאומטריים.", "Blast alien waves, grab power-ups, beat the boss.": "יורים בגלי חייזרים, אוספים שדרוגים ומביסים את הבוס.",
     "Slide and merge the tiles to reach 2048.": "מחליקים ומחברים אריחים עד 2048.", "Smash every brick — level after level.": "מנפצים כל לבנה, שלב אחרי שלב.",
@@ -111,6 +113,12 @@ const TEXT = {
     "Head the crosses into the goal past the keeper.": "נוגחים את ההגבהות לשער ועוברים את השוער.", "A full football match: pass, dribble and shoot.": "משחק כדורגל מלא: מסירות, כדרורים ובעיטות.",
     "Jump and capture to beat the computer.": "קופצים ואוכלים כדי לנצח את המחשב.", "Fill the grid so every row, column and box has 1 to 9.": "ממלאים את הלוח כך שבכל שורה, עמודה וריבוע יהיו 1 עד 9.",
     "The classic card game. Build each suit from A to K.": "משחק הקלפים הקלאסי. בונים כל צורה מ־A עד K.", "Find and sink the computer's hidden fleet.": "מוצאים ומטביעים את הצי המוסתר של המחשב.",
+    "Build towers and stop 20 waves of invaders.": "בונים מגדלים ועוצרים 20 גלים של פולשים.", "Find the secret 5-letter word in 6 tries.": "מוצאים את המילה הסודית בת 5 האותיות ב־6 ניסיונות.",
+    "Find every hidden word in the letter grid.": "מוצאים כל מילה מוסתרת בלוח האותיות.", "Countries, flags and capitals of the world.": "מדינות, דגלים ובירות העולם.",
+    "Hit the falling notes right on the beat.": "פוגעים בתווים הנופלים בדיוק בקצב.", "Bake cupcakes, hire helpers, grow your bakery.": "אופים קאפקייקס, מגייסים עוזרים ומגדילים את המאפייה.",
+    "Draw pixel art and save your picture.": "מציירים ציורי פיקסלים ושומרים את הציור.", "Defend your base from waves of enemy tanks.": "מגינים על הבסיס מגלים של טנקי אויב.",
+    "Cast your line and catch the rarest fish.": "זורקים חכה ותופסים את הדגים הכי נדירים.", "Find the exit of a brand new maze every time.": "מוצאים את היציאה ממבוך חדש בכל פעם.",
+    "🔤 Word": "🔤 מילים", "🏰 Strategy": "🏰 אסטרטגיה", "🎨 Creative": "🎨 יצירה",
     "No games match your search 😕": "לא נמצאו משחקים 😕", "About Noam's Game Hub": "על המשחקים של נועם", "💾 Save your scores": "💾 שומרים שיאים",
     "👨‍👩‍👧 Made for kids": "👨‍👩‍👧 מתאים לילדים", "Every game is safe for all ages. There's no chat, no violence and no in-game shop. Ads are set to child-safe mode.": "כל המשחקים מתאימים לכל הגילים. אין צ'אט, אין אלימות ואין חנות בתוך המשחק. הפרסומות מוגדרות למצב בטוח לילדים.",
     "Questions": "שאלות", "Is it really free?": "זה באמת בחינם?", "Yes. Almost every game is free to play without an account. Premium is optional.": "כן. כמעט כל המשחקים חינמיים גם בלי חשבון. פרימיום הוא רשות.",

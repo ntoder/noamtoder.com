@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A pixel art drawing studio. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Pixel Paint · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.tools{display:grid;gap:6px}.tools button{padding:9px;border-radius:10px;border:1px solid #2a3060;background:#12152b;color:#eef0ff;font:600 14px Inter,sans-serif;cursor:pointer;text-align:left}.tools button.active{border-color:#7c5cff;background:#2a2360}.pal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pal button,.pal .custom{aspect-ratio:1;border-radius:9px;border:2px solid #2a3060;cursor:pointer}.pal button.on{border-color:#fff;transform:scale(1.08)}.pal .custom{display:grid;place-items:center;position:relative;overflow:hidden;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)}.pal .custom input{position:absolute;inset:0;opacity:0;cursor:pointer}#c{max-width:min(576px,calc(100vw - 40px));height:auto;cursor:crosshair}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Pixel <span>Paint</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            <div class="side" style="width:190px;max-width:100%"><div class="panel"><small>Tools</small><div id="tools" class="tools"><button data-t="pen">✏️ Pen</button><button data-t="erase">🧽 Eraser</button><button data-t="fill">🪣 Fill</button><button data-t="pick">💧 Pick colour</button><button id="mirrorBtn">🦋 Mirror</button><button id="gridBtn">▦ Grid</button></div></div>
+            <div class="panel"><small>Size</small><span class="seg" id="size"><button data-n="16">16</button><button data-n="24">24</button><button data-n="32">32</button></span></div>
+            <div class="panel"><small>Start from</small><div id="starters" class="seg"><button data-s="heart">❤️</button><button data-s="smile">🙂</button><button data-s="star">⭐</button></div></div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><div class="frame"><canvas id="c" width="576" height="576" data-fixed></canvas></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="undoBtn" style="padding:8px 12px">↶ Undo</button><button class="btn ghost" id="redoBtn" style="padding:8px 12px">↷ Redo</button><button class="btn ghost" id="clearBtn" style="padding:8px 12px">🗑 Clear</button><button class="btn" id="saveBtn" style="padding:8px 14px">💾 Save picture</button></div></div>
+            <div class="side" style="width:190px;max-width:100%"><div class="panel"><small>Colour</small><div id="cur" style="height:34px;border-radius:10px;margin-bottom:8px;border:2px solid #2a3060"></div><div id="pal" class="pal"></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Your picture saves by itself in this browser. Keys: B pen, E eraser, G fill, I pick colour, Ctrl+Z undo.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, SAVE = "pixelSave";
+        const PALETTE = ["#000000", "#ffffff", "#9aa0c8", "#5a5f80", "#ff4d6d", "#ff9d4d", "#ffc94d", "#fff35c", "#7ed957", "#2ee6a0", "#2ee6c9", "#4da3ff", "#3a5cff", "#7c5cff", "#c15cff", "#ff5cc8", "#8a5a30", "#c98a4b", "#ffd29d", "#1a1d33"];
+        let N = 24, px, color = "#ff4d6d", tool = "pen", grid = true, history = [], redo = [], drawing = false, mirror = false, lastCell = null;
+        function blank(n) { return Array.from({ length: n * n }, () => null); }
+        function load() { try { const s = JSON.parse(localStorage.getItem(SAVE)); if (s && s.px && s.n) { N = s.n; px = s.px; return; } } catch (e) {} px = blank(N); }
+        function store() { try { localStorage.setItem(SAVE, JSON.stringify({ n: N, px })); } catch (e) {} }
+        const S = () => W / N;
+        function snapshot() { history.push(px.slice()); if (history.length > 80) history.shift(); redo = []; }
+        function cellAt(e) { const p = Kit.point(cv, e), x = Math.floor(p.x / S()), y = Math.floor(p.y / S()); return x >= 0 && y >= 0 && x < N && y < N ? [x, y] : null; }
+        function set(x, y, v) { px[y * N + x] = v; if (mirror) px[y * N + (N - 1 - x)] = v; }
+        function fill(x, y, v) {
+            const target = px[y * N + x]; if (target === v) return;
+            const st = [[x, y]];
+            while (st.length) { const [cx, cy] = st.pop(); if (cx < 0 || cy < 0 || cx >= N || cy >= N || px[cy * N + cx] !== target) continue; px[cy * N + cx] = v; st.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]); }
+        }
+        function lineTo(a, b, v) {
+            let [x0, y0] = a; const [x1, y1] = b, dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+            for (;;) { set(x0, y0, v); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+        }
+        function apply(c) {
+            const [x, y] = c;
+            if (tool === "pick") { const v = px[y * N + x]; if (v) { color = v; renderPalette(); } tool = "pen"; renderTools(); return; }
+            if (tool === "fill") { fill(x, y, color); return; }
+            const v = tool === "erase" ? null : color;
+            if (lastCell) lineTo(lastCell, c, v); else set(x, y, v);
+            lastCell = c;
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); const c = cellAt(e); if (!c) return; snapshot(); drawing = true; lastCell = null; apply(c); if (tool === "fill") { drawing = false; beep(400, 0.05, "triangle", 0.03); } draw(); store(); try { cv.setPointerCapture(e.pointerId); } catch (er) {} });
+        cv.addEventListener("pointermove", (e) => { const c = cellAt(e); hover = c; if (drawing && c && (tool === "pen" || tool === "erase")) { apply(c); store(); } draw(); });
+        cv.addEventListener("pointerup", () => { drawing = false; lastCell = null; });
+        cv.addEventListener("pointerleave", () => { hover = null; draw(); });
+        let hover = null;
+        function draw() {
+            const s = S();
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+                const v = px[y * N + x];
+                ctx.fillStyle = v || ((x + y) % 2 ? "#e9e9f2" : "#f6f6fb"); ctx.fillRect(x * s, y * s, s, s);
+            }
+            if (grid) { ctx.strokeStyle = "#00000018"; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k <= N; k++) { ctx.moveTo(k * s, 0); ctx.lineTo(k * s, W); ctx.moveTo(0, k * s); ctx.lineTo(W, k * s); } ctx.stroke(); }
+            if (mirror) { ctx.strokeStyle = "#7c5cff88"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, W); ctx.stroke(); ctx.setLineDash([]); }
+            if (hover) { ctx.strokeStyle = tool === "erase" ? "#ff4d6d" : "#1a1d33"; ctx.lineWidth = 2; ctx.strokeRect(hover[0] * s + 1, hover[1] * s + 1, s - 2, s - 2); }
+        }
+        function renderPalette() {
+            $("pal").innerHTML = PALETTE.map((c) => `<button data-c="${c}" style="background:${c}" class="${c === color ? "on" : ""}"></button>`).join("") + `<label class="custom" title="Any colour"><input type="color" id="picker" value="${color}">🎨</label>`;
+            $("pal").querySelectorAll("button").forEach((b) => b.onclick = () => { color = b.dataset.c; if (tool === "erase" || tool === "pick") tool = "pen"; renderPalette(); renderTools(); });
+            $("picker").oninput = (e) => { color = e.target.value; if (tool === "erase") tool = "pen"; renderTools(); };
+            $("cur").style.background = color;
+        }
+        function renderTools() { document.querySelectorAll("#tools button[data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tool)); $("mirrorBtn").classList.toggle("active", mirror); $("gridBtn").classList.toggle("active", grid); }
+        document.querySelectorAll("#tools button[data-t]").forEach((b) => b.onclick = () => { tool = b.dataset.t; renderTools(); });
+        $("mirrorBtn").onclick = () => { mirror = !mirror; renderTools(); draw(); };
+        $("gridBtn").onclick = () => { grid = !grid; renderTools(); draw(); };
+        $("undoBtn").onclick = () => { const h = history.pop(); if (h) { redo.push(px); px = h; draw(); store(); } };
+        $("redoBtn").onclick = () => { const r = redo.pop(); if (r) { history.push(px); px = r; draw(); store(); } };
+        $("clearBtn").onclick = () => { snapshot(); px = blank(N); draw(); store(); };
+        document.querySelectorAll("#size button").forEach((b) => {
+            b.classList.toggle("active", +b.dataset.n === N);
+            b.onclick = () => { const n = +b.dataset.n; if (n === N) return; snapshot(); const old = px, on = N; N = n; px = blank(N); for (let y = 0; y < Math.min(on, N); y++) for (let x = 0; x < Math.min(on, N); x++) px[y * N + x] = old[y * on + x]; history = []; draw(); store(); document.querySelectorAll("#size button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        $("saveBtn").onclick = () => {
+            // export a crisp PNG (each pixel becomes a 20×20 square), transparent where empty
+            const k = Math.max(8, Math.floor(480 / N)), out = document.createElement("canvas"); out.width = out.height = N * k; const o = out.getContext("2d");
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = px[y * N + x]; if (v) { o.fillStyle = v; o.fillRect(x * k, y * k, k, k); } }
+            const a = document.createElement("a"); a.download = "my-pixel-art.png"; a.href = out.toDataURL("image/png"); a.click();
+            beep(880, 0.08, "triangle", 0.05);
+            if (window.GameHub && window.GameHub.recordPlay) window.GameHub.recordPlay();
+        };
+        // a few starter pictures to trace or colour in
+        const STARTERS = {
+            heart: ["..XX.XX..", ".XXXXXXX.", ".XXXXXXX.", "..XXXXX..", "...XXX...", "....X...."],
+            smile: ["..XXXXX..", ".X.....X.", "X..X.X..X", "X.......X", "X.X...X.X", ".X.XXX.X.", "..XXXXX.."],
+            star: ["....X....", "...XXX...", "XXXXXXXXX", ".XXXXXXX.", "..XXXXX..", ".XX...XX.", "X.......X"]
+        };
+        document.querySelectorAll("#starters button").forEach((b) => b.onclick = () => {
+            const art = STARTERS[b.dataset.s]; snapshot(); px = blank(N);
+            const ox = Math.floor((N - art[0].length * 2) / 2), oy = Math.floor((N - art.length * 2) / 2);
+            art.forEach((row, y) => row.split("").forEach((ch, x) => { if (ch === "X") for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) px[(oy + y * 2 + dy) * N + ox + x * 2 + dx] = color; }));
+            draw(); store();
+        });
+        addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ") { e.preventDefault(); (e.shiftKey ? $("redoBtn") : $("undoBtn")).click(); return; }
+            const k = { KeyB: "pen", KeyE: "erase", KeyG: "fill", KeyI: "pick" }[e.code]; if (k) { tool = k; renderTools(); }
+        });
+        load(); renderPalette(); renderTools(); draw();
+        document.querySelectorAll("#size button").forEach((x) => x.classList.toggle("active", +x.dataset.n === N));
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Pixel Paint</h2><p>A pixel art drawing studio. Choose colours from the palette or pick any colour you like, then draw on the grid one square at a time. Fill big areas with the bucket, use mirror mode to paint both sides at once for perfectly symmetrical pictures, and undo any mistakes. Your drawing is saved in your browser automatically, and you can download it as a picture to keep or share.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click and drag</td><td>Draw</td></tr><tr><td>B / E / G / I</td><td>Pen, eraser, fill, pick colour</td></tr><tr><td>Ctrl+Z</td><td>Undo</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Start with the outline in a dark colour, then fill it in.</li><li>Mirror mode is great for faces, hearts and spaceships.</li><li>Try the 16 by 16 size first. Small pictures look the most like real pixel art.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/TankBattle/tankbattle">Tank Battle</a><a href="/Maze/maze">Maze Escape</a><a href="/Game2048/2048">2048</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

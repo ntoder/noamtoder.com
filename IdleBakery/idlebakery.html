@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build a cupcake empire! Tap the big cupcake to bake, then spend your cupcakes on helpers that bake for you: mixers, ovens, bakers, shops, factories and even a bakery on the Moon. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Idle Bakery · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.bakery{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;width:min(1100px,100%)}.bakeArea{flex:1 1 380px;min-height:520px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(circle at 50% 55%,#3a2a7a,#12152b 70%)}.cnt{text-align:center}.cnt b{display:block;font:800 44px Inter,sans-serif}.cnt span{color:#9aa0c8;font-weight:700}.cnt small{display:block;color:#2ee6c9;font-weight:700;margin-top:4px}#cake{font-size:150px;background:none;border:0;cursor:pointer;filter:drop-shadow(0 12px 30px rgba(255,77,141,.45));transition:transform .08s;touch-action:manipulation;user-select:none}#cake:hover{transform:scale(1.04)}#cake.bop{animation:bop .12s}@keyframes bop{50%{transform:scale(.92)}}.floaty{position:absolute;pointer-events:none;font:800 20px Inter,sans-serif;color:#fff;text-shadow:0 2px 6px #000;animation:fu .9s forwards;transform:translateX(-50%)}@keyframes fu{to{transform:translate(-50%,-70px);opacity:0}}.golden{position:absolute;font-size:44px;background:none;border:0;cursor:pointer;animation:gl 1s infinite alternate}@keyframes gl{to{transform:scale(1.2) rotate(15deg)}}#away{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#2ee6a0;color:#0b0d1a;font-weight:800;padding:8px 14px;border-radius:12px;opacity:0;transition:opacity .3s;max-width:90%;text-align:center}#away.show{opacity:1}.shopSide{flex:0 1 340px}.item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;margin-top:6px;border-radius:12px;border:1px solid #2a3060;background:#12152b;color:#9aa0c8;cursor:pointer;text-align:left;font-family:Inter,sans-serif}.item.can{color:#eef0ff;border-color:#4a3fa8}.item:disabled{opacity:.45;cursor:default}.item .ic{font-size:28px}.item .tx{flex:1}.item .tx b{display:block;font-size:15px}.item .tx small{font-size:12px;text-transform:none;letter-spacing:0;margin:0;color:inherit;font-weight:600}.item .own{font:800 22px Inter,sans-serif;color:#7c5cff}.ups{display:grid;gap:6px}.up{display:grid;grid-template-columns:30px 1fr auto;grid-template-rows:auto auto;align-items:center;gap:0 8px;padding:8px;border-radius:12px;border:1px solid #2a3060;background:#12152b;color:#9aa0c8;cursor:pointer;text-align:left;font-family:Inter,sans-serif}.up span{grid-row:span 2;font-size:22px}.up b{font-size:14px}.up small{grid-column:2;font-size:11px;margin:0;text-transform:none;letter-spacing:0;font-weight:600;color:inherit}.up em{grid-row:1/3;grid-column:3;font-style:normal;color:#ffc94d;font-weight:800;font-size:13px}.up.can{color:#eef0ff;border-color:#c9a01f}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Idle <span>Bakery</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Baked</small></div><div class="stat"><b id="cps">0</b><small>Per second</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="bakery">
+            <div class="frame bakeArea" id="bakeArea"><div class="cnt"><b id="count">0</b><span>cupcakes</span><small id="rate"></small></div><button id="cake" aria-label="Bake">🧁</button><div id="away"></div><button class="btn ghost" id="resetBtn" style="position:absolute;bottom:10px;left:10px;padding:6px 10px;font-size:12px">↺ Start over</button></div>
+            <div class="side shopSide"><div class="panel"><small>Upgrades</small><div id="upList" class="ups"></div></div><div class="panel"><small>Shop</small><span class="seg" id="buyN"><button data-n="1" class="active">×1</button><button data-n="10">×10</button></span><div id="shopList"></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Tap the cupcake to bake. Buy helpers to bake for you, even while you're away. Catch the 🌟 for bonuses! Your bakery saves by itself.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const BEST = "bakeryBest", SAVE = "bakerySave";
+        const SHOP = [
+            { id: "mixer", name: "Mixer", icon: "🥄", cost: 15, cps: 0.2, desc: "Stirs up a little batter." },
+            { id: "oven", name: "Oven", icon: "🔥", cost: 100, cps: 1, desc: "Bakes cupcakes all day." },
+            { id: "baker", name: "Baker", icon: "👩‍🍳", cost: 600, cps: 6, desc: "A friendly baker joins in." },
+            { id: "shop", name: "Bakery Shop", icon: "🏪", cost: 4000, cps: 30, desc: "Customers line up!" },
+            { id: "factory", name: "Factory", icon: "🏭", cost: 30000, cps: 150, desc: "Cupcakes on a conveyor belt." },
+            { id: "farm", name: "Sugar Farm", icon: "🌾", cost: 250000, cps: 800, desc: "Grows its own sugar." },
+            { id: "robot", name: "Robot Chef", icon: "🤖", cost: 2e6, cps: 4500, desc: "Never needs a break." },
+            { id: "rocket", name: "Space Bakery", icon: "🚀", cost: 2.5e7, cps: 26000, desc: "Bakes on the Moon." },
+            { id: "portal", name: "Cupcake Portal", icon: "🌀", cost: 3e8, cps: 160000, desc: "Cupcakes from other worlds." }
+        ];
+        const UPGRADES = [
+            { id: "c1", name: "Big Spoon", icon: "🥄", cost: 100, desc: "Tapping bakes 2× more", kind: "click", x: 2 },
+            { id: "c2", name: "Golden Whisk", icon: "✨", cost: 5000, desc: "Tapping bakes 3× more", kind: "click", x: 3 },
+            { id: "c3", name: "Magic Mitten", icon: "🧤", cost: 2e5, desc: "Tapping also gets 1% of your per-second", kind: "clickcps", x: 0.01 },
+            { id: "o1", name: "Hotter Ovens", icon: "🔥", cost: 1500, desc: "Ovens bake 2× faster", kind: "b", b: "oven", x: 2 },
+            { id: "b1", name: "Chef Hats", icon: "🎩", cost: 9000, desc: "Bakers bake 2× faster", kind: "b", b: "baker", x: 2 },
+            { id: "s1", name: "Neon Sign", icon: "💡", cost: 60000, desc: "Shops sell 2× more", kind: "b", b: "shop", x: 2 },
+            { id: "f1", name: "Faster Belts", icon: "⚙️", cost: 5e5, desc: "Factories make 2× more", kind: "b", b: "factory", x: 2 },
+            { id: "all", name: "Secret Recipe", icon: "📜", cost: 1e6, desc: "Everything bakes 50% faster", kind: "all", x: 1.5 },
+            { id: "all2", name: "Rainbow Sprinkles", icon: "🌈", cost: 5e7, desc: "Everything bakes 2× faster", kind: "all", x: 2 }
+        ];
+        let g = { cakes: 0, total: 0, own: {}, ups: [], clicks: 0, last: Date.now() }, golden = null, frenzy = 0, buyN = 1;
+        function short(n) { if (n < 10 && n % 1) return n.toFixed(1); n = Math.floor(n); if (n < 1e6) return n.toLocaleString(); const u = ["M", "B", "T", "Qa", "Qi"]; let i = 0; n /= 1e6; while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; } return n.toFixed(n < 10 ? 2 : 1) + u[i]; }
+        function load() { try { const s = JSON.parse(localStorage.getItem(SAVE)); if (s) g = { ...g, ...s }; } catch (e) {} }
+        function save() { g.last = Date.now(); try { localStorage.setItem(SAVE, JSON.stringify(g)); } catch (e) {} }
+        const owned = (id) => g.own[id] || 0;
+        const has = (id) => g.ups.includes(id);
+        function cost(item, n = 1) { let c = 0; for (let k = 0; k < n; k++) c += Math.ceil(item.cost * Math.pow(1.15, owned(item.id) + k)); return c; }
+        function mulFor(id) { let m = 1; for (const u of UPGRADES) if (has(u.id) && ((u.kind === "b" && u.b === id) || u.kind === "all")) m *= u.x; return m; }
+        function cps() { let s = 0; for (const it of SHOP) s += owned(it.id) * it.cps * mulFor(it.id); return s * (frenzy > 0 ? 7 : 1); }
+        function perClick() { let c = 1; for (const u of UPGRADES) if (has(u.id) && u.kind === "click") c *= u.x; if (has("c3")) c += cps() * 0.01; return c * (frenzy > 0 ? 7 : 1); }
+        function add(n) { g.cakes += n; g.total += n; }
+        function renderShop() {
+            $("shopList").innerHTML = SHOP.map((it, i) => {
+                const locked = i > 0 && owned(SHOP[i - 1].id) === 0 && g.total < it.cost * 0.5, c = cost(it, buyN);
+                return `<button class="item ${g.cakes >= c ? "can" : ""}" data-id="${it.id}" ${locked ? "disabled" : ""}><span class="ic">${locked ? "❔" : it.icon}</span><span class="tx"><b>${locked ? "???" : it.name}</b><small>${locked ? "Keep baking to unlock" : `🧁 ${short(c)} · +${short(it.cps * mulFor(it.id))}/s each`}</small></span><span class="own">${owned(it.id) || ""}</span></button>`;
+            }).join("");
+            const ups = UPGRADES.filter((u) => !has(u.id) && g.total >= u.cost * 0.4);
+            $("upList").innerHTML = ups.length ? ups.map((u) => `<button class="up ${g.cakes >= u.cost ? "can" : ""}" data-u="${u.id}" title="${u.desc}"><span>${u.icon}</span><b>${u.name}</b><small>${u.desc}</small><em>🧁 ${short(u.cost)}</em></button>`).join("") : '<div style="color:#9aa0c8;font-size:13px">Keep baking to find upgrades!</div>';
+        }
+        function tick() {
+            $("count").textContent = short(g.cakes); $("rate").textContent = `${short(cps())} per second${frenzy > 0 ? " · 🔥 FRENZY x7!" : ""}`;
+            Kit.stat("score", short(g.total)); Kit.stat("cps", short(cps()));
+        }
+        let lastShop = 0;
+        function loop(now) {
+            const dt = Math.min(1, (now - (loop.p || now)) / 1000); loop.p = now;
+            add(cps() * dt); if (frenzy > 0) frenzy -= dt;
+            if (!golden && Math.random() < dt / 45) spawnGolden();
+            tick(); if (now - lastShop > 400) { lastShop = now; renderShop(); }
+            requestAnimationFrame(loop);
+        }
+        function spawnGolden() {
+            const el = document.createElement("button"); el.className = "golden"; el.textContent = "🌟";
+            el.style.left = `${10 + Math.random() * 75}%`; el.style.top = `${15 + Math.random() * 65}%`;
+            el.onclick = () => { const bonus = Math.max(50, cps() * 60); if (Math.random() < 0.5) { add(bonus); pop(el, `+${short(bonus)} 🧁`); } else { frenzy = 12; pop(el, "FRENZY x7!"); } tune([784, 988, 1319, 1568], 0.06, "square", 0.05); el.remove(); golden = null; };
+            $("bakeArea").appendChild(el); golden = el; setTimeout(() => { if (golden === el) { el.remove(); golden = null; } }, 9000);
+        }
+        function pop(el, s) {
+            const r = el.getBoundingClientRect(), a = $("bakeArea").getBoundingClientRect(), f = document.createElement("div");
+            f.className = "floaty"; f.textContent = s; f.style.left = `${r.left - a.left + r.width / 2}px`; f.style.top = `${r.top - a.top}px`;
+            $("bakeArea").appendChild(f); setTimeout(() => f.remove(), 900);
+        }
+        $("cake").addEventListener("pointerdown", (e) => {
+            e.preventDefault(); const n = perClick(); add(n); g.clicks++;
+            const a = $("bakeArea").getBoundingClientRect(), f = document.createElement("div");
+            f.className = "floaty"; f.textContent = "+" + short(n); f.style.left = `${e.clientX - a.left}px`; f.style.top = `${e.clientY - a.top - 20}px`;
+            $("bakeArea").appendChild(f); setTimeout(() => f.remove(), 900);
+            $("cake").classList.remove("bop"); void $("cake").offsetWidth; $("cake").classList.add("bop");
+            beep(500 + Math.random() * 200, 0.03, "triangle", 0.03); tick();
+        });
+        $("shopList").addEventListener("click", (e) => {
+            const b = e.target.closest("button[data-id]"); if (!b) return; const it = SHOP.find((x) => x.id === b.dataset.id), c = cost(it, buyN);
+            if (g.cakes < c) return beep(150, 0.05, "square", 0.03);
+            g.cakes -= c; g.own[it.id] = owned(it.id) + buyN; beep(660, 0.06, "triangle", 0.05); renderShop(); tick(); save();
+        });
+        $("upList").addEventListener("click", (e) => {
+            const b = e.target.closest("button[data-u]"); if (!b) return; const u = UPGRADES.find((x) => x.id === b.dataset.u);
+            if (g.cakes < u.cost) return beep(150, 0.05, "square", 0.03);
+            g.cakes -= u.cost; g.ups.push(u.id); tune([659, 880, 1100], 0.05, "square", 0.04); renderShop(); tick(); save();
+        });
+        document.querySelectorAll("#buyN button").forEach((b) => b.onclick = () => { buyN = +b.dataset.n; document.querySelectorAll("#buyN button").forEach((x) => x.classList.toggle("active", x === b)); renderShop(); });
+        $("resetBtn").onclick = () => { if (!$("resetBtn").dataset.sure) { $("resetBtn").dataset.sure = "1"; $("resetBtn").textContent = "Tap again to start over"; setTimeout(() => { delete $("resetBtn").dataset.sure; $("resetBtn").textContent = "↺ Start over"; }, 3000); return; } g = { cakes: 0, total: 0, own: {}, ups: [], clicks: 0, last: Date.now() }; save(); renderShop(); tick(); delete $("resetBtn").dataset.sure; $("resetBtn").textContent = "↺ Start over"; };
+        // while you were away (up to 2 hours, at half speed)
+        load();
+        const away = Math.min(7200, (Date.now() - (g.last || Date.now())) / 1000);
+        if (away > 60 && cps() > 0) { const earned = cps() * away * 0.5; add(earned); $("away").textContent = `While you were away, your bakery baked ${short(earned)} cupcakes!`; $("away").classList.add("show"); setTimeout(() => $("away").classList.remove("show"), 6000); }
+        renderShop(); tick(); requestAnimationFrame(loop);
+        let sent = 0;
+        function submit() {
+            save(); Kit.setBest(BEST, Math.floor(g.total)); Kit.stat("best", short(Kit.best(BEST)));
+            const gh = window.GameHub, user = gh && gh.state && gh.state.user;
+            if (user && g.total > Math.max(10, sent * 1.05)) { sent = g.total; Kit.save(Math.floor(g.total)); }
+        }
+        setInterval(save, 10000);
+        setInterval(submit, 120000);
+        addEventListener("pagehide", submit);
+        Kit.stat("best", short(Kit.best(BEST)));
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Idle Bakery</h2><p>Build a cupcake empire! Tap the big cupcake to bake, then spend your cupcakes on helpers that bake for you: mixers, ovens, bakers, shops, factories and even a bakery on the Moon. Upgrades make everything faster, and golden stars give big bonuses. Your bakery saves by itself and keeps baking at half speed for up to two hours while you're away, so come back to see how much it has grown.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap the cupcake</td><td>Bake</td></tr><tr><td>Click the shop</td><td>Buy helpers and upgrades</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Buy cheap helpers early. They pay for themselves quickly.</li><li>Upgrades that double a helper are often the best deal.</li><li>Catch the golden star when it appears for a frenzy or a big bonus.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/PixelPaint/pixelpaint">Pixel Paint</a><a href="/Fishing/fishing">Fishing Frenzy</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

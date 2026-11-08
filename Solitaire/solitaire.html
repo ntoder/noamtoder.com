@@ -128,7 +128,7 @@
             const cx = colX(h.kind === "tab" ? h.i : h.kind === "waste" ? 1 : 3 + h.i) + (h.kind === "waste" && drawN === 3 ? Math.min(2, waste.length - 1) * 20 : 0);
             const cy = h.kind === "tab" ? TABY + cardPos(h.pile, h.idx) : TOPY;
             drag = { src: h, n: h.pile.length - h.idx, cards: h.pile.slice(h.idx), dx: p.x - cx, dy: p.y - cy, x: p.x, y: p.y, moved: false, sx: p.x, sy: p.y };
-            cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+            try { cv.setPointerCapture(e.pointerId); } catch (er) {}
         });
         cv.addEventListener("pointermove", (e) => { if (!drag) return; const p = Kit.point(cv, e); drag.x = p.x; drag.y = p.y; if (Math.hypot(p.x - drag.sx, p.y - drag.sy) > 6) drag.moved = true; });
         cv.addEventListener("pointerup", (e) => {
@@ -207,7 +207,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         <section><h2>About Solitaire</h2><p>Classic Klondike solitaire, the card game everyone knows. Build four piles, one for each suit, from Ace up to King. In the seven columns you can stack cards in descending order with alternating red and black colours, and only a King can go in an empty column. Turn cards from the stock when you're stuck. Choose to draw one card at a time or three for a harder game. Undo as much as you like.</p></section>
         <section><h3>How to play</h3><table><tr><td>Drag</td><td>Move cards</td></tr><tr><td>Double-click / tap</td><td>Send a card to the best place</td></tr><tr><td>Space</td><td>Draw from the stock</td></tr><tr><td>Ctrl+Z</td><td>Undo</td></tr></table></section>
         <section><h3>Tips</h3><ul><li>Turning over face-down cards in the columns is usually the best move.</li><li>Don't rush to fill an empty column unless you have a King ready.</li><li>Move Aces and Twos to the foundations as soon as you can.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/SeaBattle/seabattle">Sea Battle</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Memory/memory">Memory Match</a><a href="/">All games →</a></div></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/SeaBattle/seabattle">Sea Battle</a><a href="/WordGuess/wordguess">Word Guess</a><a href="/RhythmTap/rhythmtap">Rhythm Tap</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>

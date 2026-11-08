@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="How well do you know the world? Name the country from its flag, find the right flag for a country, or match countries with their capital cities. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Flag Quiz · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.bigflag{height:150px;max-width:100%;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);margin:6px 0 4px}.smallflag{height:70px;border-radius:6px;margin-bottom:6px}.qtext{color:#9aa0c8;font-weight:700;margin:6px 0}.country{font:800 30px Inter,sans-serif;margin-bottom:12px}.ans{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.ans button{padding:15px 10px;border-radius:14px;border:1px solid #2a3060;background:#1e2347;color:#eef0ff;font:700 17px Inter,sans-serif;cursor:pointer}.ans button:hover{border-color:#7c5cff}.ans.flags button{padding:10px}.ans.flags img{height:80px;max-width:100%;border-radius:6px}.ans button.good{background:#1f7a4a;border-color:#2ee6a0}.ans button.bad{background:#5a1530;border-color:#ff4d8d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Flag <span>Quiz</span></h1>
+        <div class="stats"><div class="stat"><b id="q">1/10</b><small>Question</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="streak">0</b><small>Streak</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="frame" style="width:min(620px,100%);padding:22px;text-align:center;min-height:440px">
+            <div style="height:10px;background:#2a3060;border-radius:6px;overflow:hidden;margin-bottom:16px"><div id="bar" style="height:100%;width:100%;background:#2ee6c9"></div></div>
+            <div id="ask"></div><div id="answers" class="ans"></div><div id="fb" style="height:26px;margin-top:12px;font-weight:800"></div>
+            <div class="overlay" id="start"><div>
+                <h2>Flag Quiz</h2>
+                <p id="startText"><span class="seg" id="mode"><button data-m="flags">🏳️ Name the flag</button><button data-m="reverse">🔍 Find the flag</button><button data-m="capitals">🏛 Capitals</button></span><span class="seg" id="region"><button data-r="all">🌍 World</button><button data-r="europe">Europe</button><button data-r="asia">Asia</button><button data-r="americas">Americas</button><button data-r="africa">Africa</button></span>10 questions, 10 seconds each. Faster answers score more!</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div><div class="overlay hidden" id="over"><div>
+                <h2>Quiz Done!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Press 1–4 to answer with the keyboard. Get 3 right in a row to double your points!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const BEST = "flagBest", ROUND = 10, QTIME = 10;
+        // code | English name | capital | Hebrew name | Hebrew capital | region
+        const DATA = `il|Israel|Jerusalem|ישראל|ירושלים|asia
+        us|United States|Washington|ארצות הברית|וושינגטון|americas
+        gb|United Kingdom|London|בריטניה|לונדון|europe
+        fr|France|Paris|צרפת|פריז|europe
+        de|Germany|Berlin|גרמניה|ברלין|europe
+        it|Italy|Rome|איטליה|רומא|europe
+        es|Spain|Madrid|ספרד|מדריד|europe
+        pt|Portugal|Lisbon|פורטוגל|ליסבון|europe
+        nl|Netherlands|Amsterdam|הולנד|אמסטרדם|europe
+        be|Belgium|Brussels|בלגיה|בריסל|europe
+        ch|Switzerland|Bern|שווייץ|ברן|europe
+        at|Austria|Vienna|אוסטריה|וינה|europe
+        gr|Greece|Athens|יוון|אתונה|europe
+        se|Sweden|Stockholm|שוודיה|שטוקהולם|europe
+        no|Norway|Oslo|נורווגיה|אוסלו|europe
+        dk|Denmark|Copenhagen|דנמרק|קופנהגן|europe
+        fi|Finland|Helsinki|פינלנד|הלסינקי|europe
+        ie|Ireland|Dublin|אירלנד|דבלין|europe
+        pl|Poland|Warsaw|פולין|ורשה|europe
+        cz|Czechia|Prague|צ'כיה|פראג|europe
+        hu|Hungary|Budapest|הונגריה|בודפשט|europe
+        ro|Romania|Bucharest|רומניה|בוקרשט|europe
+        ua|Ukraine|Kyiv|אוקראינה|קייב|europe
+        tr|Turkey|Ankara|טורקיה|אנקרה|asia
+        hr|Croatia|Zagreb|קרואטיה|זאגרב|europe
+        is|Iceland|Reykjavik|איסלנד|רייקיאוויק|europe
+        cy|Cyprus|Nicosia|קפריסין|ניקוסיה|europe
+        ca|Canada|Ottawa|קנדה|אוטווה|americas
+        mx|Mexico|Mexico City|מקסיקו|מקסיקו סיטי|americas
+        br|Brazil|Brasilia|ברזיל|ברזיליה|americas
+        ar|Argentina|Buenos Aires|ארגנטינה|בואנוס איירס|americas
+        cl|Chile|Santiago|צ'ילה|סנטיאגו|americas
+        co|Colombia|Bogota|קולומביה|בוגוטה|americas
+        pe|Peru|Lima|פרו|לימה|americas
+        uy|Uruguay|Montevideo|אורוגוואי|מונטווידאו|americas
+        cu|Cuba|Havana|קובה|הוואנה|americas
+        jm|Jamaica|Kingston|ג'מייקה|קינגסטון|americas
+        cn|China|Beijing|סין|בייג'ינג|asia
+        jp|Japan|Tokyo|יפן|טוקיו|asia
+        kr|South Korea|Seoul|דרום קוריאה|סיאול|asia
+        in|India|New Delhi|הודו|ניו דלהי|asia
+        th|Thailand|Bangkok|תאילנד|בנגקוק|asia
+        vn|Vietnam|Hanoi|וייטנאם|האנוי|asia
+        ph|Philippines|Manila|הפיליפינים|מנילה|asia
+        id|Indonesia|Jakarta|אינדונזיה|ג'קרטה|asia
+        my|Malaysia|Kuala Lumpur|מלזיה|קואלה לומפור|asia
+        sg|Singapore|Singapore|סינגפור|סינגפור|asia
+        np|Nepal|Kathmandu|נפאל|קטמנדו|asia
+        ae|United Arab Emirates|Abu Dhabi|איחוד האמירויות|אבו דאבי|asia
+        jo|Jordan|Amman|ירדן|עמאן|asia
+        eg|Egypt|Cairo|מצרים|קהיר|africa
+        ma|Morocco|Rabat|מרוקו|רבאט|africa
+        za|South Africa|Pretoria|דרום אפריקה|פרטוריה|africa
+        ng|Nigeria|Abuja|ניגריה|אבוג'ה|africa
+        ke|Kenya|Nairobi|קניה|ניירובי|africa
+        et|Ethiopia|Addis Ababa|אתיופיה|אדיס אבבה|africa
+        gh|Ghana|Accra|גאנה|אקרה|africa
+        tz|Tanzania|Dodoma|טנזניה|דודומה|africa
+        sn|Senegal|Dakar|סנגל|דקאר|africa
+        au|Australia|Canberra|אוסטרליה|קנברה|oceania
+        nz|New Zealand|Wellington|ניו זילנד|ולינגטון|oceania
+        fj|Fiji|Suva|פיג'י|סובה|oceania`.split("\n").map((l) => l.trim()).map((l) => { const [code, en, cap, he, hecap, region] = l.split("|"); return { code, en, cap, he, hecap, region }; });
+        let mode = "flags", region = "all", qs, qi, score, streak, correct, left, timer = null, locked = false, isHe = false;
+        try { mode = localStorage.getItem("flagMode") || "flags"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        const nm = (c) => (isHe ? c.he : c.en), cp = (c) => (isHe ? c.hecap : c.cap);
+        const flag = (code) => `/flags/${code}.svg`;
+        function start() {
+            isHe = document.documentElement.lang === "he";
+            const pool = DATA.filter((c) => region === "all" || c.region === region).sort(() => Math.random() - 0.5);
+            qs = pool.slice(0, ROUND).map((c) => {
+                const others = DATA.filter((o) => o !== c && (region === "all" || o.region === region || Math.random() < 0.2)).sort(() => Math.random() - 0.5).slice(0, 3);
+                return { c, opts: [c, ...others].sort(() => Math.random() - 0.5) };
+            });
+            qs.forEach((q) => { const im = new Image(); im.src = flag(q.c.code); q.opts.forEach((o) => { const i2 = new Image(); i2.src = flag(o.code); }); });
+            qi = 0; score = 0; streak = 0; correct = 0; Kit.hide("start"); Kit.hide("over"); stats(); show();
+        }
+        function stats() { Kit.stat("score", score); Kit.stat("q", `${Math.min(qi + 1, ROUND)}/${ROUND}`); Kit.stat("streak", streak); }
+        function show() {
+            const q = qs[qi]; locked = false; left = QTIME; stats();
+            const ask = $("ask"), ans = $("answers");
+            if (mode === "flags") { ask.innerHTML = `<img src="${flag(q.c.code)}" alt="flag" class="bigflag"><p class="qtext">Which country's flag is this?</p>`; ans.className = "ans"; ans.innerHTML = q.opts.map((o, i) => `<button data-i="${i}">${nm(o)}</button>`).join(""); }
+            else if (mode === "reverse") { ask.innerHTML = `<p class="qtext">Which flag belongs to</p><div class="country">${nm(q.c)}?</div>`; ans.className = "ans flags"; ans.innerHTML = q.opts.map((o, i) => `<button data-i="${i}"><img src="${flag(o.code)}" alt=""></button>`).join(""); }
+            else { ask.innerHTML = `<img src="${flag(q.c.code)}" alt="" class="smallflag"><p class="qtext">What is the capital of</p><div class="country">${nm(q.c)}?</div>`; ans.className = "ans"; ans.innerHTML = q.opts.map((o, i) => `<button data-i="${i}">${cp(o)}</button>`).join(""); }
+            ans.querySelectorAll("button").forEach((b) => b.onclick = () => pick(+b.dataset.i));
+            clearInterval(timer); const t0 = performance.now();
+            timer = setInterval(() => { left = Math.max(0, QTIME - (performance.now() - t0) / 1000); $("bar").style.width = `${left / QTIME * 100}%`; $("bar").style.background = left < 3 ? "#ff4d8d" : ""; if (left <= 0) pick(-1); }, 50);
+        }
+        function pick(i) {
+            if (locked) return; locked = true; clearInterval(timer);
+            const q = qs[qi], right = q.opts.indexOf(q.c), btns = [...$("answers").querySelectorAll("button")];
+            btns[right].classList.add("good"); if (i >= 0 && i !== right) btns[i].classList.add("bad");
+            if (i === right) { streak++; correct++; const pts = Math.round(50 + left * 10) * (streak >= 3 ? 2 : 1); score += pts; $("fb").textContent = `+${pts}${streak >= 3 ? " 🔥" : ""}`; $("fb").style.color = "#2ee6a0"; beep(660 + streak * 40, 0.08, "triangle", 0.05); }
+            else { streak = 0; $("fb").textContent = i < 0 ? `Time's up! It's ${mode === "capitals" ? cp(q.c) : nm(q.c)}` : `It's ${mode === "capitals" ? cp(q.c) : nm(q.c)}`; $("fb").style.color = "#ff4d8d"; beep(160, 0.2, "sawtooth", 0.05); }
+            stats();
+            setTimeout(() => { $("fb").textContent = ""; qi++; if (qi >= ROUND) end(); else show(); }, i === right ? 700 : 1500);
+        }
+        function end() {
+            stats(); Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${correct} out of ${ROUND} correct<br>${score.toLocaleString()} points · best ${best.toLocaleString()}`;
+            if (correct >= 8) tune([523, 659, 784, 1047], 0.1, "triangle", 0.06); Kit.show("over");
+        }
+        document.querySelectorAll("#mode button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.m === mode);
+            b.onclick = () => { mode = b.dataset.m; try { localStorage.setItem("flagMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        document.querySelectorAll("#region button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.r === region);
+            b.onclick = () => { region = b.dataset.r; document.querySelectorAll("#region button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        addEventListener("keydown", (e) => { const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[e.code]; if (n !== undefined && qs && !locked) pick(n); if (e.code === "Enter" && !$("start").classList.contains("hidden")) start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { Kit.hide("over"); Kit.show("start"); };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Flag Quiz</h2><p>How well do you know the world? Name the country from its flag, find the right flag for a country, or match countries with their capital cities. Each round has ten questions with ten seconds each, and quicker answers score more points. Play the whole world or focus on one region such as Europe, Asia, the Americas or Africa. A great way to learn geography.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click an answer</td><td>Choose it</td></tr><tr><td>1 to 4</td><td>Answer with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Look at the colours and symbols. Many neighbouring countries have similar flags.</li><li>Answer quickly but carefully. Three right in a row doubles your points.</li><li>Practise one region at a time to learn it well.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/RhythmTap/rhythmtap">Rhythm Tap</a><a href="/PixelPaint/pixelpaint">Pixel Paint</a><a href="/Maze/maze">Maze Escape</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

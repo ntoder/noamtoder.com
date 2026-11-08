@@ -43,7 +43,16 @@ export const TARGETS = {
     checkers:     { easy: 1,    hard: 4,     unit: "wins in a row" },
     sudoku:       { easy: 800,  hard: 3000,  unit: "points" },
     solitaire:    { easy: 300,  hard: 1500,  unit: "points" },
-    seabattle:    { easy: 500,  hard: 1500,  unit: "points" }
+    seabattle:    { easy: 500,  hard: 1500,  unit: "points" },
+    castledefense:{ easy: 800,  hard: 2500,  unit: "points" },
+    wordguess:    { easy: 300,  hard: 1500,  unit: "points" },
+    wordsearch:   { easy: 300,  hard: 1500,  unit: "points" },
+    flagquiz:     { easy: 400,  hard: 1200,  unit: "points" },
+    rhythmtap:    { easy: 5000, hard: 30000, unit: "points" },
+    idlebakery:   { easy: 1000, hard: 100000, unit: "cupcakes" },
+    tankbattle:   { easy: 1000, hard: 5000,  unit: "points" },
+    fishing:      { easy: 200,  hard: 800,   unit: "points" },
+    maze:         { easy: 200,  hard: 800,   unit: "points" }
 };
 
 // ---------- Dates ----------

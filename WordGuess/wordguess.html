@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Guess the secret five-letter English word in six tries. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Word Guess · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#board{display:grid;gap:7px}.wr{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.wr.shake{animation:sh .35s}@keyframes sh{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}.wt{width:min(62px,15vw);height:min(62px,15vw);border:2px solid #2a3060;border-radius:10px;display:grid;place-items:center;font:800 min(30px,7vw) Inter,sans-serif;text-transform:uppercase;background:#12152b}.wt.filled{border-color:#9aa0c8;animation:pp .1s}@keyframes pp{50%{transform:scale(1.08)}}.wt.yes,.wt.near,.wt.no{animation:fl .45s both;border-color:transparent}.wt.yes{background:#1f9a55}.wt.near{background:#c9a01f}.wt.no{background:#3a3f5c}@keyframes fl{0%{transform:rotateX(0)}50%{transform:rotateX(90deg)}100%{transform:rotateX(0)}}#kb{display:flex;flex-direction:column;gap:6px;align-items:center;width:min(560px,100%)}#kb div{display:flex;gap:5px;width:100%;justify-content:center}#kb button{flex:1;max-width:46px;height:54px;border:0;border-radius:8px;background:#2a3060;color:#eef0ff;font:800 16px Inter,sans-serif;text-transform:uppercase;cursor:pointer;touch-action:manipulation}#kb button.wide{max-width:76px;flex:1.6;font-size:13px}#kb button.yes{background:#1f9a55}#kb button.near{background:#c9a01f}#kb button.no{background:#1a1d33;color:#5a5f80}#wmsg{position:absolute;left:50%;top:-6px;transform:translateX(-50%);background:#eef0ff;color:#0b0d1a;font-weight:800;padding:8px 14px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}#wmsg.show{opacity:1}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Word <span>Guess</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Points</small></div><div class="stat"><b id="streak">0</b><small>Streak</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center"><b id="mode" style="color:#9aa0c8"></b><button class="btn ghost" id="dailyBtn" style="padding:7px 12px;font-size:14px">📅 Today's word</button><button class="btn ghost" id="randomBtn" style="padding:7px 12px;font-size:14px">🎲 New word</button></div>
+            <div class="frame" style="padding:14px;background:transparent;border:0;box-shadow:none;overflow:visible"><div id="board"></div><div id="wmsg"></div>
+            <div class="overlay hidden" id="over" style="border-radius:16px"><div><h2>Nice!</h2><p id="overText"></p><button class="btn" id="againBtn">🎲 Next word</button></div></div></div>
+            <div id="kb"></div>
+        </div>
+    </div>
+    
+    <p class="hint">🟩 right letter in the right spot · 🟨 right letter, wrong spot · ⬛ not in the word. The words are in English!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const BEST = "wordBest";
+        // answers: common, kid-friendly words. guesses can be any word in this list.
+        const WORDS = ("apple about above actor adult after again agree ahead alarm album alert alike alive allow alone along angel anger angle angry ankle apron arena argue arise armor arrow aside asked audio award aware awful bacon badge bagel baker balls banjo basic basin batch beach beans beard beast begin being belly below bench berry bikes birds birth black blade blame blank blast blaze blend bless blind block bloom blown board boats bonus boost booth boots bored bossy brain brake brand brave bread break brick bride brief bring broad broke brook broom brown brush buddy build built bunch bunny burst cabin cable cache camel candy canoe cards cargo carry catch cause chain chair chalk champ charm chart chase cheap check cheek cheer chess chest chick chief child chill chirp chunk claim class clean clear clerk click cliff climb clock close cloth cloud clown coach coast cocoa coins comet comic coral couch cough count court cover crabs craft crane crash crawl crazy cream creek crisp crown crumb crust cubes curly curve cycle daily dairy daisy dance dared dates delay depth diary dizzy dodge doing donut doors dough draft drain drama drawn dream dress dried drift drill drink drive drops drums dryer ducks dusty eager eagle early earth eaten eight elbow empty enjoy enter equal error event every exact extra fable faces facts fairy faith false fancy farms feast fence ferry fetch fever field fifth fifty fight final first flags flame flash flock flood floor flour fluff fluid flute focus foggy force forty found frame fresh fries frogs front frost fruit fudge funny fuzzy games garden ghost giant gifts giver glass globe glove glows goals going goose grade grain grand grape grass gravy great green greet grill grins group grown guard guess guest guide habit hairy handy happy hatch heart heavy hello hills hippo hobby honey horse hotel house human humor hurry igloo image index input irony items ivory jeans jelly jewel joint joker jolly juice jumbo jumpy kayak kitty knees knife knock koala label laugh layer learn lemon level light lilac limit lions lived lodge lucky lunch magic major mango maple march match mayor meals means medal melon merry metal might mixed model money month moose motor mount mouse mouth movie muddy music nails names nanny nasty nerve never night ninja noble noise north notes novel nurse nutty ocean offer often olive onion opera orbit order otter outer owner paint panda pants paper party pasta patch peace peach pearl pedal penny perch piano picky piece pilot pinch pizza place plain plane plant plate plays plaza point polar porch power press price pride prize proud puppy purse queen quick quiet quilt quite radar radio rainy raise ranch range rapid reach ready relax reply rhyme rider ridge right rings river roads roast robin robot rocks rocky roles round route royal rugby ruler rusty sadly salad salty sandy sauce scale scarf scary scene scoop score scout sense seven shade shake shape share shark sharp sheep shelf shell shine shiny shirt shoes shore short shout sight silly skate skill skirt skunk slate sleep slice slide slime smart smell smile smoke snack snail snake sneak snowy solar solid solve sorry sound south space spare spark speak speed spell spend spice spicy spike spill spine spoon sport spray squad stack staff stage stair stamp stand stare stars start state steam steel stick still stone stool storm story stove straw strip stuck study stuff style sugar sunny super sweet swift swing sword table tacos taste teach teddy teeth thank theme thick thing think third three throw thumb tiger tired title toast today token tooth topic torch total touch tough towel tower toys track trade trail train treat trees trend trick truck truly trunk trust truth tulip tuned twins uncle under unity until upset urban usual vapor video visit vital vivid voice wagon waste watch water waves weird whale wheat wheel where white whole windy witch woman world worry worth would wrist write wrong yacht yards yearn yeast young yummy zebra").split(" ");
+        const ANSWERS = WORDS.filter((w) => w.length === 5);
+        let answer, row, guesses, cur, over, streak = 0, points = 0, daily = false, keyState = {};
+        try { streak = +localStorage.getItem("wordStreak") || 0; points = +localStorage.getItem("wordPoints") || 0; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function dayWord() { const d = new Date(), n = d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate(); let h = n * 2654435761 % 4294967296; return ANSWERS[h % ANSWERS.length]; }
+        function newGame(isDaily) {
+            daily = !!isDaily; answer = daily ? dayWord() : Kit.pick(ANSWERS); row = 0; guesses = []; cur = ""; over = false; keyState = {};
+            $("mode").textContent = daily ? "📅 Today's word" : "🎲 Random word";
+            render(); Kit.hide("over"); stats();
+        }
+        function stats() { Kit.stat("score", points); Kit.stat("streak", streak); }
+        function render() {
+            const g = $("board"); g.innerHTML = "";
+            for (let r = 0; r < 6; r++) {
+                const word = r < guesses.length ? guesses[r].w : r === row ? cur : "";
+                const res = r < guesses.length ? guesses[r].res : null;
+                const div = document.createElement("div"); div.className = "wr" + (r === row && $("board").dataset.shake === "1" ? " shake" : "");
+                for (let i = 0; i < 5; i++) { const c = document.createElement("div"); c.className = "wt" + (res ? " " + res[i] : word[i] ? " filled" : ""); if (res) c.style.animationDelay = `${i * 0.12}s`; c.textContent = word[i] || ""; div.appendChild(c); }
+                g.appendChild(div);
+            }
+            document.querySelectorAll("#kb button[data-k]").forEach((b) => { b.className = keyState[b.dataset.k] || ""; });
+        }
+        function score(w) {
+            const res = Array(5).fill("no"), left = {};
+            for (let i = 0; i < 5; i++) { if (w[i] === answer[i]) res[i] = "yes"; else left[answer[i]] = (left[answer[i]] || 0) + 1; }
+            for (let i = 0; i < 5; i++) if (res[i] !== "yes" && left[w[i]]) { res[i] = "near"; left[w[i]]--; }
+            return res;
+        }
+        function shake(msg) { toast(msg); $("board").dataset.shake = "1"; render(); setTimeout(() => { $("board").dataset.shake = "0"; }, 400); beep(150, 0.1, "square", 0.04); }
+        function toast(s) { const el = $("wmsg"); el.textContent = s; el.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 1500); }
+        function submit() {
+            if (over) return;
+            if (cur.length < 5) return shake("Not enough letters");
+            if (!WORDS.includes(cur)) return shake("Not in the word list");
+            const res = score(cur); guesses.push({ w: cur, res });
+            const rank = { no: 1, near: 2, yes: 3 };
+            for (let i = 0; i < 5; i++) { const k = cur[i]; if (!keyState[k] || rank[res[i]] > rank[keyState[k]]) keyState[k] = res[i]; }
+            res.forEach((r, i) => setTimeout(() => beep(r === "yes" ? 880 : r === "near" ? 660 : 330, 0.06, "triangle", 0.04), i * 120));
+            const won = cur === answer; cur = ""; row++; render();
+            if (won) {
+                over = true; streak++; const pts = (7 - guesses.length) * 100 + (streak > 1 ? streak * 20 : 0); points += pts;
+                Kit.save(points); Kit.setBest(BEST, points); save(); stats();
+                setTimeout(() => { tune([523, 659, 784, 1047], 0.09, "triangle", 0.05); end(`🎉 ${["Genius!", "Amazing!", "Great!", "Nice!", "Good!", "Phew!"][guesses.length - 1]}`, `You got it in ${guesses.length}! +${pts} points<br>Win streak: ${streak} · streak points: ${points}`); }, 800);
+            } else if (row >= 6) {
+                over = true; const lost = points; streak = 0; points = 0; save(); stats();
+                setTimeout(() => { beep(160, 0.4, "sawtooth", 0.05, -60); end("So close!", `The word was <b>${answer.toUpperCase()}</b><br>Your streak points were ${lost}.`); }, 800);
+            }
+        }
+        function save() { try { localStorage.setItem("wordStreak", streak); localStorage.setItem("wordPoints", points); } catch (e) {} }
+        function end(title, text) { document.querySelector("#over h2").textContent = title; $("overText").innerHTML = text; Kit.show("over"); }
+        function key(k) {
+            if (over) return;
+            if (k === "enter") return submit();
+            if (k === "back") { cur = cur.slice(0, -1); return render(); }
+            if (/^[a-z]$/.test(k) && cur.length < 5) { cur += k; beep(600, 0.02, "triangle", 0.02); render(); }
+        }
+        // on-screen keyboard
+        const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+        $("kb").innerHTML = ROWS.map((r, i) => `<div>${i === 2 ? '<button data-act="enter" class="wide">Enter</button>' : ""}${r.split("").map((c) => `<button data-k="${c}">${c}</button>`).join("")}${i === 2 ? '<button data-act="back" class="wide">⌫</button>' : ""}</div>`).join("");
+        $("kb").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; key(b.dataset.k || b.dataset.act); });
+        addEventListener("keydown", (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === "Enter") { e.preventDefault(); if (over && !$("over").classList.contains("hidden")) return newGame(false); key("enter"); }
+            else if (e.key === "Backspace") key("back");
+            else if (/^[a-zA-Z]$/.test(e.key)) key(e.key.toLowerCase());
+        });
+        $("againBtn").onclick = () => newGame(false);
+        $("dailyBtn").onclick = () => newGame(true);
+        $("randomBtn").onclick = () => newGame(false);
+        newGame(false);
+        if (window.__test) window.__test.wg = () => answer;
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Word Guess</h2><p>Guess the secret five-letter English word in six tries. After each guess the letters change colour: green means the letter is in the right place, yellow means it's in the word but somewhere else, and grey means it isn't in the word at all. Use the clues to narrow it down. Play today's word, which is the same for everyone, or as many random words as you like, and build a winning streak.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Type or tap letters</td><td>Spell your guess</td></tr><tr><td>Enter</td><td>Check your guess</td></tr><tr><td>Backspace</td><td>Delete a letter</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Start with a word that has lots of different common letters, like CRANE or SLATE.</li><li>Don't reuse grey letters. They aren't in the word.</li><li>Remember a yellow letter must move to a different spot.</li></ul></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/WordSearch/wordsearch">Word Search</a><a href="/RhythmTap/rhythmtap">Rhythm Tap</a><a href="/TankBattle/tankbattle">Tank Battle</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
