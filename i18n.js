@@ -31,7 +31,7 @@ const NAMES = {
     "Idle Bakery": "המאפייה", "Pixel Paint": "ציור פיקסלים", "Tank Battle": "קרב טנקים", "Fishing Frenzy": "טירוף דיג", "Maze Escape": "בריחה מהמבוך"
 };
 const gn = (n) => NAMES[n] || n;
-const UNITS = { points: "נקודות", pipes: "צינורות", goals: "גולים" };
+const UNITS = { points: "נקודות", pipes: "צינורות", goals: "גולים", blocks: "קומות", rounds: "סיבובים", "wins in a row": "ניצחונות ברצף", cupcakes: "קאפקייקס" };
 
 // ---------- Whole sentences (matched on an element's full text, so word order can change) ----------
 const BLOCKS = {
@@ -150,6 +150,27 @@ const TEXT = {
     "Sharp memory": "זיכרון חד", "Score 700 in Memory Match": "700 נקודות במשחק הזיכרון", "Daily player": "שחקן יומי", "Finish a daily challenge": "סיימו אתגר יומי",
     "On a roll": "ברצף", "Finish daily challenges 3 days in a row": "סיימו אתגר יומי 3 ימים ברצף", "Week warrior": "לוחם השבוע", "Finish daily challenges 7 days in a row": "סיימו אתגר יומי 7 ימים ברצף",
     "Supporter": "תומך", "Get Premium": "קבלו פרימיום",
+    // new achievements
+    "Globetrotter": "מטייל עולמי", "Play 25 different games": "שחקו ב־25 משחקים שונים", "Hub legend": "אגדת האתר", "Play 1,000 games in total": "שחקו 1,000 משחקים בסך הכול",
+    "Sports fan": "אוהד ספורט", "Play 8 sports games": "שחקו ב־8 משחקי ספורט", "Puzzle lover": "חובב פאזלים", "Play 8 puzzle games": "שחקו ב־8 משחקי פאזל",
+    "Word nerd": "חובב מילים", "Play every word game": "שחקו בכל משחקי המילים", "Artist": "אמן", "Make a picture in Pixel Paint": "ציירו תמונה בצייר הפיקסלים",
+    "Level 5": "רמה 5", "Reach level 5": "הגיעו לרמה 5", "Level 10": "רמה 10", "Reach level 10": "הגיעו לרמה 10", "Level 20": "רמה 20", "Reach level 20": "הגיעו לרמה 20",
+    "All-rounder": "שחקן רב־גוני", "Reach a daily-challenge score in 10 games": "הגיעו לניקוד של אתגר יומי ב־10 משחקים", "Superstar": "סופרסטאר",
+    "Reach a daily-challenge score in 25 games": "הגיעו לניקוד של אתגר יומי ב־25 משחקים", "Grand master": "רב־אמן", "Reach expert scores in 15 games": "הגיעו לניקוד של מומחה ב־15 משחקים",
+    "Regular": "קבוע", "Finish 10 daily challenges": "סיימו 10 אתגרים יומיים", "Month master": "אלוף החודש", "Finish daily challenges 30 days in a row": "סיימו אתגר יומי 30 ימים ברצף",
+    "New look": "לוק חדש", "Pick an avatar on your profile": "בחרו אווטאר בפרופיל", "Collector": "אספן", "Add 5 games to your favorites": "הוסיפו 5 משחקים למועדפים",
+    "Critic": "מבקר", "Rate a game": "דרגו משחק", "Top critic": "מבקר בכיר", "Rate 10 games": "דרגו 10 משחקים", "Say hello": "תגידו שלום", "Write a comment on a game": "כתבו תגובה על משחק",
+    "Online!": "אונליין!", "Play an online game with a friend": "שחקו משחק אונליין עם חבר", "First online win": "ניצחון אונליין ראשון", "Win an online game": "נצחו במשחק אונליין",
+    "Online champion": "אלוף האונליין", "Win 10 online games": "נצחו ב־10 משחקי אונליין", "Always online": "תמיד אונליין", "Play 25 online games": "שחקו 25 משחקי אונליין",
+    "Reach an expert score in any game to earn its master badge.": "הגיעו לניקוד של מומחה במשחק כלשהו כדי לקבל את תג האלוף שלו.", "Show all game masters": "הצגת כל תגי האלופים",
+    // profile + player pages
+    "👁️ View my public page": "👁️ העמוד הציבורי שלי", "Keep my profile private": "הפרופיל שלי פרטי", "Pick an avatar": "בחירת אווטאר", "Avatar saved": "האווטאר נשמר",
+    "Your profile is private now": "הפרופיל שלך פרטי עכשיו", "Your profile is public now": "הפרופיל שלך ציבורי עכשיו", "Photo": "תמונה",
+    "Loading player…": "טוען שחקן…", "We couldn't find that player.": "לא מצאנו את השחקן הזה.", "This player keeps their profile private.": "השחקן הזה שומר את הפרופיל שלו פרטי.",
+    "Achievements": "הישגים", "Online wins": "ניצחונות אונליין", "🎮 Favourite games": "🎮 משחקים אהובים", "No achievements yet.": "עדיין אין הישגים.", "No games played yet.": "עדיין לא שיחק.",
+    "👤 My profile": "👤 הפרופיל שלי", "(you)": "(את/ה)", "LEVEL": "רמה",
+    // homepage
+    "Sort: Featured": "מיון: מומלצים", "⭐ Top rated": "⭐ הכי מדורגים", "🔥 Most popular": "🔥 הכי פופולריים", "🆕 Newest": "🆕 הכי חדשים", "🔤 A to Z": "🔤 לפי א״ב", "Sort games": "מיון משחקים", "Clear": "ניקוי",
     // premium
     "← Games": "→ משחקים", "👤 Profile": "👤 פרופיל", "Go Premium": "עוברים לפרימיום", "One payment. Yours forever.": "תשלום אחד. שלך לתמיד.", "lifetime": "לכל החיים",
     "Pay once · no subscription": "משלמים פעם אחת · בלי מנוי", "🎟️ Have a Premium code?": "🎟️ יש לכם קוד פרימיום?", "Type it in to switch on Premium straight away.": "הקלידו אותו ופרימיום יופעל מיד.",
@@ -276,7 +297,11 @@ Object.assign(TEXT, INFO, NAMES);
 
 // ---------- Text with numbers in it ----------
 const PATTERNS = [
-    [/^Score ([\d,]+) (points|pipes|goals) in (.+)$/, (m, n, u, g) => `השיגו ${n} ${UNITS[u]} ב${gn(g)}`],
+    [/^Score ([\d,]+) (points|pipes|goals|blocks|rounds|wins in a row|cupcakes) in (.+)$/, (m, n, u, g) => `השיגו ${n} ${UNITS[u]} ב${gn(g)}`],
+    [/^(.+) master$/, (m, g) => `אלוף ${gn(g)}`],
+    [/^(🎮 Playing|⭐ Skill|📅 Daily|💬 Social|🌐 Online|👑 Game masters) · (\d+) of (\d+)$/, (m, c, a, b) => `${{ "🎮 Playing": "🎮 משחק", "⭐ Skill": "⭐ מיומנות", "📅 Daily": "📅 יומי", "💬 Social": "💬 חברתי", "🌐 Online": "🌐 אונליין", "👑 Game masters": "👑 אלופי משחקים" }[c]} · ${a} מתוך ${b}`],
+    [/^([\d,]+) XP$/, (m, n) => `${n} XP`],
+    [/^(\d+) plays?$/, (m, n) => `${n} משחקים`],
     [/^score ([\d,]+) (points|pipes|goals) in (.+)$/, (m, n, u, g) => `השיגו ${n} ${UNITS[u]} ב${gn(g)}`],
     [/^Finish it today for \+40 XP and keep your streak going\.$/, () => "סיימו היום וקבלו 40+ XP, ותשמרו על הרצף."],
     [/^✅ Done for today! A new challenge comes tomorrow\.$/, () => "✅ סיימתם להיום! מחר יש אתגר חדש."],

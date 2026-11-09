@@ -43,7 +43,10 @@ service cloud.firestore {
       // in the same batch (see /codes below).
       allow update: if isAdmin()
         || (signedIn() && request.auth.uid == uid
-            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys()))
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
+            // the comment timer can only be set to "now" (stops people skipping the wait)
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastCommentAt'])
+                || request.resource.data.lastCommentAt == request.time))
         || (signedIn() && request.auth.uid == uid
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['premium', 'premiumSince', 'redeemedCode'])
@@ -75,7 +78,8 @@ service cloud.firestore {
     // Anyone can read. Players write only their own entry, with their real profile name.
     function validEntry(uid) {
       return signedIn() && request.auth.uid == uid && notBanned()
-        && request.resource.data.keys().hasOnly(['name', 'best', 'premium', 'frame', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'avatar', 'best', 'premium', 'frame', 'updatedAt'])
+        && (!('avatar' in request.resource.data) || request.resource.data.avatar == me().get('avatar', ''))
         && request.resource.data.best is number
         && request.resource.data.best >= 0 && request.resource.data.best < 100000000
         && request.resource.data.name == me().name
@@ -110,6 +114,101 @@ service cloud.firestore {
     match /settings/{doc} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Public player pages: players/{uid}. Anyone can look; you only write your own, with your real name.
+    match /players/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid && notBanned()
+        && request.resource.data.keys().hasOnly(['name', 'avatar', 'premium', 'frame', 'level', 'xp', 'ach', 'top', 'played', 'onlineWins', 'since', 'private', 'updatedAt'])
+        && request.resource.data.name == me().name
+        && request.resource.data.premium == isPremiumUser()
+        && request.resource.data.get('avatar', '') == me().get('avatar', '')
+        && request.resource.data.get('level', 1) is int && request.resource.data.get('level', 1) < 1000
+        && request.resource.data.get('ach', []).size() <= 200
+        && request.resource.data.get('top', []).size() <= 8
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    // Star ratings: ratings/{game}/votes/{uid} = { stars: 1..5 }
+    match /ratings/{game}/votes/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid && notBanned()
+        && request.resource.data.keys().hasOnly(['stars', 'updatedAt'])
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
+    // Comments: comments/{game}/posts/{id}. One comment every 30 seconds, max 300 characters.
+    match /comments/{game}/posts/{id} {
+      allow read: if true;
+      allow create: if signedIn() && notBanned()
+        && get(/databases/$(database)/documents/settings/site).data.get('commentsOff', false) != true
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'avatar', 'premium', 'text', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name == me().name
+        && request.resource.data.avatar == me().get('avatar', '')
+        && request.resource.data.premium == isPremiumUser()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 2 && request.resource.data.text.size() <= 300
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt == request.time
+        && (me().get('lastCommentAt', null) == null || me().lastCommentAt < request.time - duration.value(30, 's'));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+    match /{path=**}/posts/{id} {
+      allow read: if true;
+    }
+
+    // Reports of rude comments: players can file them, only the admin reads them
+    match /reports/{id} {
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['game', 'post', 'by', 'createdAt'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow read, delete: if isAdmin();
+    }
+
+    // Homepage numbers (ratings + player counts), rebuilt by the admin's browser
+    match /stats/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Online game rooms: rooms/{CODE}
+    function inRoom() {
+      return request.auth.uid == resource.data.host.uid
+        || (resource.data.guest != null && request.auth.uid == resource.data.guest.uid);
+    }
+    match /rooms/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && notBanned()
+        && code.matches('^[A-Z0-9]{5}$')
+        && request.resource.data.host.uid == request.auth.uid
+        && request.resource.data.guest == null
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.moves.size() == 0
+        && request.resource.data.game is string;
+      // join an open room as the guest
+      allow update: if signedIn() && notBanned()
+        && resource.data.guest == null && resource.data.status == 'waiting'
+        && request.auth.uid != resource.data.host.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest', 'status', 'updatedAt'])
+        && request.resource.data.guest.uid == request.auth.uid
+        && request.resource.data.status == 'playing';
+      // the two players play: moves, results, rematches, emojis, leaving
+      allow update: if signedIn() && inRoom()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moves', 'result', 'score', 'rematch', 'round', 'emote', 'status', 'leftBy', 'updatedAt'])
+        && request.resource.data.host == resource.data.host
+        && request.resource.data.guest == resource.data.guest
+        && request.resource.data.game == resource.data.game
+        && request.resource.data.moves.size() <= resource.data.moves.size() + 1
+        && request.resource.data.moves.size() <= 600
+        && request.resource.data.status in ['playing', 'left'];
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.host.uid);
     }
 
     // Everything else is locked by default

@@ -9,6 +9,16 @@
   const av = (emoji, id, big) => `<span class="nc-av${big ? ' big' : ''}" style="--h:${hue(id)}">${esc(emoji || '🙂')}</span>`;
   const time = (t) => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (n - d < 6 * 864e5 ? d.toLocaleDateString([], { weekday: 'short' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short' })); };
   const ago = (t) => { if (!t) return 'not seen yet'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+  // 🎮 play a game together: the invite is a normal message with a join link, shown here as a game card
+  const PLAY = [['TicTacToe/tictactoe', '❌', 'Tic-Tac-Toe'], ['FourInARow/fourinarow', '🟡', 'Four in a Row'], ['Checkers/checkers', '⚪', 'Checkers'], ['Chess/chess', '♟️', 'Chess']];
+  const SITE = /^https?:$/.test(location.protocol) ? location.origin : 'https://noamtoder.com';
+  const GAME_RE = /^🎮 [^\n]*?(https?:\/\/[^\s/]+\/(TicTacToe|FourInARow|Checkers|Chess)\/\w+\?room=([A-Z0-9]{5}))\s*$/;
+  function gameCard(m, mine) {
+    const g = m.text && m.text.match(GAME_RE); if (!g) return '';
+    const p = PLAY.find((x) => x[0].startsWith(g[2] + '/')); if (!p) return '';
+    const url = mine ? g[1].replace('?room=', '?host=') : g[1];
+    return `<div class="nc-game"><span class="ic">${p[1]}</span><span class="tx"><b>${esc(p[2])}</b><small>${mine ? 'You invited them to play' : 'Wants to play with you!'} · ${esc(g[3])}</small></span><button class="btn primary" data-url="${esc(url)}">▶ ${mine ? 'Open' : 'Join'}</button></div>`;
+  }
   const linkify = (s) => esc(s).replace(/\bhttps?:\/\/[^\s<]+[^\s<.,;:!?)"'\]]/g, (u) => `<a href="#" data-url="${u}">${u}</a>`).replace(/\n/g, '<br>');
   let body = null, view = { tab: 'chats', screen: 'list', key: null }, flash = '';
 
@@ -170,13 +180,13 @@
       if (day !== lastDay) { lastDay = day; sep = `<div class="nc-day">${new Date(m.t).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</div>`; }
       const tick = mine && !isG ? `<i class="nc-tick ${m.status}" title="${{ pending: 'Waiting to send (they’re offline)', sent: 'Sent', delivered: 'Delivered', read: 'Read' }[m.status] || ''}">${m.status === 'pending' ? '🕓' : m.status === 'sent' ? '✓' : '✓✓'}</i>` : '';
       const who = isG && !mine ? `<span class="nc-who" style="--h:${hue(m.from)}">${esc(m.fromEmoji || '')} ${esc(m.fromName || 'Someone')}</span>` : '';
-      const inner = (m.img ? `<img class="nc-img" src="${esc(m.img)}" alt="photo">` : '') + (m.share ? `<a href="#" class="nc-share" data-url="${esc(m.share.url)}"><b>🔗 ${esc(m.share.title || m.share.url)}</b><small>${esc(m.share.url.replace(/^https?:\/\//, '').slice(0, 60))}</small></a>` : '') + (m.ginv ? `<div class="nc-ginv">${esc(m.ginv.e)} <b>${esc(m.ginv.n)}</b><button class="btn primary" data-join='${esc(JSON.stringify(m.ginv))}'>${D.groups[m.ginv.g] ? 'Open' : 'Join group'}</button></div>` : '') + (m.text && !(m.ginv && /^Join my group/.test(m.text)) ? `<div class="nc-text">${linkify(m.text)}</div>` : '');
+      const inner = (m.img ? `<img class="nc-img" src="${esc(m.img)}" alt="photo">` : '') + (m.share ? `<a href="#" class="nc-share" data-url="${esc(m.share.url)}"><b>🔗 ${esc(m.share.title || m.share.url)}</b><small>${esc(m.share.url.replace(/^https?:\/\//, '').slice(0, 60))}</small></a>` : '') + (m.ginv ? `<div class="nc-ginv">${esc(m.ginv.e)} <b>${esc(m.ginv.n)}</b><button class="btn primary" data-join='${esc(JSON.stringify(m.ginv))}'>${D.groups[m.ginv.g] ? 'Open' : 'Join group'}</button></div>` : '') + (gameCard(m, mine) || (m.text && !(m.ginv && /^Join my group/.test(m.text)) ? `<div class="nc-text">${linkify(m.text)}</div>` : ''));
       return `${sep}<div class="nc-msg ${mine ? 'mine' : ''}" data-id="${m.id}">${who}<div class="nc-bub">${inner}<span class="nc-time">${new Date(m.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${tick}</span></div></div>`;
     }).join('');
     main.innerHTML = `<div class="nc-bar nc-convbar"><button class="nc-ib" id="nc-back" title="Back">‹</button>${av(isG ? g.emoji : f.emoji, isG ? g.gid : f.id)}<span class="nc-ttl"><b>${esc(isG ? g.name : f.name)}</b><small>${status}</small></span><button class="nc-ib" id="nc-more" title="More">⋯</button></div>
       <div class="nc-msgs" id="nc-msgs">${msgs || `<div class="nc-empty small"><div>${isG ? g.emoji : '👋'}</div>${isG ? 'Messages here go to everyone in the group.' : f.status === 'pending' ? `When ${esc(f.name)} accepts, you can chat. You can write now: it’ll be delivered then.` : `Say hi to ${esc(f.name)}!`}</div>`}</div>
       <div class="nc-emo" id="nc-emo" hidden>${QUICK.map((e) => `<button>${e}</button>`).join('')}</div>
-      <div class="nc-comp"><button class="nc-cb" id="nc-emob" title="Emoji">😊</button><button class="nc-cb" id="nc-imgb" title="Send a photo">📷</button><button class="nc-cb" id="nc-tabb" title="Share the page you’re on">🔗</button>
+      <div class="nc-comp"><button class="nc-cb" id="nc-emob" title="Emoji">😊</button><button class="nc-cb" id="nc-imgb" title="Send a photo">📷</button><button class="nc-cb" id="nc-tabb" title="Share the page you’re on">🔗</button><button class="nc-cb" id="nc-playb" title="Play a game together">🎮</button>
         <textarea id="nc-text" rows="1" placeholder="Message${isG ? ' the group' : ''}…" maxlength="8000"></textarea><button class="nc-send" id="nc-send" title="Send (Enter)">➤</button><input type="file" id="nc-file" accept="image/*" hidden></div>`;
     const list = main.querySelector('#nc-msgs'); list.scrollTop = list.scrollHeight;
     main.querySelector('#nc-back').onclick = () => go('list');
@@ -193,6 +203,17 @@
     main.querySelectorAll('#nc-emo button').forEach((b) => (b.onclick = () => { const s = ta.selectionStart || ta.value.length; ta.value = ta.value.slice(0, s) + b.textContent + ta.value.slice(s); draft[key] = ta.value; ta.focus(); }));
     main.querySelector('#nc-imgb').onclick = () => main.querySelector('#nc-file').click();
     main.querySelector('#nc-file').onchange = (e) => { const file = e.target.files[0]; if (file) sendImage(key, file); };
+    main.querySelector('#nc-playb').onclick = async (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const a = await popup(PLAY.map(([id, ic, n]) => ({ id, label: `${ic} ${n}` })), r.left, r.top - 8);
+      const p = PLAY.find((x) => x[0] === a); if (!p) return;
+      const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const code = Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => ABC[b % ABC.length]).join('');
+      const url = `${SITE}/${p[0]}?room=${code}`;
+      newTab({ url: url.replace('?room=', '?host=') });            // your game opens and waits for your friend
+      await C.sendTo(key, { text: `🎮 Let's play ${p[2]}! Join me here: ${url}` });
+      toast(`🎮 Invite sent. ${p[2]} opened in a new tab`);
+    };
     main.querySelector('#nc-tabb').onclick = () => { const t = state.active; if (!t || !/^https?:/.test(t.url || '') || t.private) { toast('Open a web page first, then share it'); return; } C.sendTo(key, { share: { url: t.url, title: t.title } }); };
     list.querySelectorAll('[data-url]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); newTab({ url: a.dataset.url }); }));
     list.querySelectorAll('.nc-img').forEach((img) => (img.onclick = () => lightbox(img.src)));

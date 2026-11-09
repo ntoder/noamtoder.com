@@ -1,5 +1,8 @@
 // Hebrew for the game pages (loaded only on game pages when Hebrew is on)
 export const TEXT = {
+    // online play
+    "🌐 Online": "🌐 אונליין", "Friend's turn…": "התור של החבר…", "Your friend wins": "החבר ניצח", "Your move": "המהלך שלכם", "Friend's move…": "המהלך של החבר…",
+    "Your turn (X)": "התור שלכם (X)", "Your turn (O)": "התור שלכם (O)", "Your turn (🟡)": "התור שלכם (🟡)", "Your turn (🔴)": "התור שלכם (🔴)",
     // ---- shared ----
     "Points": "נקודות", "Time": "זמן", "Round": "סיבוב", "Combo": "קומבו", "Streak": "רצף", "Height": "גובה", "Mines": "מוקשים", "Status": "מצב",
     "Length": "אורך", "Pipes": "צינורות", "Most goals": "הכי הרבה גולים", "Win streak": "רצף ניצחונות", "Best streak": "הרצף הכי טוב", "Draws": "תיקו",
@@ -634,6 +637,7 @@ const SHIP = { Carrier: "נושאת המטוסים", Battleship: "ספינת ה�
 
 // Text with numbers in it (each line of a message is matched on its own)
 export const PATTERNS = [
+    [/^(🏆 You win! |Your friend wins\. )(White|Black) wins by checkmate!$/, (m, w, c) => `${w.startsWith("🏆") ? "🏆 ניצחתם! " : "החבר ניצח. "}מט! ${c === "White" ? "הלבן" : "השחור"} ניצח!`],
     [/^Score ([\d,]+) · length (\d+)$/, (m, a, b) => `ניקוד ${a} · אורך ${b}`],
     [/^Score ([\d,]+) · (\d+) lines · level (\d+)$/, (m, a, b, c) => `ניקוד ${a} · ${b} שורות · שלב ${c}`],
     [/^Score ([\d,]+) · round (\d+)$/, (m, a, b) => `ניקוד ${a} · סיבוב ${b}`],

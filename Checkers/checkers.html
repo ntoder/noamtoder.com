@@ -25,7 +25,7 @@
             <canvas id="c" width="560" height="560"></canvas>
             <div class="overlay" id="start"><div>
                 <h2>Checkers</h2>
-                <p id="startText"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="normal">🤖 Normal</button><button data-m="hard">🤖 Hard</button><button data-m="2p">👥 2 Players</button></span>You play white from the bottom. Click a piece, then click where to move.<br>Capture by jumping over the computer's pieces. Take them all to win!</p>
+                <p id="startText"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="normal">🤖 Normal</button><button data-m="hard">🤖 Hard</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span>You play white from the bottom. Click a piece, then click where to move.<br>Capture by jumping over the computer's pieces. Take them all to win!</p>
                 <button class="btn" id="startBtn">▶ Play</button>
             </div></div>
             <div class="overlay hidden" id="over"><div>
@@ -50,6 +50,11 @@
         let board, turn, mode = "normal", sel = -1, opts = [], last = null, over = false, thinking = false, anim = null, streak = 0, t = 0, fx = Kit.particles(), history = [];
         try { mode = localStorage.getItem("checkersMode") || "normal"; streak = +localStorage.getItem("checkersStreak") || 0; } catch (e) {}
         Kit.stat("best", Kit.best(BEST)); Kit.stat("score", streak);
+        const net = Kit.net, online = () => mode === "online";
+        let prevMode = mode === "online" ? "normal" : mode;
+        const flip = () => online() && net.mySide === -1;            // red sees the board from its own side
+        const vi = (i) => (flip() ? 63 - i : i);                       // board square <-> screen square
+        const canAct = () => !over && !anim && (online() ? net.myTurn() : !thinking && (mode === "2p" || turn === 1));
         const rc = (i) => [i >> 3, i & 7], at = (r, c) => (r >= 0 && r < 8 && c >= 0 && c < 8 ? r * 8 + c : -1);
         function initial() { const b = Array(64).fill(0); for (let i = 0; i < 64; i++) { const [r, c] = rc(i); if ((r + c) % 2) { if (r < 3) b[i] = -1; if (r > 4) b[i] = 1; } } return b; }
         const side = (v) => Math.sign(v);
@@ -111,9 +116,9 @@
         }
         function reset() { board = initial(); turn = 1; sel = -1; opts = []; last = null; over = false; thinking = false; anim = null; history = []; status(); }
         function status() {
-            const who = turn === 1 ? (mode === "2p" ? "⚪ White's turn" : "Your turn") : mode === "2p" ? "🔴 Red's turn" : "🤔 Computer is thinking…";
+            const who = online() ? (turn === net.mySide ? "Your turn" : "Friend's turn…") : turn === 1 ? (mode === "2p" ? "⚪ White's turn" : "Your turn") : mode === "2p" ? "🔴 Red's turn" : "🤔 Computer is thinking…";
             const must = !over && moves(board, turn).some((m) => m.caps.length);
-            $("status").textContent = over ? "" : who + (must && (mode === "2p" || turn === 1) ? " · you must jump!" : "");
+            $("status").textContent = over ? "" : who + (must && canAct() ? " · you must jump!" : "");
             const cnt = (s) => board.filter((v) => side(v) === s).length;
             $("left").textContent = `⚪ ${cnt(1)}  ·  🔴 ${cnt(-1)}`;
         }
@@ -127,10 +132,16 @@
             turn = -turn;
             if (!moves(board, turn).length) return finish(-turn);
             status();
-            if (mode !== "2p" && turn === -1) { thinking = true; status(); setTimeout(() => { const mv = cpuMove(); thinking = false; play(mv); }, 250); }
+            if (mode !== "2p" && !online() && turn === -1) { thinking = true; status(); setTimeout(() => { const mv = cpuMove(); thinking = false; play(mv); }, 250); }
         }
         function finish(winner) {
             over = true; let msg;
+            if (online()) {
+                net.over(winner);
+                if (winner === net.mySide) tune([523, 659, 784, 1047], 0.1, "triangle", 0.06); else beep(160, 0.4, "sawtooth", 0.05, -60);
+                status(); $("status").textContent = winner === net.mySide ? "🏆 You win!" : "Your friend wins";
+                return;
+            }
             if (mode === "2p") msg = winner === 1 ? "⚪ White wins!" : "🔴 Red wins!";
             else if (winner === 1) { streak++; msg = `🏆 You win! Win streak: ${streak}`; Kit.save(streak); Kit.setBest(BEST, streak); tune([523, 659, 784, 1047], 0.1, "triangle", 0.06); }
             else { msg = `The computer wins. Your streak was ${streak}.`; streak = 0; beep(160, 0.4, "sawtooth", 0.05, -60); }
@@ -148,14 +159,14 @@
         }
         function draw() {
             for (let i = 0; i < 64; i++) { const [r, c] = rc(i); ctx.fillStyle = (r + c) % 2 ? "#5a3fd8" : "#e8e4ff"; ctx.fillRect(c * S, r * S, S, S); }
-            if (last) for (const sq of [last.from, last.path[last.path.length - 1]]) { const [r, c] = rc(sq); ctx.fillStyle = "rgba(255,201,77,.35)"; ctx.fillRect(c * S, r * S, S, S); }
-            if (sel >= 0) { const [r, c] = rc(sel); ctx.fillStyle = "rgba(46,230,201,.5)"; ctx.fillRect(c * S, r * S, S, S); }
+            if (last) for (const sq of [last.from, last.path[last.path.length - 1]]) { const [r, c] = rc(vi(sq)); ctx.fillStyle = "rgba(255,201,77,.35)"; ctx.fillRect(c * S, r * S, S, S); }
+            if (sel >= 0) { const [r, c] = rc(vi(sel)); ctx.fillStyle = "rgba(46,230,201,.5)"; ctx.fillRect(c * S, r * S, S, S); }
             // pieces that must move glow
-            if (!over && !anim && !thinking && (mode === "2p" || turn === 1) && sel < 0) { const ms = moves(board, turn); if (ms[0] && ms[0].caps.length) for (const m of ms) { const [r, c] = rc(m.from); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 4; ctx.globalAlpha = 0.5 + Math.sin(t * 6) * 0.4; ctx.strokeRect(c * S + 3, r * S + 3, S - 6, S - 6); ctx.globalAlpha = 1; } }
-            for (const m of opts) { const to = m.path[m.path.length - 1], [r, c] = rc(to); ctx.fillStyle = "rgba(11,13,26,.4)"; ctx.beginPath(); ctx.arc(c * S + S / 2, r * S + S / 2, S * 0.16, 0, 7); ctx.fill(); }
-            for (let i = 0; i < 64; i++) if (board[i]) { const [r, c] = rc(i); piece(c * S + S / 2, r * S + S / 2, board[i]); }
+            if (canAct() && sel < 0) { const ms = moves(board, turn); if (ms[0] && ms[0].caps.length) for (const m of ms) { const [r, c] = rc(vi(m.from)); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 4; ctx.globalAlpha = 0.5 + Math.sin(t * 6) * 0.4; ctx.strokeRect(c * S + 3, r * S + 3, S - 6, S - 6); ctx.globalAlpha = 1; } }
+            for (const m of opts) { const to = m.path[m.path.length - 1], [r, c] = rc(vi(to)); ctx.fillStyle = "rgba(11,13,26,.4)"; ctx.beginPath(); ctx.arc(c * S + S / 2, r * S + S / 2, S * 0.16, 0, 7); ctx.fill(); }
+            for (let i = 0; i < 64; i++) if (board[i]) { const [r, c] = rc(vi(i)); piece(c * S + S / 2, r * S + S / 2, board[i]); }
             if (anim) {
-                const p = anim.m.path, a = rc(p[anim.step]), b = rc(p[anim.step + 1]), k = Math.min(1, anim.t);
+                const p = anim.m.path, a = rc(vi(p[anim.step])), b = rc(vi(p[anim.step + 1])), k = Math.min(1, anim.t);
                 const y = (a[0] + (b[0] - a[0]) * k) * S + S / 2, x = (a[1] + (b[1] - a[1]) * k) * S + S / 2;
                 piece(x, y, anim.v, Math.sin(k * Math.PI) * 14);
             }
@@ -167,25 +178,36 @@
             fx.update(dt); draw();
         });
         cv.addEventListener("pointerdown", (e) => {
-            if (over || anim || thinking || (mode !== "2p" && turn !== 1)) return;
-            const p = Kit.point(cv, e), i = Math.floor(p.y / S) * 8 + Math.floor(p.x / S);
+            if (!canAct()) return;
+            const p = Kit.point(cv, e), i = vi(Math.floor(p.y / S) * 8 + Math.floor(p.x / S));
             const hit = opts.find((m) => m.path[m.path.length - 1] === i);
-            if (hit) return play(hit);
+            if (hit) { play(hit); if (online()) net.send(hit.path.join("-")); return; }
             const ms = moves(board, turn).filter((m) => m.from === i);
             if (ms.length) { sel = i; opts = ms; beep(700, 0.03, "triangle", 0.03); } else { sel = -1; opts = []; }
         });
         $("undoBtn").onclick = () => {
-            if (anim || thinking || !history.length) return;
+            if (anim || thinking || !history.length || online()) return;
             let h = history.pop(); if (mode !== "2p" && h.turn === -1 && history.length) h = history.pop();
             board = h.board; turn = h.turn; over = false; sel = -1; opts = []; last = null; Kit.hide("over"); status();
         };
         document.querySelectorAll("#mode button").forEach((b) => {
             b.classList.toggle("active", b.dataset.m === mode);
-            b.onclick = () => { mode = b.dataset.m; try { localStorage.setItem("checkersMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+            b.onclick = () => { if (b.dataset.m === "online") return net.open(); mode = b.dataset.m; prevMode = mode; try { localStorage.setItem("checkersMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
         });
-        $("startBtn").onclick = () => { Kit.hide("start"); reset(); };
+        $("startBtn").onclick = () => { if (mode === "online") mode = prevMode; Kit.hide("start"); reset(); };
         $("againBtn").onclick = () => { Kit.hide("over"); reset(); };
-        $("menuBtn").onclick = () => Kit.show("start");
+        $("menuBtn").onclick = () => { if (online()) net.leave(); Kit.show("start"); };
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: [1, -1], names: { 1: "⚪ White", "-1": "🔴 Red" },
+            start() { mode = "online"; hl(); Kit.hide("start"); Kit.hide("over"); reset(); },
+            apply(str) {
+                if (anim) finishMove();
+                const m = moves(board, turn).find((x) => x.path.join("-") === str);
+                if (!m) return console.warn("[checkers] bad online move", str);
+                play(m);
+                if (net.replaying) finishMove();
+            },
+            leave() { if (online()) { mode = prevMode; hl(); reset(); Kit.show("start"); } } });
         reset(); game.start();
         if (window.__test) window.__test.ck = () => ({ moves: () => moves(board, turn), turn, board });
     })();

@@ -156,5 +156,11 @@
         b.onclick = () => { b.textContent = Kit.toggleMute() ? "🔇" : "🔊"; };
         bar.appendChild(b);
     });
+    // online play with a friend (loads /online.js only when a game asks for it)
+    Kit.net = { active: false, mySide: null, replaying: false, myTurn: () => false, send() {}, over() {}, leave() {},
+        open() { Kit.net._ready && Kit.net._ready.then(() => Kit.net.open()); } };
+    Kit.online = (adapter) => {
+        Kit.net._ready = import("/online.js").then((m) => m.init(adapter)).catch((e) => console.warn("[Kit] online unavailable", e));
+    };
     window.Kit = Kit;
 })();

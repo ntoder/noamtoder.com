@@ -95,8 +95,8 @@
                     const f = FRAMES[r.frame || "none"];
                     return `<div class="row${r.uid === myUid ? " me" : ""}">
                         <div class="rank r${i + 1}">${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</div>
-                        <div class="who"><span class="av" style="${f && r.premium ? f.css : ""}">${esc((r.name || "?").charAt(0).toUpperCase())}</span>
-                            <span class="nm${r.premium ? " gold" : ""}">${esc(r.name)}${r.premium ? " ★" : ""}${r.uid === myUid ? " (you)" : ""}</span></div>
+                        <div class="who"><span class="av" style="${f && r.premium ? f.css : ""}${r.avatar ? ";font-size:20px" : ""}">${esc(r.avatar || (r.name || "?").charAt(0).toUpperCase())}</span>
+                            <a class="nm${r.premium ? " gold" : ""}" href="/player?u=${encodeURIComponent(r.uid)}" style="color:inherit;text-decoration:none">${esc(r.name)}${r.premium ? " ★" : ""}</a>${r.uid === myUid ? ' <span class="you">(you)</span>' : ""}</div>
                         <div class="score">${Number(r.best).toLocaleString()}</div>
                     </div>`;
                 }).join("") : `<div class="empty">No scores yet ${scope === "week" ? "this week" : ""}. Be the first! <br><br><a class="btn" style="text-decoration:none" href="${GAMES[game].path}">▶ Play ${esc(GAMES[game].name)}</a></div>`;

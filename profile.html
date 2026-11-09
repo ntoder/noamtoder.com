@@ -134,6 +134,20 @@
         .style-card.locked .frames, .style-card.locked #skins { opacity: .45; pointer-events: none; }
         .lockmsg a { color: var(--gold); font-weight: 700; }
         .loading { text-align: center; color: var(--muted); padding: 20vh 16px; }
+        .avatar.emoji { font-size: 52px; }
+        .av-wrap { position: relative; }
+        .av-edit { position: absolute; bottom: -6px; right: -6px; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--bg); background: var(--accent); color: #fff; cursor: pointer; font-size: 14px; }
+        .av-pick { display: none; grid-template-columns: repeat(8, 1fr); gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 24px; }
+        .av-pick.open { display: grid; }
+        .av-pick button { font-size: 26px; aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); cursor: pointer; }
+        .av-pick button:hover, .av-pick button.sel { border-color: var(--accent-2); background: var(--card-hover); }
+        .av-pick .none { font-size: 13px; font-weight: 700; color: var(--muted); }
+        .pubrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+        .switch { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); font-weight: 700; cursor: pointer; }
+        .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+        .ach-cat { margin: 18px 0 8px; font-size: 15px; color: var(--muted); font-weight: 800; }
+        .ach-more { margin-top: 10px; }
+        @media (max-width: 520px) { .av-pick { grid-template-columns: repeat(6, 1fr); } }
         .toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: var(--card); border: 1px solid var(--accent); padding: 12px 18px; border-radius: 12px;
@@ -157,7 +171,7 @@
 
     <main class="hidden" id="main">
         <section class="hero">
-            <div class="avatar" id="avatar">?</div>
+            <div class="av-wrap"><div class="avatar" id="avatar">?</div><button class="av-edit" id="avEdit" title="Pick an avatar" aria-label="Pick an avatar">✏️</button></div>
             <div class="who">
                 <div class="name-row" id="nameView">
                     <h1 id="name">Player</h1>
@@ -172,6 +186,10 @@
                 <div class="meta" id="since"></div>
                 <div class="pills" id="pills"></div>
                 <div class="nameerr hidden" id="nameErr"></div>
+                <div class="pubrow">
+                    <a class="btn" id="pubLink" href="#">👁️ View my public page</a>
+                    <label class="switch"><input type="checkbox" id="privBox"> <span>Keep my profile private</span></label>
+                </div>
             </div>
             <div class="levelbox">
                 <div class="lvl"><small>LEVEL</small><b id="lvl">1</b></div>
@@ -179,6 +197,8 @@
                 <div class="xptext" id="xpText">0 / 100 XP</div>
             </div>
         </section>
+
+        <div class="av-pick" id="avPick"></div>
 
         <section class="daily" id="daily"></section>
 
@@ -217,8 +237,9 @@
         import { auth, db } from "/firebase-config.js";
         import { signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { ready, state, GAMES, isPremium, isLockedGame, getMyGames, todaysChallenge, getFavorites, setFrame, setSkin, frameCss } from "/hub.js";
-        import { xpFor, levelFor, achievementsFor, dailyStreak, nameProblem, FRAMES, SKINS } from "/progress.js";
+        import { ready, state, GAMES, isPremium, isLockedGame, getMyGames, todaysChallenge, getFavorites, setFrame, setSkin, frameCss, setAvatar, setPrivate } from "/hub.js";
+        import { xpFor, levelFor, achievementsFor, dailyStreak, nameProblem, FRAMES, SKINS, AVATARS, ACH_CATS } from "/progress.js";
+        import { syncPlayer, checkAchievements } from "/social.js";
 
         const $ = (id) => document.getElementById(id);
         const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -249,7 +270,9 @@
         function renderName() {
             $("name").textContent = name;
             const av = $("avatar");
-            if (user.photoURL) {
+            av.classList.toggle("emoji", !!profile.avatar);
+            if (profile.avatar) av.textContent = profile.avatar;
+            else if (user.photoURL) {
                 av.innerHTML = "";
                 const img = document.createElement("img");
                 img.src = user.photoURL; img.alt = ""; img.referrerPolicy = "no-referrer";
@@ -275,6 +298,27 @@
         }
         $("adminLink").classList.toggle("hidden", profile.role !== "admin");
 
+        // Avatar picker
+        function renderPick() {
+            $("avPick").innerHTML = AVATARS.map(a => `<button data-av="${a}" class="${profile.avatar === a ? "sel" : ""}">${a}</button>`).join("")
+                + `<button data-av="" class="none ${profile.avatar ? "" : "sel"}">${user.photoURL ? "Photo" : "ABC"}</button>`;
+        }
+        renderPick();
+        $("avEdit").addEventListener("click", () => $("avPick").classList.toggle("open"));
+        $("avPick").addEventListener("click", async (e) => {
+            const b = e.target.closest("[data-av]"); if (!b) return;
+            try { await setAvatar(b.dataset.av); profile.avatar = b.dataset.av; renderName(); renderPick(); renderStyle(); $("avPick").classList.remove("open"); toast("Avatar saved"); }
+            catch (err) { toast("Couldn't save: " + (err.code || err.message)); }
+        });
+
+        // Public page + privacy
+        $("pubLink").href = "/player?u=" + encodeURIComponent(user.uid);
+        $("privBox").checked = !!profile.private;
+        $("privBox").addEventListener("change", async (e) => {
+            try { await setPrivate(e.target.checked); profile.private = e.target.checked; toast(e.target.checked ? "Your profile is private now" : "Your profile is public now"); }
+            catch (err) { e.target.checked = !e.target.checked; toast("Couldn't save: " + (err.code || err.message)); }
+        });
+
         // Edit name
         $("editName").addEventListener("click", () => {
             $("nameInput").value = name;
@@ -296,7 +340,7 @@
                 await updateDoc(doc(db, "users", user.uid), { name: next });
                 await updateProfile(user, { displayName: next });
                 name = next; state.profile.name = next;
-                renderName();
+                renderName(); syncPlayer();
                 $("nameErr").classList.add("hidden");
                 toast("Name updated");
             } catch (err) { toast("Couldn't save: " + (err.code || err.message)); }
@@ -345,18 +389,32 @@
             <p>${done ? "✅ Done! Come back tomorrow for a new one." : "Finish it today for +40 XP."}${streak ? ` · 🔥 ${streak}-day streak` : ""}</p></div>
             ${done ? "" : `<a class="btn primary" style="text-decoration:none" href="${GAMES[c.game].path}">▶ Play</a>`}`;
 
-        // Achievements
+        // Achievements, grouped. Game masters show the ones you have plus a "show all" button.
         const ach = achievementsFor(mine, profile, Object.keys(GAMES).length);
         $("achCount").textContent = `${ach.filter(a => a.done).length} of ${ach.length}`;
-        $("ach").innerHTML = ach.sort((a, b) => b.done - a.done).map(a => `<div class="badge ${a.done ? "on" : "off"}" title="${esc(a.desc)}">
-            <div class="ic">${a.icon}</div><div><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div></div>`).join("");
+        const badge = (a) => `<div class="badge ${a.done ? "on" : "off"}" title="${esc(a.desc)}">
+            <div class="ic">${a.icon}</div><div><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div></div>`;
+        $("ach").outerHTML = '<div id="ach"></div>';
+        $("ach").innerHTML = Object.entries(ACH_CATS).map(([cat, label]) => {
+            const list = ach.filter(a => a.cat === cat).sort((a, b) => b.done - a.done);
+            const got = list.filter(a => a.done).length;
+            const shown = cat === "master" ? list.filter(a => a.done) : list;
+            return `<div class="ach-cat">${label} · ${got} of ${list.length}</div>
+                <div class="ach" data-cat="${cat}">${shown.map(badge).join("") || '<p style="color:var(--muted);font-size:14px">Reach an expert score in any game to earn its master badge.</p>'}</div>
+                ${cat === "master" ? '<button class="btn ach-more" id="achAll">Show all game masters</button>' : ""}`;
+        }).join("");
+        $("achAll").addEventListener("click", () => {
+            document.querySelector('[data-cat="master"]').innerHTML = ach.filter(a => a.cat === "master").sort((a, b) => b.done - a.done).map(badge).join("");
+            $("achAll").remove();
+        });
+        checkAchievements().catch(() => {});
 
         // Frames + skins
         const prem = isPremium(profile);
         $("styleCard").classList.toggle("locked", !prem);
         $("styleLock").classList.toggle("hidden", prem);
         function renderStyle() {
-            const initial = name.charAt(0).toUpperCase();
+            const initial = profile.avatar || name.charAt(0).toUpperCase();
             $("frames").innerHTML = Object.entries(FRAMES).map(([k, f]) => `<button class="fr ${(profile.frame || "none") === k ? "sel" : ""}" data-frame="${k}" style="${f.css}">${esc(initial)}<small>${f.name}</small></button>`).join("");
             $("skins").innerHTML = Object.entries(SKINS).map(([g, s]) => `<div class="skinrow"><span class="lab">${esc(GAMES[g].name)}</span>
                 ${Object.entries(s.options).map(([k, [label, color]]) => `<button class="sw ${((profile.skins || {})[g] || "classic") === k ? "sel" : ""}" title="${esc(label)} ${esc(s.label)}" data-game="${g}" data-skin="${k}" style="background:${color}"></button>`).join("")}</div>`).join("");

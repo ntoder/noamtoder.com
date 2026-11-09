@@ -25,7 +25,7 @@
             <canvas id="c" width="560" height="560"></canvas>
             <div class="overlay" id="start"><div>
                 <h2>Chess</h2>
-                <p id="startText"><span class="seg" id="mode"><button data-m="ai1">🤖 Easy</button><button data-m="ai2">🤖 Medium</button><button data-m="ai3">🤖 Hard</button><button data-m="2p">👥 2 Players</button></span><span class="seg" id="side"><button data-s="w">Play White</button><button data-s="b">Play Black</button><button data-s="r">Random</button></span>Click a piece to see its moves, then click where to go.</p>
+                <p id="startText"><span class="seg" id="mode"><button data-m="ai1">🤖 Easy</button><button data-m="ai2">🤖 Medium</button><button data-m="ai3">🤖 Hard</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span><span class="seg" id="side"><button data-s="w">Play White</button><button data-s="b">Play Black</button><button data-s="r">Random</button></span>Click a piece to see its moves, then click where to go.</p>
                 <button class="btn" id="startBtn">▶ Start game</button>
             </div></div>
             <div class="overlay hidden" id="over"><div>
@@ -173,6 +173,9 @@
         // ---- game state + UI
         let st, history, moveList, sel = -1, targets = [], last = null, mode = "ai2", human = "w", flipped = false, over = false, thinking = false, pendingPromo = null;
         try { mode = localStorage.getItem("chessMode") || "ai2"; } catch (e) {}
+        const net = Kit.net, online = () => mode === "online";
+        let prevMode = mode === "online" ? "ai2" : mode;
+        const mkey = (m) => m.from + "-" + m.to + (m.promo || "");
         function san(stBefore, m, all) {
             if (m.castle) return m.castle === "K" ? "O-O" : "O-O-O";
             const t = m.piece.toLowerCase(); let s = "";
@@ -189,7 +192,7 @@
             st = initial(); history = []; moveList = []; sel = -1; targets = []; last = null; over = false; thinking = false; pendingPromo = null;
             human = mode === "2p" ? "w" : human; flipped = mode !== "2p" && human === "b";
             Kit.hide("over"); Kit.hide("promo"); render(); status();
-            if (mode !== "2p" && st.turn !== human) aiTurn();
+            if (mode !== "2p" && !online() && st.turn !== human) aiTurn();
         }
         function play(m) {
             const all = legal(st);
@@ -197,8 +200,9 @@
             st = make(st, m); last = m; sel = -1; targets = [];
             if (m.cap) beep(300, 0.08, "square", 0.05, -100); else beep(520, 0.05, "triangle", 0.04);
             render(); status(); checkEnd();
-            if (!over && mode !== "2p" && st.turn !== human) aiTurn();
+            if (!over && mode !== "2p" && !online() && st.turn !== human) aiTurn();
         }
+        function myPlay(m) { play(m); if (online()) net.send(mkey(m)); }
         function aiTurn() {
             thinking = true; status();
             setTimeout(() => { const m = bestMove(st, +mode.slice(2)); thinking = false; if (m && !over) play(m); }, 250);
@@ -213,6 +217,14 @@
             if (!ms.length) res = inCheck(st) ? (st.turn === "w" ? "Black" : "White") + " wins by checkmate!" : "Stalemate: it's a draw.";
             else if (st.half >= 100) res = "Draw by the 50-move rule.";
             else if (insufficient(st.b)) res = "Draw: not enough pieces to checkmate.";
+            if (res && online()) {
+                over = true;
+                const win = res.startsWith("White") ? "w" : res.startsWith("Black") ? "b" : "draw";
+                net.over(win);
+                if (win === human) Kit.tune([523, 659, 784, 1047], 0.12, "triangle");
+                $("status").textContent = (win === "draw" ? "" : win === human ? "🏆 You win! " : "Your friend wins. ") + res;
+                return;
+            }
             if (res) {
                 over = true;
                 const youWon = mode !== "2p" && res.startsWith(human === "w" ? "White" : "Black");
@@ -223,7 +235,7 @@
         }
         function status() {
             const who = st.turn === "w" ? "White" : "Black";
-            let s = over ? "Game over" : thinking ? "🤔 Computer is thinking…" : mode === "2p" ? `${who} to move` : st.turn === human ? "Your move" : "Computer's move";
+            let s = over ? "Game over" : online() ? (st.turn === human ? "Your move" : "Friend's move…") : thinking ? "🤔 Computer is thinking…" : mode === "2p" ? `${who} to move` : st.turn === human ? "Your move" : "Computer's move";
             if (!over && inCheck(st)) s += " · Check!";
             $("status").textContent = s;
             const rows = [];
@@ -263,39 +275,48 @@
         }
         cv.addEventListener("pointerdown", (e) => {
             if (over || thinking || pendingPromo) return;
-            if (mode !== "2p" && st.turn !== human) return;
+            if (online() ? !net.myTurn() : mode !== "2p" && st.turn !== human) return;
             const pt = Kit.point(cv, e); let x = Math.floor(pt.x / S), y = Math.floor(pt.y / S);
             if (flipped) { x = 7 - x; y = 7 - y; }
             const i = y * 8 + x, p = st.b[i];
             const hits = targets.filter((m) => m.to === i);
             if (hits.length) {
                 if (hits[0].promo) { pendingPromo = hits; Kit.show("promo"); return; }
-                return play(hits[0]);
+                return myPlay(hits[0]);
             }
             if (p && colorOf(p) === st.turn) { sel = i; targets = legal(st).filter((m) => m.from === i); beep(700, 0.03, "triangle", 0.03); }
             else { sel = -1; targets = []; }
             render();
         });
         document.querySelectorAll("#promo button").forEach((b) => b.onclick = () => {
-            const m = pendingPromo.find((x) => x.promo === b.dataset.p); pendingPromo = null; Kit.hide("promo"); play(m);
+            const m = pendingPromo.find((x) => x.promo === b.dataset.p); pendingPromo = null; Kit.hide("promo"); myPlay(m);
         });
         $("undoBtn").onclick = () => {
-            if (thinking || !history.length) return;
+            if (thinking || !history.length || online()) return;
             const steps = mode === "2p" ? 1 : (st.turn === human ? 2 : 1);
             for (let k = 0; k < steps && history.length; k++) { const h = history.pop(); st = h.st; last = h.last; moveList.pop(); }
             over = false; sel = -1; targets = []; Kit.hide("over"); render(); status();
         };
         $("flipBtn").onclick = () => { flipped = !flipped; render(); };
-        $("newBtn").onclick = () => Kit.show("start");
+        $("newBtn").onclick = () => { if (online()) net.leave(); Kit.show("start"); };
         document.querySelectorAll("#mode button").forEach((b) => {
             b.classList.toggle("active", b.dataset.m === mode);
-            b.onclick = () => { mode = b.dataset.m; try { localStorage.setItem("chessMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+            b.onclick = () => { if (b.dataset.m === "online") return net.open(); mode = b.dataset.m; prevMode = mode; try { localStorage.setItem("chessMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
         });
         document.querySelectorAll("#side button").forEach((b) => {
             b.classList.toggle("active", b.dataset.s === human);
             b.onclick = () => { human = b.dataset.s === "r" ? (Math.random() < 0.5 ? "w" : "b") : b.dataset.s; document.querySelectorAll("#side button").forEach((x) => x.classList.toggle("active", x === b)); };
         });
-        $("startBtn").onclick = () => { Kit.hide("start"); newGame(); };
+        $("startBtn").onclick = () => { if (mode === "online") mode = prevMode; Kit.hide("start"); newGame(); };
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: ["w", "b"], names: { w: "⚪ White", b: "⚫ Black" },
+            start(side) { mode = "online"; hl(); Kit.hide("start"); Kit.hide("over"); Kit.hide("promo"); human = side; newGame(); flipped = side === "b"; render(); status(); },
+            apply(str) {
+                const m = legal(st).find((x) => mkey(x) === str);
+                if (!m) return console.warn("[chess] bad online move", str);
+                play(m);
+            },
+            leave() { if (online()) { mode = prevMode; hl(); Kit.show("start"); } } });
         $("againBtn").onclick = () => { Kit.hide("over"); Kit.show("start"); };
         st = initial(); history = []; moveList = []; render(); status();
     })();

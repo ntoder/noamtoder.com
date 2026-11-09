@@ -148,3 +148,8 @@ textarea.nc-in { font: 600 12px ui-monospace, monospace; }
 .nc-more > summary::before { content: '▸ '; }
 .nc-more[open] > summary::before { content: '▾ '; }
 .nc-more > summary:hover { background: var(--surface-2); }
+
+.nc-game { display: flex; align-items: center; gap: 10px; min-width: 230px; }
+.nc-game .ic { font-size: 30px; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, currentColor 12%, transparent); flex: none; }
+.nc-game .tx { flex: 1; min-width: 0; } .nc-game b { display: block; } .nc-game small { display: block; opacity: .75; font-size: 11px; }
+.nc-game .btn { height: 30px; padding: 0 12px; font-size: 13px; }

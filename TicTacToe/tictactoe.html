@@ -20,7 +20,7 @@
     </div>
     <div class="stage">
         <div class="playwrap">
-            <div><div style="margin-bottom:10px"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="hard">🤖 Unbeatable</button><button data-m="2p">👥 2 Players</button></span></div>
+            <div><div style="margin-bottom:10px"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="hard">🤖 Unbeatable</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span></div>
             <div class="frame"><canvas id="c" width="450" height="450"></canvas></div></div>
             <div class="side" style="width:200px"><div class="panel"><small>Status</small><b id="status" style="font-size:15px"></b></div>
             <div class="panel"><small>Score</small><div style="display:flex;justify-content:space-around;font-weight:800"><div><div style="color:#2ee6c9;font-size:22px" id="tx">0</div><small style="margin:0">X</small></div><div><div style="font-size:22px" id="td">0</div><small style="margin:0">Draws</small></div><div><div style="color:#ff4d8d;font-size:22px" id="to">0</div><small style="margin:0">O</small></div></div></div></div>
@@ -34,7 +34,8 @@
         const { $, beep, tune } = Kit;
         const cv = $("c"), ctx = cv.getContext("2d"), S = cv.width / 3;
         const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
-        let b, turn, mode = "hard", over, win, anim, tally = { x: 0, o: 0, d: 0 }, first = "x", t = 0;
+        let b, turn, mode = "hard", over, win, anim, tally = { x: 0, o: 0, d: 0 }, first = "x", t = 0, prevMode = "hard";
+        const net = Kit.net, online = () => mode === "online";
         try { mode = localStorage.getItem("tttMode") || "hard"; } catch (e) {}
         function check(bd) { for (const l of LINES) if (bd[l[0]] && bd[l[0]] === bd[l[1]] && bd[l[1]] === bd[l[2]]) return { p: bd[l[0]], l }; return bd.every(Boolean) ? { p: "d" } : null; }
         function mm(bd, p) {
@@ -50,9 +51,10 @@
             for (const i of Kit.pick([free, free.slice().reverse()])) { b[i] = "o"; const v = mm(b, "x"); b[i] = ""; if (v > bv) { bv = v; best = i; } }
             return best;
         }
-        function reset() { b = Array(9).fill(""); turn = first; over = false; win = null; anim = Array(9).fill(0); status(); if (mode !== "2p" && turn === "o") setTimeout(() => move(cpuMove()), 450); }
+        function reset() { b = Array(9).fill(""); turn = online() ? "x" : first; over = false; win = null; anim = Array(9).fill(0); status(); if (mode !== "2p" && !online() && turn === "o") setTimeout(() => move(cpuMove()), 450); }
         function status() {
-            $("status").textContent = over ? (win.p === "d" ? "It's a draw!" : mode === "2p" ? `${win.p.toUpperCase()} wins!` : win.p === "x" ? "🏆 You win!" : "The computer wins") :
+            $("status").textContent = online() ? (over ? (win.p === "d" ? "It's a draw!" : win.p === net.mySide ? "🏆 You win!" : "Your friend wins") : turn === net.mySide ? `Your turn (${turn.toUpperCase()})` : "Friend's turn…") :
+                over ? (win.p === "d" ? "It's a draw!" : mode === "2p" ? `${win.p.toUpperCase()} wins!` : win.p === "x" ? "🏆 You win!" : "The computer wins") :
                 mode === "2p" ? `${turn.toUpperCase()}'s turn` : turn === "x" ? "Your turn (X)" : "Computer is thinking…";
             $("tx").textContent = tally.x; $("to").textContent = tally.o; $("td").textContent = tally.d;
         }
@@ -62,12 +64,18 @@
             const w = check(b);
             if (w) {
                 over = true; win = w; tally[w.p]++;
-                if (w.p === "d") beep(330, 0.2, "triangle", 0.04); else if (mode === "2p" || w.p === "x") tune([523, 659, 784, 1047], 0.09, "triangle", 0.05); else beep(160, 0.35, "sawtooth", 0.05, -60);
+                if (online()) net.over(w.p === "d" ? "draw" : w.p);
+                if (w.p === "d") beep(330, 0.2, "triangle", 0.04); else if (mode === "2p" || (online() ? w.p === net.mySide : w.p === "x")) tune([523, 659, 784, 1047], 0.09, "triangle", 0.05); else beep(160, 0.35, "sawtooth", 0.05, -60);
                 first = first === "x" ? "o" : "x";
                 status(); return;
             }
             turn = turn === "x" ? "o" : "x"; status();
-            if (mode !== "2p" && turn === "o") setTimeout(() => move(cpuMove()), 450);
+            if (mode !== "2p" && !online() && turn === "o") setTimeout(() => move(cpuMove()), 450);
+        }
+        function play(i) {
+            if (online()) { if (!net.myTurn() || over || b[i]) return; move(i); net.send(i); return; }
+            if (mode !== "2p" && turn !== "x") return;
+            move(i);
         }
         function draw() {
             ctx.fillStyle = "#12152b"; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -89,22 +97,26 @@
                 ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 10; ctx.globalAlpha = 0.6 + Math.sin(t * 6) * 0.3;
                 ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(zx, zy); ctx.stroke(); ctx.globalAlpha = 1;
             }
-            if (over) Kit.text(ctx, "Tap to play again", cv.width / 2, cv.height - 16, 14, "#9aa0c8");
+            if (over && !online()) Kit.text(ctx, "Tap to play again", cv.width / 2, cv.height - 16, 14, "#9aa0c8");
         }
         const game = Kit.loop((dt) => { t += dt; for (let i = 0; i < 9; i++) if (anim[i] > 0 && anim[i] < 1) anim[i] += dt * 4; draw(); });
         cv.addEventListener("pointerdown", (e) => {
-            if (over) return reset();
-            if (mode !== "2p" && turn !== "x") return;
-            const p = Kit.point(cv, e); move(Math.floor(p.y / S) * 3 + Math.floor(p.x / S));
+            if (over) return online() ? null : reset();
+            const p = Kit.point(cv, e); play(Math.floor(p.y / S) * 3 + Math.floor(p.x / S));
         });
         Kit.onKeys(Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ["Digit" + n, String(n)]).concat([["Enter", "r"]])), (a) => {
-            if (a === "r" || over) return over && reset();
-            if (mode !== "2p" && turn !== "x") return; move(+a - 1);
+            if (a === "r" || over) return over && !online() && reset();
+            play(+a - 1);
         });
         document.querySelectorAll("#mode button").forEach((bt) => {
             bt.classList.toggle("active", bt.dataset.m === mode);
-            bt.onclick = () => { mode = bt.dataset.m; tally = { x: 0, o: 0, d: 0 }; first = "x"; try { localStorage.setItem("tttMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === bt)); reset(); };
+            bt.onclick = () => { if (bt.dataset.m === "online") return net.open(); if (online()) net.leave(); mode = bt.dataset.m; tally = { x: 0, o: 0, d: 0 }; first = "x"; try { localStorage.setItem("tttMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === bt)); reset(); };
         });
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: ["x", "o"], names: { x: "X", o: "O" },
+            start() { if (!online()) prevMode = mode; mode = "online"; tally = { x: 0, o: 0, d: 0 }; hl(); reset(); },
+            apply(m) { move(+m); },
+            leave() { if (online()) { mode = prevMode === "online" ? "hard" : prevMode; hl(); reset(); } } });
         reset(); game.start();
     })();
     </script>

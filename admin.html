@@ -197,6 +197,19 @@
                 <tbody id="gameStats"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
             </table></div>
 
+            <h2 class="section-title" id="commentsSec">💬 Comments</h2>
+            <p class="section-sub">The newest comments from every game. 🚩 means a player reported it. Delete anything rude.</p>
+            <div class="save-row" style="margin-bottom:12px;flex-wrap:wrap;gap:10px">
+                <label class="chk"><input type="checkbox" id="commentsOff"> Turn off comments on the whole site</label>
+                <button class="btn" id="refreshComments">↻ Refresh</button>
+                <button class="btn" id="rebuildStats">⭐ Update homepage ratings</button>
+                <span class="email" id="statsNote"></span>
+            </div>
+            <div class="table-wrap"><table>
+                <thead><tr><th>Game</th><th>Player</th><th>Comment</th><th>When</th><th></th></tr></thead>
+                <tbody id="commentRows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            </table></div>
+
             <h2 class="section-title" id="announce">📢 Announcement banner</h2>
             <p class="section-sub">Shows a bar at the top of every page, e.g. "New game: Space Shooter!". Players can close it.</p>
             <div class="announce-form">
@@ -257,7 +270,7 @@
                 $("app").classList.remove("hidden");
                 await load();
                 await setupGames();
-                setupAnnouncement();
+                setupAnnouncement(); setupComments();
                 loadCodes();
                 loadGameStats();
             } catch {
@@ -407,6 +420,49 @@
             } catch (err) {
                 $("gameStats").innerHTML = `<tr><td colspan="5" class="empty">Stats unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</td></tr>`;
             }
+        }
+
+        // ---- Comments ----
+        async function setupComments() {
+            const soc = await import("/social.js");
+            $("commentsOff").checked = !!(hub.site || {}).commentsOff;
+            $("commentsOff").onchange = async (e) => {
+                try { await saveSiteSettings({ commentsOff: e.target.checked }); toast(e.target.checked ? "Comments are off" : "Comments are on"); }
+                catch (err) { e.target.checked = !e.target.checked; toast("Failed: " + (err.code || err.message)); }
+            };
+            $("rebuildStats").onclick = async () => {
+                $("rebuildStats").disabled = true; $("statsNote").textContent = "Counting…";
+                try { const g = await soc.rebuildSummary(); $("statsNote").textContent = `Done: ${Object.values(g).reduce((n, x) => n + x.n, 0)} ratings`; }
+                catch (err) { $("statsNote").textContent = "Failed: " + (err.code || err.message); }
+                $("rebuildStats").disabled = false;
+            };
+            const load = async () => {
+                try {
+                    const [rows, reps] = await Promise.all([soc.latestComments(60), soc.getReports().catch(() => [])]);
+                    const flagged = {}; reps.forEach((r) => (flagged[r.post] = (flagged[r.post] || 0) + 1));
+                    rows.sort((a, b) => (flagged[b.id] || 0) - (flagged[a.id] || 0));
+                    $("commentRows").innerHTML = rows.length ? rows.map((c) => `<tr data-g="${esc(c.game)}" data-id="${esc(c.id)}"${flagged[c.id] ? ' style="background:#ff4d8d18"' : ""}>
+                        <td>${esc(GAMES[c.game]?.name || c.game)}</td>
+                        <td><a href="/player?u=${encodeURIComponent(c.uid)}" style="color:inherit">${esc(c.avatar || "")} ${esc(c.name)}</a></td>
+                        <td style="max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere">${flagged[c.id] ? `<b style="color:var(--hot)">🚩 ${flagged[c.id]}</b> ` : ""}${esc(c.text)}</td>
+                        <td>${esc(soc.timeAgo(c.createdAt))}</td>
+                        <td style="white-space:nowrap">${flagged[c.id] ? '<button class="btn" data-keep>Keep</button> ' : ""}<button class="btn danger" data-del>Delete</button></td></tr>`).join("")
+                        : '<tr><td colspan="5" class="empty">No comments yet.</td></tr>';
+                } catch (err) { $("commentRows").innerHTML = `<tr><td colspan="5" class="empty">Comments unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</td></tr>`; }
+            };
+            $("refreshComments").onclick = load;
+            $("commentRows").onclick = async (e) => {
+                const tr = e.target.closest("tr"); if (!tr) return;
+                if (e.target.closest("[data-del]")) {
+                    try { await soc.deleteComment(tr.dataset.g, tr.dataset.id); await soc.clearReports(tr.dataset.g, tr.dataset.id); tr.remove(); toast("Comment deleted"); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+                if (e.target.closest("[data-keep]")) {
+                    try { await soc.clearReports(tr.dataset.g, tr.dataset.id); tr.style.background = ""; e.target.remove(); toast("Report cleared"); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+            };
+            load();
         }
 
         // ---- Announcement ----

@@ -223,6 +223,7 @@ export async function saveScore(score, game = CURRENT_GAME) {
         const lb = await submitLeaderboard(game, score);
         if (lb) msgs.push(lb);
         if (msgs.length && CURRENT_GAME) toast(msgs.join("<br>"), 4500);
+        social().then((m) => { m.noteScore(game, score); m.checkAchievements(); }).catch(() => {});
         return { saved: true, best, newBest: score > oldBest };
     } catch (e) {
         console.warn("[GameHub] save failed", e);
@@ -237,6 +238,7 @@ export async function recordPlay(game = CURRENT_GAME) {
     if (!state.user || isBanned()) return { saved: false };
     try {
         await setDoc(gameRef(state.user.uid, game), { plays: increment(1), lastPlayed: serverTimestamp() }, { merge: true });
+        social().then((m) => { m.noteScore(game, null); m.checkAchievements(); }).catch(() => {});
         return { saved: true };
     } catch (e) { return { saved: false }; }
 }
@@ -289,7 +291,7 @@ async function submitLeaderboard(game, score) {
         if (!warnedName) { warnedName = true; return `Change your name on your <a href="/profile">profile</a> to appear on the leaderboard`; }
         return null;
     }
-    const entry = { name: p.name, best: score, premium: isPremium(p), frame: p.frame || "none", updatedAt: serverTimestamp() };
+    const entry = { name: p.name, avatar: p.avatar || "", best: score, premium: isPremium(p), frame: p.frame || "none", updatedAt: serverTimestamp() };
     const [a, w] = await Promise.all([getDoc(lbAll(game, state.user.uid)), getDoc(lbWeek(game, state.user.uid))]);
     const writes = [];
     if (!a.exists() || score > (a.data().best || 0)) writes.push(setDoc(lbAll(game, state.user.uid), entry));
@@ -315,6 +317,14 @@ export async function getLeaderboard(game, scope = "all", n = 10, wk = weekKey()
 export function getFavorites() {
     return state.profile?.favorites || ls.get("gh_favs", []);
 }
+// favorites picked before logging in get added to the account
+ready.then(async () => {
+    const local = ls.get("gh_favs", []);
+    if (!state.user || !state.profile || !local.length) return;
+    const missing = local.filter((id) => !(state.profile.favorites || []).includes(id));
+    if (!missing.length) return;
+    try { await updateDoc(meRef(), { favorites: arrayUnion(...missing) }); state.profile.favorites = [...new Set([...(state.profile.favorites || []), ...missing])]; } catch (e) {}
+});
 export async function toggleFavorite(id) {
     const favs = new Set(getFavorites());
     const on = !favs.has(id);
@@ -325,13 +335,44 @@ export async function toggleFavorite(id) {
     }
     return on;
 }
-export function getRecent() { return ls.get("gh_recent", []); }
-function markRecent(game) {
-    const r = getRecent().filter((x) => x !== game);
-    r.unshift(game);
-    ls.set("gh_recent", r.slice(0, 8));
+export function getRecent() {
+    // this device's list first, then games played on other devices (saved on the account)
+    const local = ls.get("gh_recent", []), acc = state.profile?.recent || [];
+    return [...new Set([...local, ...acc])].filter((id) => GAMES[id]).slice(0, 12);
 }
-if (CURRENT_GAME) markRecent(CURRENT_GAME);
+let recentSaved = false;
+function markRecent(game) {
+    const r = ls.get("gh_recent", []).filter((x) => x !== game);
+    r.unshift(game);
+    ls.set("gh_recent", r.slice(0, 12));
+    // keep a copy on the account (once per page) so "Continue playing" follows you to other devices
+    if (state.user && state.profile && !isBanned() && !recentSaved) {
+        recentSaved = true;
+        const acc = [game, ...(state.profile.recent || []).filter((x) => x !== game)].slice(0, 12);
+        updateMe({ recent: acc }).catch(() => {});
+    }
+}
+if (CURRENT_GAME) { ls.set("gh_recent", [CURRENT_GAME, ...ls.get("gh_recent", []).filter((x) => x !== CURRENT_GAME)].slice(0, 12)); ready.then(() => markRecent(CURRENT_GAME)); }
+export function clearRecent() {
+    ls.set("gh_recent", []);
+    if (state.user && state.profile) updateMe({ recent: [] }).catch(() => {});
+}
+
+// ---------- Avatar ----------
+export async function setAvatar(emoji) {
+    if (!state.user || !state.profile) return false;
+    await updateMe({ avatar: emoji });
+    social().then((m) => m.checkAchievements()).catch(() => {});
+    return true;
+}
+export async function setPrivate(on) {
+    if (!state.user || !state.profile) return false;
+    await updateMe({ private: !!on });
+    social().then((m) => m.syncPlayer()).catch(() => {});
+    return true;
+}
+const social = () => import("./social.js");
+export { social };
 
 // ---------- Skins & frames (Premium) ----------
 export function skin(game) {
@@ -455,7 +496,7 @@ if (CURRENT_GAME) {
     ready.then(() => {
         if (isLockedGame(CURRENT_GAME)) showLock();
         else if (PLAY_ONLY.includes(CURRENT_GAME)) recordPlay();
-        showGameExtras();
+        showGameExtras().finally(() => social().then((m) => { m.mountGamePage({ getFavorites, toggleFavorite }); m.checkAchievements(); }).catch((e) => console.warn("[GameHub] social failed", e)));
     });
 }
 
@@ -464,6 +505,7 @@ async function showGameExtras() {
     await domReady;
     const info = document.querySelector(".gh-info");
     if (!info || !TARGETS[CURRENT_GAME]) return;
+    if (info.querySelector(".gh-lb")) return;
     const c = todaysChallenge();
     if (c.game === CURRENT_GAME) {
         const done = state.profile?.daily?.[c.day];
@@ -483,7 +525,7 @@ async function showGameExtras() {
         const rows = await getLeaderboard(CURRENT_GAME, "week", 5);
         sec.querySelector(".gh-lb").innerHTML = rows.length
             ? `<table>${rows.map((r, i) => `<tr${r.uid === state.user?.uid ? ' style="background:#7c5cff22"' : ""}><td>${["🥇", "🥈", "🥉", "4", "5"][i]}</td>
-                <td style="${r.premium ? "color:#ffc94d;" : ""}font-weight:700">${esc(r.name)}${r.premium ? " ★" : ""}</td>
+                <td style="${r.premium ? "color:#ffc94d;" : ""}font-weight:700"><a class="gh-lbname" href="/player?u=${encodeURIComponent(r.uid)}" style="color:inherit;text-decoration:none">${esc(r.name)}${r.premium ? " ★" : ""}</a></td>
                 <td style="text-align:right;color:#2ee6c9;font-weight:800">${Number(r.best).toLocaleString()}</td></tr>`).join("")}</table>`
             : "No scores yet this week. Be the first!";
     } catch (e) { sec.querySelector(".gh-lb").textContent = "Leaderboard unavailable right now."; }

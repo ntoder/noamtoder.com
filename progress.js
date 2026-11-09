@@ -1,5 +1,6 @@
 // progress.js — XP, levels, achievements, daily challenge and the name filter.
 // Pure functions (no Firebase), so any page can use them.
+import { GAMES } from "./games.js";
 
 // ---------- Score targets per game (used by daily challenges & achievements) ----------
 // easy = a fair daily goal, hard = an achievement for really good players
@@ -99,6 +100,8 @@ export function xpFor(games = {}, profile = {}) {
         if (t && (g.best || 0) >= t.hard) xp += 150;                 // big bonus for a great score
     }
     xp += Object.keys(profile.daily || {}).length * 40;              // 40 XP per daily challenge
+    const s = profile.stats || {};
+    xp += (s.onlineGames || 0) * 10 + (s.onlineWins || 0) * 20;      // online games count too
     return xp;
 }
 // Level n needs 50·n·(n−1) XP in total: level 2 = 100, level 3 = 300, level 4 = 600 …
@@ -110,34 +113,67 @@ export function levelFor(xp) {
 }
 
 // ---------- Achievements ----------
-const A = (id, icon, name, desc, test) => ({ id, icon, name, desc, test });
+// cat = which group the badge shows in on the profile page
+// p.stats (written by hub.js): { rated, comments, onlineGames, onlineWins }
+const A = (cat, id, icon, name, desc, test) => ({ cat, id, icon, name, desc, test });
+const st = (p, k) => (p.stats && p.stats[k]) || 0;
+const lvl = (g, p) => levelFor(xpFor(g, p)).level;
+const tagPlayed = (g, tag) => Object.keys(GAMES).filter((id) => GAMES[id].tags.includes(tag) && g[id] && g[id].plays).length;
+const tagTotal = (tag) => Object.keys(GAMES).filter((id) => GAMES[id].tags.includes(tag)).length;
+export const ACH_CATS = { play: "🎮 Playing", skill: "⭐ Skill", daily: "📅 Daily", social: "💬 Social", online: "🌐 Online", master: "👑 Game masters" };
 export const ACHIEVEMENTS = [
-    A("first",    "🎮", "First game",       "Play any game",                       (g) => played(g) >= 1),
-    A("five",     "🖐️", "Explorer",         "Play 5 different games",              (g) => played(g) >= 5),
-    A("ten",      "🧭", "Adventurer",       "Play 10 different games",             (g) => played(g) >= 10),
-    A("all",      "🌍", "Tried them all",   "Play every game on the hub",          (g, p, n) => played(g) >= n),
-    A("plays50",  "🔥", "Keen player",      "Play 50 games in total",              (g) => plays(g) >= 50),
-    A("plays250", "💪", "Unstoppable",      "Play 250 games in total",             (g) => plays(g) >= 250),
-    A("good3",    "⭐", "Getting good",     "Reach a daily-challenge score in 3 games", (g) => over(g, "easy") >= 3),
-    A("pro",      "🏆", "Pro",              "Reach an expert score in any game",   (g) => over(g, "hard") >= 1),
-    A("legend",   "👑", "Legend",           "Reach expert scores in 5 games",      (g) => over(g, "hard") >= 5),
-    A("space",    "🚀", "Space ace",        "Score 5,000 in Space Shooter",        (g) => best(g, "spaceshooter") >= 5000),
-    A("bricks",   "🧱", "Brick breaker",    "Score 1,000 in Brick Smash",          (g) => best(g, "breakout") >= 1000),
-    A("tiles",    "🔢", "Number cruncher",  "Score 10,000 in 2048",                (g) => best(g, "game2048") >= 10000),
-    A("memory",   "🧠", "Sharp memory",     "Score 700 in Memory Match",           (g) => best(g, "memory") >= 700),
-    A("daily1",   "📅", "Daily player",     "Finish a daily challenge",            (g, p) => Object.keys(p.daily || {}).length >= 1),
-    A("streak3",  "📆", "On a roll",        "Finish daily challenges 3 days in a row", (g, p) => dailyStreak(p.daily) >= 3),
-    A("streak7",  "🗓️", "Week warrior",     "Finish daily challenges 7 days in a row", (g, p) => dailyStreak(p.daily) >= 7),
-    A("premium",  "★",  "Supporter",        "Get Premium",                         (g, p) => !!p.premium)
+    A("play", "first",    "🎮", "First game",       "Play any game",                       (g) => played(g) >= 1),
+    A("play", "five",     "🖐️", "Explorer",         "Play 5 different games",              (g) => played(g) >= 5),
+    A("play", "ten",      "🧭", "Adventurer",       "Play 10 different games",             (g) => played(g) >= 10),
+    A("play", "twentyfive","🗺️", "Globetrotter",    "Play 25 different games",             (g) => played(g) >= 25),
+    A("play", "all",      "🌍", "Tried them all",   "Play every game on the hub",          (g, p, n) => played(g) >= n),
+    A("play", "plays50",  "🔥", "Keen player",      "Play 50 games in total",              (g) => plays(g) >= 50),
+    A("play", "plays250", "💪", "Unstoppable",      "Play 250 games in total",             (g) => plays(g) >= 250),
+    A("play", "plays1000","🌋", "Hub legend",       "Play 1,000 games in total",           (g) => plays(g) >= 1000),
+    A("play", "sports",   "⚽", "Sports fan",       "Play 8 sports games",                 (g) => tagPlayed(g, "sports") >= Math.min(8, tagTotal("sports"))),
+    A("play", "brainy",   "🧩", "Puzzle lover",     "Play 8 puzzle games",                 (g) => tagPlayed(g, "puzzle") >= Math.min(8, tagTotal("puzzle"))),
+    A("play", "words",    "🔤", "Word nerd",        "Play every word game",                (g) => tagPlayed(g, "word") >= tagTotal("word")),
+    A("play", "artist",   "🎨", "Artist",           "Make a picture in Pixel Paint",       (g) => !!(g.pixelpaint && g.pixelpaint.plays)),
+    A("play", "level5",   "🥉", "Level 5",          "Reach level 5",                       (g, p) => lvl(g, p) >= 5),
+    A("play", "level10",  "🥈", "Level 10",         "Reach level 10",                      (g, p) => lvl(g, p) >= 10),
+    A("play", "level20",  "🥇", "Level 20",         "Reach level 20",                      (g, p) => lvl(g, p) >= 20),
+    A("skill", "good3",   "⭐", "Getting good",     "Reach a daily-challenge score in 3 games", (g) => over(g, "easy") >= 3),
+    A("skill", "good10",  "🌟", "All-rounder",      "Reach a daily-challenge score in 10 games", (g) => over(g, "easy") >= 10),
+    A("skill", "good25",  "💫", "Superstar",        "Reach a daily-challenge score in 25 games", (g) => over(g, "easy") >= 25),
+    A("skill", "pro",     "🏆", "Pro",              "Reach an expert score in any game",   (g) => over(g, "hard") >= 1),
+    A("skill", "legend",  "👑", "Legend",           "Reach expert scores in 5 games",      (g) => over(g, "hard") >= 5),
+    A("skill", "mastermind","🧠", "Grand master",   "Reach expert scores in 15 games",     (g) => over(g, "hard") >= 15),
+    A("daily", "daily1",  "📅", "Daily player",     "Finish a daily challenge",            (g, p) => Object.keys(p.daily || {}).length >= 1),
+    A("daily", "daily10", "📌", "Regular",          "Finish 10 daily challenges",          (g, p) => Object.keys(p.daily || {}).length >= 10),
+    A("daily", "streak3", "📆", "On a roll",        "Finish daily challenges 3 days in a row", (g, p) => dailyStreak(p.daily) >= 3),
+    A("daily", "streak7", "🗓️", "Week warrior",     "Finish daily challenges 7 days in a row", (g, p) => dailyStreak(p.daily) >= 7),
+    A("daily", "streak30","🏅", "Month master",     "Finish daily challenges 30 days in a row", (g, p) => dailyStreak(p.daily) >= 30),
+    A("social", "avatar", "😎", "New look",         "Pick an avatar on your profile",      (g, p) => !!p.avatar),
+    A("social", "fav5",   "❤️", "Collector",        "Add 5 games to your favorites",       (g, p) => (p.favorites || []).length >= 5),
+    A("social", "rate1",  "⭐", "Critic",           "Rate a game",                         (g, p) => st(p, "rated") >= 1),
+    A("social", "rate10", "📝", "Top critic",       "Rate 10 games",                       (g, p) => st(p, "rated") >= 10),
+    A("social", "comment","💬", "Say hello",        "Write a comment on a game",           (g, p) => st(p, "comments") >= 1),
+    A("social", "premium","★",  "Supporter",        "Get Premium",                         (g, p) => !!p.premium),
+    A("online", "online1","🌐", "Online!",          "Play an online game with a friend",   (g, p) => st(p, "onlineGames") >= 1),
+    A("online", "onwin1", "🤝", "First online win", "Win an online game",                  (g, p) => st(p, "onlineWins") >= 1),
+    A("online", "onwin10","🎖️", "Online champion",  "Win 10 online games",                 (g, p) => st(p, "onlineWins") >= 10),
+    A("online", "online25","📡", "Always online",   "Play 25 online games",                (g, p) => st(p, "onlineGames") >= 25),
+    // one "master" badge for every game with a score: reach its expert score
+    ...Object.keys(TARGETS).filter((id) => GAMES[id]).map((id) => A("master", "m_" + id, "👑", GAMES[id].name + " master",
+        `Score ${TARGETS[id].hard.toLocaleString("en")} ${TARGETS[id].unit} in ${GAMES[id].name}`, (g) => best(g, id) >= TARGETS[id].hard))
 ];
 function played(g) { return Object.values(g).filter((x) => x.plays).length; }
 function plays(g) { return Object.values(g).reduce((n, x) => n + (x.plays || 0), 0); }
 function best(g, id) { return (g[id] && g[id].best) || 0; }
 function over(g, lvl) { return Object.keys(TARGETS).filter((id) => best(g, id) >= TARGETS[id][lvl]).length; }
 
-export function achievementsFor(games = {}, profile = {}, totalGames = 16) {
+export function achievementsFor(games = {}, profile = {}, totalGames = Object.keys(GAMES).length) {
     return ACHIEVEMENTS.map((a) => ({ ...a, done: !!a.test(games, profile, totalGames) }));
 }
+
+// ---------- Avatars (free for everyone) ----------
+export const AVATARS = ["😎", "🤖", "👾", "🦊", "🐼", "🐯", "🦁", "🐸", "🐧", "🦄", "🐙", "🦖", "🐶", "🐱", "🐵", "🦉",
+    "⚽", "🏀", "🎮", "🚀", "⭐", "🔥", "⚡", "🌈", "🍕", "🧁", "👑", "🎨", "🎸", "🏆", "💎", "🛸"];
 
 // ---------- Avatar frames (Premium) ----------
 export const FRAMES = {
@@ -184,3 +220,29 @@ export function nameProblem(name) {
     return null;
 }
 function deleet(s) { return s.replace(/[0134578@$!|]/g, (c) => LEET[c] || c); }
+
+// ---------- Comment filter ----------
+// Blocks rude words, links, emails and phone numbers in comments. Returns a problem message or null.
+export function textProblem(text) {
+    const raw = String(text || "").trim();
+    if (raw.length < 2) return "Write a bit more first.";
+    if (raw.length > 300) return "Comments can be up to 300 characters.";
+    if (/https?:|www\.|\.(com|net|org|io|co|il|ly|gg|me)\b|@/i.test(raw)) return "Comments can't have links or emails in them.";
+    if (/(\d[\s-]?){7,}/.test(raw)) return "Comments can't have phone numbers in them.";
+    if (/(.)\1{9,}/.test(raw)) return "Please don't spam.";
+    const lower = raw.toLowerCase();
+    let tokens = lower.split(/[^a-z0-9֐-׿@$!|]+/).filter(Boolean);
+    // join spaced-out letters: "s h i t" -> "shit"
+    const joined = [];
+    for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i].length === 1) { let w = ""; while (i < tokens.length && tokens[i].length === 1) w += tokens[i++]; i--; joined.push(w); }
+        else joined.push(tokens[i]);
+    }
+    const words = joined.map(deleet);
+    for (const w of BAD) {
+        const bw = deleet(w);
+        if (WHOLE_ONLY.includes(w)) { if (words.some((x) => x === bw || x.replace(/(.)\1+/g, "$1") === bw)) return "Please keep comments friendly."; }
+        else if (words.some((x) => x.includes(bw) || x.replace(/(.)\1+/g, "$1").includes(bw.replace(/(.)\1+/g, "$1")))) return "Please keep comments friendly.";
+    }
+    return null;
+}

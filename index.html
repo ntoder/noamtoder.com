@@ -183,6 +183,15 @@
             font: inherit; padding: 11px 0; width: 100%;
         }
         .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+        .tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .sort { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: 600 14px 'Inter', sans-serif; padding: 11px 12px; cursor: pointer; }
+        .sort:focus { outline: 0; border-color: var(--accent); }
+        .card-meta { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); font-weight: 700; margin-top: auto; padding-top: 4px; }
+        .card-meta .st { color: var(--gold); }
+        .mini h3 .clear { float: right; background: none; border: 0; color: var(--muted); font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+        html.he .mini h3 .clear { float: left; }
+        .mini h3 .clear:hover { color: var(--text); }
+        #userAvatar.emoji { font-size: 18px; background: var(--bg-2); }
         .chip {
             padding: 7px 16px; border-radius: 999px; cursor: pointer;
             background: var(--bg-2); color: var(--muted); border: 1px solid var(--line);
@@ -409,7 +418,7 @@
         <section class="today" id="today">
             <div class="daily-card" id="dailyCard"></div>
             <div class="rows">
-                <div class="mini hidden" id="recentWrap"><h3>🕹️ Continue playing</h3><div class="mini-row" id="recentRow"></div></div>
+                <div class="mini hidden" id="recentWrap"><h3>🕹️ Continue playing <button class="clear" id="clearRecent">Clear</button></h3><div class="mini-row" id="recentRow"></div></div>
                 <div class="mini hidden" id="favWrap"><h3>❤️ Your favorites</h3><div class="mini-row" id="favRow"></div></div>
             </div>
         </section>
@@ -429,10 +438,19 @@
         <!-- All games -->
         <div class="section-head" id="games">
             <h2>All Games <small id="count"></small></h2>
-            <label class="search">
-                <span aria-hidden="true">🔍</span>
-                <input type="search" id="search" placeholder="Search games…" aria-label="Search games">
-            </label>
+            <div class="tools">
+                <select class="sort" id="sort" aria-label="Sort games">
+                    <option value="default">Sort: Featured</option>
+                    <option value="rated">⭐ Top rated</option>
+                    <option value="popular">🔥 Most popular</option>
+                    <option value="new">🆕 Newest</option>
+                    <option value="az">🔤 A to Z</option>
+                </select>
+                <label class="search">
+                    <span aria-hidden="true">🔍</span>
+                    <input type="search" id="search" placeholder="Search games…" aria-label="Search games">
+                </label>
+            </div>
         </div>
 
         <div class="filters" role="group" aria-label="Filter by category">
@@ -506,6 +524,7 @@
             try { localStorage.setItem("gh_favs", JSON.stringify([...f])); } catch (e) {}
             return f.has(id);
         };
+        let getRecent = () => lsGet("gh_recent", []);
         let todayChallenge = () => dailyChallenge(new Date(), DEFAULT_PREMIUM), dailyDone = () => false;
 
         const $ = (id) => document.getElementById(id);
@@ -514,9 +533,23 @@
         $("gameCount").textContent = ids.length;
 
         // ---------- Game grid ----------
-        let filter = "all";
+        let filter = "all", sortBy = "default", summary = {};
+        try { sortBy = localStorage.getItem("gh_sort") || "default"; } catch (e) {}
+        $("sort").value = sortBy;
+        function sorted() {
+            const pos = Object.fromEntries(ids.map((id, i) => [id, i]));
+            const r = (id) => summary[id] || {};
+            const by = {
+                default: (a, b) => pos[a] - pos[b],
+                rated: (a, b) => ((r(b).n ? r(b).avg : 0) - (r(a).n ? r(a).avg : 0)) || ((r(b).n || 0) - (r(a).n || 0)) || pos[a] - pos[b],
+                popular: (a, b) => ((r(b).players || 0) - (r(a).players || 0)) || pos[a] - pos[b],
+                new: (a, b) => pos[b] - pos[a],
+                az: (a, b) => GAMES[a].name.localeCompare(GAMES[b].name)
+            }[sortBy] || ((a, b) => pos[a] - pos[b]);
+            return [...ids].sort(by);
+        }
         function renderGrid() {
-            $("grid").innerHTML = ids.map((id) => {
+            $("grid").innerHTML = sorted().map((id) => {
                 const g = GAMES[id], prem = isPremiumGame(id), locked = isLockedGame(id);
                 const tag = g.original ? '<span class="tag original">Original</span>'
                           : g.isNew ? '<span class="tag new">New</span>'
@@ -526,11 +559,21 @@
                     <div class="thumb">${tag}${early(id) ? '<span class="tag prem">🚀 Early access</span>' : prem ? '<span class="tag prem">★ Premium</span>' : ""}
                         <button class="heart${fav ? " on" : ""}" data-fav="${id}" aria-label="${fav ? "Remove from" : "Add to"} favorites" title="Favorite">${fav ? "❤️" : "🤍"}</button>
                         <img src="${g.img}" alt="${esc(g.name)}" loading="lazy" onerror="this.style.display='none'"></div>
-                    <div class="card-body"><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p></div>
+                    <div class="card-body"><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p>${meta(id)}</div>
                 </a>`;
             }).join("");
             apply();
         }
+        function meta(id) {
+            const r = summary[id];
+            if (!r || (!r.n && !r.players)) return "";
+            return `<div class="card-meta">${r.n ? `<span class="st">★ ${r.avg.toFixed(1)}</span><span>(${r.n})</span>` : ""}${r.players ? `<span>👥 ${r.players}</span>` : ""}</div>`;
+        }
+        $("sort").addEventListener("change", () => {
+            sortBy = $("sort").value;
+            try { localStorage.setItem("gh_sort", sortBy); } catch (e) {}
+            renderGrid();
+        });
         function apply() {
             const q = $("search").value.trim().toLowerCase();
             let shown = 0;
@@ -582,7 +625,7 @@
                     <b>Score ${c.target.toLocaleString()} ${c.unit} in ${esc(GAMES[c.game].name)}</b>
                     <span>${done ? "✅ Done for today! A new challenge comes tomorrow." : "Finish it today for +40 XP and keep your streak going."}</span></div>
                 ${done ? "" : `<a class="btn btn-primary" href="${GAMES[c.game].path}">▶ Play</a>`}`;
-            const recent = lsGet("gh_recent", []).filter((id) => GAMES[id]).slice(0, 6);
+            const recent = getRecent().filter((id) => GAMES[id]).slice(0, 6);
             $("recentWrap").classList.toggle("hidden", !recent.length);
             $("recentRow").innerHTML = recent.map(miniCard).join("");
             const favs = getFavs().filter((id) => GAMES[id]).slice(0, 6);
@@ -590,6 +633,10 @@
             $("favRow").innerHTML = favs.map(miniCard).join("");
         }
         renderToday();
+        $("clearRecent").addEventListener("click", () => {
+            if (hubMod) hubMod.clearRecent(); else try { localStorage.setItem("gh_recent", "[]"); } catch (e) {}
+            renderToday();
+        });
 
         // ---------- Mobile menu ----------
         $("menuBtn").addEventListener("click", () => {
@@ -608,7 +655,13 @@
         if (hubMod) {
         const { onAccount, isPremium } = hubMod;
         isPremiumGame = hubMod.isPremiumGame; isLockedGame = hubMod.isLockedGame;
-        getFavs = hubMod.getFavorites; toggleFav = hubMod.toggleFavorite;
+        getFavs = hubMod.getFavorites; toggleFav = hubMod.toggleFavorite; getRecent = hubMod.getRecent;
+        // star ratings + player counts (one small document, cached)
+        hubMod.social().then(async (soc) => {
+            summary = await soc.getSummary(); renderGrid();
+            await hubMod.ready;
+            if (hubMod.state.profile?.role === "admin") { await soc.maybeRebuildSummary(); summary = await soc.getSummary(); renderGrid(); }
+        }).catch(() => {});
         todayChallenge = hubMod.todaysChallenge; dailyDone = (day) => !!hubMod.state.profile?.daily?.[day];
         onAccount(({ user, profile }) => {
             renderGrid(); renderToday();
@@ -620,7 +673,9 @@
             const name = profile.name || user.displayName || user.email.split("@")[0];
             $("userName").textContent = name;
             const avatar = $("userAvatar");
-            if (user.photoURL) {
+            avatar.classList.toggle("emoji", !!profile.avatar);
+            if (profile.avatar) avatar.textContent = profile.avatar;
+            else if (user.photoURL) {
                 avatar.textContent = "";
                 const img = document.createElement("img");
                 img.src = user.photoURL; img.alt = ""; img.referrerPolicy = "no-referrer";
