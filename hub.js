@@ -531,6 +531,68 @@ async function showGameExtras() {
     } catch (e) { sec.querySelector(".gh-lb").textContent = "Leaderboard unavailable right now."; }
 }
 
+// ---------- Cookie notice ----------
+// Visitors in Europe/UK/Switzerland get Google's own consent message (set up in AdSense), so this
+// notice skips them. Everyone else sees a small bar once: "Accept" or "Only necessary".
+// The choice is saved as gh_cookies = "all" | "necessary" and passed to Google with Consent Mode.
+const COOKIE_TXT = LANG === "he"
+    ? { t: "🍪 האתר משתמש בעוגיות כדי לשמור את ההתחברות והשיאים שלכם, לספור ביקורים (Google Analytics) ולהציג פרסומות.", ok: "מאשר/ת", no: "רק הכרחיות", more: "פרטים", set: "🍪 הגדרות עוגיות" }
+    : { t: "🍪 We use cookies to keep you logged in and save your scores, count visits (Google Analytics) and show ads.", ok: "Accept", no: "Only necessary", more: "Learn more", set: "🍪 Cookie settings" };
+export function cookieChoice() { try { return localStorage.getItem("gh_cookies"); } catch (e) { return null; } }
+export function setCookieChoice(v) {
+    try { localStorage.setItem("gh_cookies", v); } catch (e) {}
+    const g = v === "all" ? "granted" : "denied";
+    if (typeof window.gtag === "function") window.gtag("consent", "update", { analytics_storage: g, ad_storage: g, ad_user_data: "denied", ad_personalization: "denied" });
+}
+function gdprApplies() {
+    // Google's consent tool answers this for visitors in Europe (only once AdSense loads it)
+    return new Promise((res) => {
+        let tries = 0;
+        const check = () => {
+            if (typeof window.__tcfapi === "function") {
+                try { window.__tcfapi("getTCData", 2, (d, ok) => res(!!(ok && d && d.gdprApplies))); } catch (e) { res(false); }
+                return;
+            }
+            if (++tries > 12) return res(false);
+            setTimeout(check, 250);
+        };
+        check();
+    });
+}
+export function showCookieBar(force = false) {
+    if (document.querySelector(".gh-cookie")) return;
+    ensureStyles();
+    const st = document.createElement("style");
+    st.textContent = `.gh-cookie{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:99997;width:min(760px,calc(100% - 24px));
+        display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#171b36;color:#eef0ff;border:1px solid #2a3060;border-radius:16px;
+        padding:12px 14px 12px 18px;box-shadow:0 14px 40px rgba(0,0,0,.5);font:600 14px Inter,Rubik,system-ui,sans-serif;line-height:1.45;direction:${LANG === "he" ? "rtl" : "ltr"}}
+      .gh-cookie p{flex:1;min-width:220px;margin:0}.gh-cookie a{color:#2ee6c9}
+      .gh-cookie .b{display:flex;gap:8px;margin-inline-start:auto}
+      .gh-cookie button{border:1px solid #2a3060;background:#12152b;color:#eef0ff;border-radius:10px;padding:9px 14px;font:700 14px Inter,Rubik,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+      .gh-cookie button.ok{background:#7c5cff;border-color:#7c5cff;color:#fff}`;
+    document.head.appendChild(st);
+    const bar = document.createElement("div");
+    bar.className = "gh-cookie"; bar.setAttribute("role", "dialog"); bar.setAttribute("aria-label", "Cookies"); bar.dataset.noi18n = "";
+    bar.innerHTML = `<p>${COOKIE_TXT.t} <a href="/privacy">${COOKIE_TXT.more}</a></p><div class="b"><button class="no">${COOKIE_TXT.no}</button><button class="ok">${COOKIE_TXT.ok}</button></div>`;
+    bar.querySelector(".ok").onclick = () => { setCookieChoice("all"); bar.remove(); };
+    bar.querySelector(".no").onclick = () => { setCookieChoice("necessary"); bar.remove(); };
+    document.body.appendChild(bar);
+}
+domReady.then(async () => {
+    if (location.pathname.startsWith("/admin")) return;
+    // "Cookie settings" link in page footers and on the privacy page
+    document.querySelectorAll("footer, [data-cookie-settings]").forEach((f) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = COOKIE_TXT.set; b.dataset.noi18n = "";
+        b.style.cssText = "background:none;border:0;color:inherit;font:inherit;text-decoration:underline;cursor:pointer;padding:0;margin:8px 0 0;opacity:.85";
+        b.onclick = () => showCookieBar(true);
+        f.appendChild(b);
+    });
+    if (cookieChoice()) return;
+    if (await gdprApplies()) return;      // Google's own message handles Europe
+    setTimeout(() => showCookieBar(), 600);
+});
+
 // ---------- Install as an app (PWA) ----------
 if ("serviceWorker" in navigator && location.protocol === "https:") {
     addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
