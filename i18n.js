@@ -48,8 +48,8 @@ const BLOCKS = {
         'ב־10 ₪, פעם אחת, אין פרסומות ויש עוד משחקים. <a href="/premium">מה מקבלים?</a>',
     "How do I report a bug or suggest a game?": "איך מדווחים על באג או מציעים משחק?",
     "Email noam@noamtoder.com. Ideas for new games are always welcome!": 'שלחו מייל ל־<a href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>. רעיונות למשחקים חדשים תמיד מתקבלים בשמחה!',
-    "Made with ❤️ by Noam · About me · More websites · Articles · Leaderboards · Premium · Terms · Privacy · Contact":
-        'נבנה באהבה ❤️ על ידי נועם · <a href="/mybio">עליי</a> · <a href="/Websites/">עוד אתרים</a> · <a href="/articles/">כתבות</a> · <a href="/leaderboard">טבלאות שיאים</a> · <a href="/premium">פרימיום</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a> · <a href="mailto:noam@noamtoder.com">צור קשר</a>',
+    "Made with ❤️ by Noam · About me · NoamChat · More websites · Articles · Leaderboards · Premium · Terms · Privacy · Contact":
+        'נבנה באהבה ❤️ על ידי נועם · <a href="/about">עליי</a> · <a href="/chat/">NoamChat</a> · <a href="/Websites/">עוד אתרים</a> · <a href="/articles/">כתבות</a> · <a href="/leaderboard">טבלאות שיאים</a> · <a href="/premium">פרימיום</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a> · <a href="mailto:noam@noamtoder.com">צור קשר</a>',
     "Made with ❤️ by Noam · Back to the Game Hub · Terms · Privacy":
         'נבנה באהבה ❤️ על ידי נועם · <a href="/">חזרה למשחקים</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a>',
     // premium page
@@ -83,7 +83,7 @@ const BLOCKS = {
 // ---------- Single pieces of text ----------
 const TEXT = {
     "Noam's": "המשחקים", "Game Hub": "של נועם", "Noam's Game Hub": "המשחקים של נועם", "Home": "בית", "Games": "משחקים", "🏆 Leaderboards": "🏆 טבלאות שיאים",
-    "Leaderboards": "טבלאות שיאים", "Articles": "כתבות", "Websites": "אתרים", "My Bio": "עליי", "📲 Install app": "📲 התקנת האפליקציה", "More ▾": "עוד ▾", "📚 Articles": "📚 כתבות", "🌐 Websites": "🌐 אתרים", "👋 My Bio": "👋 עליי", "★ Premium": "★ פרימיום",
+    "Leaderboards": "טבלאות שיאים", "Articles": "כתבות", "Websites": "אתרים", "My Bio": "עליי", "📲 Install app": "📲 התקנת האפליקציה", "More ▾": "עוד ▾", "📚 Articles": "📚 כתבות", "🌐 Websites": "🌐 אתרים", "👋 About": "👋 עליי", "★ Premium": "★ פרימיום",
     "Premium": "פרימיום", "Log in": "התחברות", "Log out": "התנתקות", "👤 My profile": "👤 הפרופיל שלי", "🛠️ Admin dashboard": "🛠️ ניהול",
     "A collection of my favorite games and websites that I've created or enjoy. Pick a game, hit play, and have fun!": "אוסף של המשחקים והאתרים שבניתי ושאני אוהב. בחרו משחק, לחצו על שחק ותהנו!",
     "★ Featured · Original": "★ מומלץ · מקורי",
@@ -170,7 +170,7 @@ const TEXT = {
     "Achievements": "הישגים", "Online wins": "ניצחונות אונליין", "🎮 Favourite games": "🎮 משחקים אהובים", "No achievements yet.": "עדיין אין הישגים.", "No games played yet.": "עדיין לא שיחק.",
     "👤 My profile": "👤 הפרופיל שלי", "(you)": "(את/ה)", "LEVEL": "רמה",
     // homepage
-    "Sort: Featured": "מיון: מומלצים", "⭐ Top rated": "⭐ הכי מדורגים", "🔥 Most popular": "🔥 הכי פופולריים", "🆕 Newest": "🆕 הכי חדשים", "🔤 A to Z": "🔤 לפי א״ב", "Sort games": "מיון משחקים", "Clear": "ניקוי",
+    "📚 Guides & articles": "📚 מדריכים וכתבות", "All articles →": "לכל הכתבות ←", "Sort: Featured": "מיון: מומלצים", "⭐ Top rated": "⭐ הכי מדורגים", "🔥 Most popular": "🔥 הכי פופולריים", "🆕 Newest": "🆕 הכי חדשים", "🔤 A to Z": "🔤 לפי א״ב", "Sort games": "מיון משחקים", "Clear": "ניקוי",
     // premium
     "← Games": "→ משחקים", "👤 Profile": "👤 פרופיל", "Go Premium": "עוברים לפרימיום", "One payment. Yours forever.": "תשלום אחד. שלך לתמיד.", "lifetime": "לכל החיים",
     "Pay once · no subscription": "משלמים פעם אחת · בלי מנוי", "🎟️ Have a Premium code?": "🎟️ יש לכם קוד פרימיום?", "Type it in to switch on Premium straight away.": "הקלידו אותו ופרימיום יופעל מיד.",

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Every number is a clue. Learn the basic rules and the famous 1-2-1 and 1-2-2-1 patterns to clear boards quickly and safely.">
+    <title>Mine Finder: the patterns that let you solve without guessing · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">💣</div>
+        <h1 class="t">Mine Finder: the patterns that let you solve without guessing</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 15 November 2026 · 7 min read</div>
+        
+<p>Mine Finder looks like a game of luck the first time you play. Then you learn to read the numbers, and it turns into a logic puzzle. Most of a board can be solved with certainty using a few simple rules and a couple of well-known patterns. Here's how.</p>
+
+<h2>What the numbers mean</h2>
+<p>A number tells you how many mines touch that square, counting all eight neighbours, including diagonals. A 1 means exactly one mine is somewhere around it. A blank square means zero, which is why blank areas open up automatically.</p>
+
+<h2>Rule 1: count the closed squares</h2>
+<p>If a number has exactly as many closed squares around it as its value, every one of those squares is a mine. A 1 with only one closed neighbour: that neighbour is a mine. A 3 with exactly three closed neighbours: all three are mines. Flag them.</p>
+
+<h2>Rule 2: count the flags</h2>
+<p>If a number already has as many flags around it as its value, every other closed square around it is safe. In our <a href="/MineFinder/minefinder">Mine Finder</a>, you can click the number itself to open all its unflagged neighbours at once, which makes this very fast.</p>
+<p>Those two rules solve a surprising amount of every board. Work around the edges of the open area, applying them to each number in turn.</p>
+
+<h2>Pattern: 1-2-1 along a wall</h2>
+<p>When you see the numbers 1, 2, 1 in a row along a straight edge of closed squares, the mines are under the two 1s, not under the 2. The square under the 2 is safe. It works because the 2 needs two mines, and the only way to give each 1 exactly one mine is to put them at the ends.</p>
+
+<h2>Pattern: 1-2-2-1 along a wall</h2>
+<p>For 1, 2, 2, 1 in a row along an edge, the mines are under the two 2s, and the squares under the 1s are safe. Once you've seen these two patterns a few times, you'll spot them instantly.</p>
+
+<h2>Pattern: a 1 in a corner</h2>
+<p>A 1 next to a corner of the open area, with two closed squares touching it, often has a neighbouring number that settles which one is the mine. Look at the numbers next to it: if one of them already has its mine accounted for, the shared square is safe and the mine is the other one.</p>
+
+<h2>Starting a board</h2>
+<p>In our game, your first click is always safe, and so are the squares around it. That means your first click opens a patch of the board with numbers to work from. Clicking near the middle tends to open a bigger area.</p>
+
+<h2>When you really have to guess</h2>
+<p>Occasionally a board reaches a point where no logic can decide, often a 50/50 between two squares at the end. When that happens, finish everything else first, then guess. If you have a choice of where to guess, a square far from any numbers is usually a better bet than a square next to a high number.</p>
+
+<h2>Getting faster</h2>
+<p>Speed comes from not hesitating. Learn the patterns well enough that you don't have to think about them, use number-clicking to open several squares at once, and use flag mode on a phone so a tap places a flag. Then try the bigger boards.</p>
+
+        <div class="cta"><a class="btn" href="/MineFinder/minefinder">▶ Play Mine Finder</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/chess-for-beginners">♟️ Chess for beginners: 10 rules that win your first games<span>You don&#x27;t need to memorise openings to start winning. These ten simple rules fix the mistakes almost every new player makes.</span></a><a href="/articles/how-to-solve-sudoku">🔢 How to solve Sudoku: techniques from easy to hard<span>Sudoku never needs guessing. Learn the logical techniques that solve easy puzzles in minutes and hard puzzles without a hint.</span></a><a href="/articles/word-guess-strategy">🟩 Word Guess strategy: the best first words and how to think<span>Why CRANE and SLATE are great starting words, how to use yellow letters properly, and the trick for when many words are still possible.</span></a><a href="/articles/learn-world-flags">🌍 How to learn the world&#x27;s flags: tricks for telling similar flags apart<span>Chad or Romania? Ireland or Ivory Coast? Simple tricks for remembering flags, and the best way to practise them.</span></a><a href="/articles/touch-typing-for-kids">⌨️ Learn to touch type: a simple guide for kids and beginners<span>Typing without looking is one of the most useful computer skills there is. Here&#x27;s how to start, and how to practise without getting bored.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

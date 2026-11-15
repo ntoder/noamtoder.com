@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Who makes Noam's Game Hub, how the games are built, how we keep the site safe for kids, and how to get in touch.">
+    <title>About Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 72px; line-height: 1.75; width: 100%; }
+        article h2 { font-size: clamp(26px, 5vw, 36px); font-weight: 800; margin-bottom: 6px; }
+        article .lead { color: var(--muted); font-size: 18px; margin-bottom: 26px; }
+        article h3 { font-size: 21px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ul { padding-left: 22px; display: grid; gap: 6px; margin-bottom: 14px; }
+        article a { color: var(--accent-2); }
+        .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 22px; }
+        .facts div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+        .facts b { display: block; font-size: 26px; color: var(--text); }
+        .facts span { color: var(--muted); font-size: 14px; }
+        .box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin: 16px 0; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+        .cta a { text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>About <span>the Game Hub</span></h1>
+        <a class="back" href="/articles/">Articles →</a>
+    </div>
+    <article>
+        <h2>Hi, I'm Noam 👋</h2>
+        <p class="lead">I make the games on this site. Here's what Noam's Game Hub is, how it's built, and how to reach me.</p>
+
+        <div class="facts">
+            <div><b>52</b><span>free games</span></div>
+            <div><b>0</b><span>downloads needed</span></div>
+            <div><b>2</b><span>languages: English and Hebrew</span></div>
+            <div><b>1</b><span>person who reads every message</span></div>
+        </div>
+
+        <h3>What this site is</h3>
+        <p>Noam's Game Hub is a collection of free games that run right in your web browser, on a computer, a tablet or a phone. There's nothing to install. You open a game and play.</p>
+        <p>It started with <a href="/Noametry/noametry">Noametry</a>, the first game I built and the one the hub is named after. Over time it grew into a full arcade: classics like <a href="/Snake/snake">Snake</a> and <a href="/Tetris/tetris">Block Drop</a>, thinking games like <a href="/Chess/chess">Chess</a> and <a href="/Sudoku/sudoku">Sudoku</a>, sports games like <a href="/Penalty/penalty">Penalty Shootout</a>, word and learning games like <a href="/WordGuess/wordguess">Word Guess</a> and <a href="/FlagQuiz/flagquiz">Flag Quiz</a>, and creative tools like <a href="/PixelPaint/pixelpaint">Pixel Paint</a>.</p>
+        <p>Every game page has a guide underneath it: how to play, the controls, a strategy section for getting better, and a bit about where that kind of game comes from. The <a href="/articles/">articles</a> go deeper, with longer guides and some behind-the-scenes posts about how games are made.</p>
+
+        <h3>Who makes it</h3>
+        <p>I'm Noam. I build web projects in HTML, CSS and JavaScript, and I run a coding club where kids learn to make their own websites and games. Building games is the best way I know to learn to code, and it's how I teach it too.</p>
+        <p>That's also why I care about how the games feel. I play-test each one on a computer and on a phone, tune how hard it is, and fix things when players tell me something is off. If a game here is too hard, too easy, or broken on your device, I really do want to know.</p>
+
+        <h3>How the games are built</h3>
+        <p>Every game is written by hand in JavaScript and drawn on an HTML <code>&lt;canvas&gt;</code>, the same technology I explain in <a href="/articles/how-browser-games-work">How a browser game works</a>. There are no plug-ins and no app stores. The games share a small toolkit I wrote for things like sound effects, touch controls and saving your best score, so a fix in one place improves every game.</p>
+        <p>If you'd like to try making one yourself, <a href="/articles/first-game">Make your first game in 30 lines of JavaScript</a> is a great first project to try.</p>
+
+        <h3>Keeping it friendly and safe</h3>
+        <ul>
+            <li><b>You can play without an account.</b> An account is free and only adds things like saved scores, leaderboards and achievements.</li>
+            <li><b>Ads are kept child-safe.</b> The site is supported by ads from Google, and our ad requests ask Google to treat visitors as children, so ads are not personalised. <a href="/premium">Premium</a> removes ads completely.</li>
+            <li><b>Comments are filtered.</b> Rude words, links and phone numbers are blocked, players can report a comment, and I remove anything unkind.</li>
+            <li><b>Online games are with friends only.</b> You play online by sharing a private room code with someone you know. There's no chatting with strangers, just emoji reactions.</li>
+        </ul>
+        <p>You can read exactly what is stored and why in the <a href="/privacy">privacy policy</a>, and the rules for using the site in the <a href="/terms">terms</a>.</p>
+
+        <h3>Get in touch</h3>
+        <div class="box">
+            <p style="margin:0">Found a bug, have an idea for a game, or want to say hi? Email me at <a href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>. I read every message. Teachers who want to use a game in class are very welcome to write too.</p>
+        </div>
+
+        <div class="cta"><a class="btn" href="/">▶ Play the games</a><a class="btn ghost" href="/articles/">Read the articles</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made with ❤️ by Noam · <a href="/" style="color:inherit">Games</a> · <a href="/articles/" style="color:inherit">Articles</a> · <a href="/terms" style="color:inherit">Terms</a> · <a href="/privacy" style="color:inherit">Privacy</a> · </footer>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

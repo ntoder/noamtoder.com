@@ -11,8 +11,8 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Noam's Game Hub — 16 free browser games made by Noam: Noametry, Space Shooter, 2048, Block Drop, Snake and more. No downloads, scores saved to your free account.">
-    <title>Noam's Game Hub</title>
+    <meta name="description" content="52 free browser games made by Noam, from Chess, Sudoku and Snake to soccer and word games, each with a full guide. No downloads, works on phones, scores saved to your free account.">
+    <title>Noam's Game Hub · 52 free browser games with guides</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#0b0d1a">
@@ -188,6 +188,14 @@
         .sort:focus { outline: 0; border-color: var(--accent); }
         .card-meta { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); font-weight: 700; margin-top: auto; padding-top: 4px; }
         .card-meta .st { color: var(--gold); }
+        .arts { margin: 40px 0 10px; }
+        .arts-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+        .arts-head h2 { font-size: 24px; }
+        .arts-head a { color: var(--accent-2); font-weight: 700; text-decoration: none; }
+        .arts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .art-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; color: var(--text); text-decoration: none; font-weight: 700; line-height: 1.35; transition: border-color .15s, transform .15s; }
+        .art-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .art-card .e { font-size: 30px; flex: none; }
         .mini h3 .clear { float: right; background: none; border: 0; color: var(--muted); font: 600 12px 'Inter', sans-serif; cursor: pointer; }
         html.he .mini h3 .clear { float: left; }
         .mini h3 .clear:hover { color: var(--text); }
@@ -379,7 +387,7 @@
                     <a href="/bookmarks/">⭐ Bookmarks</a>
                     <a href="/articles/">📚 Articles</a>
                     <a href="/Websites/">🌐 Websites</a>
-                    <a href="/mybio">👋 My Bio</a>
+                    <a href="/about">👋 About</a>
                     <a href="#" class="hidden" id="installBtn">📲 Install app</a>
                 </div>
             </li>
@@ -505,11 +513,15 @@
                 <details><summary>How do I report a bug or suggest a game?</summary><p>Email <a href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>. Ideas for new games are always welcome!</p></details>
             </div>
         </section>
+        <section class="arts" aria-label="Guides and articles">
+            <div class="arts-head"><h2>📚 Guides &amp; articles</h2><a href="/articles/">All articles →</a></div>
+            <div class="arts-grid"><a class="art-card" href="/articles/chess-for-beginners"><span class="e">♟️</span><span class="t" data-noi18n>Chess for beginners: 10 rules that win your first games</span></a><a class="art-card" href="/articles/how-to-solve-sudoku"><span class="e">🔢</span><span class="t" data-noi18n>How to solve Sudoku: techniques from easy to hard</span></a><a class="art-card" href="/articles/word-guess-strategy"><span class="e">🟩</span><span class="t" data-noi18n>Word Guess strategy: the best first words</span></a><a class="art-card" href="/articles/history-of-arcade-games"><span class="e">🕹️</span><span class="t" data-noi18n>From Pong to phones: a short history of arcade games</span></a></div>
+        </section>
         <div data-ad="banner"></div>
     </main>
 
     <footer>
-        Made with ❤️ by Noam · <a href="/mybio">About me</a> · <a href="/chat/">NoamChat</a> · <a href="/Websites/">More websites</a> · <a href="/articles/">Articles</a> · <a href="/leaderboard">Leaderboards</a> · <a href="/premium">Premium</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:noam@noamtoder.com">Contact</a>
+        Made with ❤️ by Noam · <a href="/about">About me</a> · <a href="/chat/">NoamChat</a> · <a href="/Websites/">More websites</a> · <a href="/articles/">Articles</a> · <a href="/leaderboard">Leaderboards</a> · <a href="/premium">Premium</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:noam@noamtoder.com">Contact</a>
     </footer>
 
     <script type="module">
