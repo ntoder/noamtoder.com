@@ -5,8 +5,8 @@
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Guide a little bird through a sky full of pipes. Free to play in your browser on Noam&#x27;s Game Hub.">
-    <title>Sky Hopper · Noam's Game Hub</title>
+    <meta name="description" content="Help a brave little chicken fly through a sky full of pipes. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Flappy Chicken · Noam's Game Hub</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/game-shell.css">
@@ -15,7 +15,7 @@
 <body>
     <div class="gbar">
         <a class="back" href="/">← Games</a>
-        <h1>Sky <span>Hopper</span></h1>
+        <h1>Flappy <span>Chicken</span></h1>
         <div class="stats"><div class="stat"><b id="score">0</b><small>Pipes</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
     </div>
     <div class="stage">
@@ -24,8 +24,8 @@
             <div class="frame">
             <canvas id="c" width="420" height="640"></canvas>
             <div class="overlay" id="start"><div>
-                <h2>Sky Hopper</h2>
-                <p id="startText">Space, ⬆ or tap to flap.<br>Fly through the gaps. Win a 🥉 at 5 pipes, 🥈 at 12, 🥇 at 25!</p>
+                <h2>Flappy Chicken</h2>
+                <p id="startText">Space, ⬆ or tap to flap.<br>Help the chicken fly through the gaps. Win a 🥉 at 5 pipes, 🥈 at 12, 🥇 at 25!</p>
                 <button class="btn" id="startBtn">▶ Fly</button>
             </div></div>
             <div class="overlay hidden" id="over"><div>
@@ -57,7 +57,7 @@
             if (state === "dead") return;
             if (state === "ready") { state = "play"; Kit.hide("start"); }
             bird.vy = -330; beep(620, 0.06, "triangle", 0.05, 200);
-            fx.burst(bird.x - 10, bird.y + 6, "#ffffff88", 4, 1.5);
+            fx.burst(bird.x - 12, bird.y + 4, "#fffaf0cc", 4, 1.5);
         }
         function gapSize() { return Math.max(130, 185 - score * 2); }
 
@@ -94,7 +94,7 @@
         function die() {
             if (state !== "play") return;
             state = "dead"; flash = 1; beep(160, 0.35, "sawtooth", 0.06, -100);
-            fx.burst(bird.x, bird.y, "#ffc94d", 22, 4);
+            fx.burst(bird.x, bird.y, "#fffaf0", 26, 4); fx.burst(bird.x, bird.y, "#ff3b4e", 6, 3);
             const best = Kit.setBest(BEST, score);
             const medal = score >= 40 ? "🏆 Platinum" : score >= 25 ? "🥇 Gold" : score >= 12 ? "🥈 Silver" : score >= 5 ? "🥉 Bronze" : "";
             setTimeout(() => { $("overText").innerHTML = `${score} pipes${medal ? " · " + medal : ""}<br>Best ${best}`; Kit.show("over"); }, 500);
@@ -126,16 +126,38 @@
             ctx.fillStyle = "#1e2347";
             const go = (t * (state === "play" ? speed : 40)) % 40;
             for (let x = -go; x < W; x += 40) ctx.fillRect(x, GROUND + 14, 20, 6);
-            // bird
+            // chicken
             const ang = Math.max(-0.5, Math.min(1.2, bird.vy / 500));
             ctx.save(); ctx.translate(bird.x, bird.y); ctx.rotate(state === "ready" ? 0 : ang);
-            ctx.fillStyle = Kit.skin("flappybird", "#ffc94d");
-            ctx.beginPath(); ctx.ellipse(0, 0, bird.r + 3, bird.r, 0, 0, 7); ctx.fill();
-            const wing = Math.sin(t * (state === "play" ? 30 : 10)) * 6;
-            ctx.fillStyle = "#ff9d4d"; ctx.beginPath(); ctx.ellipse(-6, 2 + wing * 0.4, 9, 6 + wing * 0.3, -0.3, 0, 7); ctx.fill();
-            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(7, -5, 6, 0, 7); ctx.fill();
+            const body = Kit.skin("flappybird", "#fffaf0");
+            const flapping = Math.sin(t * (state === "play" ? 30 : 10));
+            // feet tucked under
+            ctx.strokeStyle = "#ff9d2e"; ctx.lineWidth = 3; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(-6, 20); ctx.moveTo(3, 13); ctx.lineTo(2, 20); ctx.stroke();
+            // tail feathers
+            ctx.fillStyle = body; ctx.strokeStyle = "#d9cdb8"; ctx.lineWidth = 1.5;
+            for (const a of [-0.7, -0.25, 0.2]) {
+                ctx.save(); ctx.translate(-14, -2); ctx.rotate(Math.PI + a);
+                ctx.beginPath(); ctx.ellipse(7, 0, 9, 4, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+            }
+            // round body
+            ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(0, 0, bird.r + 3, bird.r + 1, 0, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#d9cdb8"; ctx.lineWidth = 1.5; ctx.stroke();
+            // comb (three red bumps on top)
+            ctx.fillStyle = "#ff3b4e";
+            for (const [cx, cy, r] of [[2, -16, 4.5], [7, -17, 5], [12, -14, 4]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); }
+            // flapping wing
+            ctx.fillStyle = "#f1e6d2"; ctx.strokeStyle = "#cbbda3";
+            ctx.save(); ctx.translate(-5, 3); ctx.rotate(-0.35 + flapping * 0.55);
+            ctx.beginPath(); ctx.ellipse(-3, 0, 10, 6, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+            // eye
             ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(9, -5, 3, 0, 7); ctx.fill();
-            ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(26, 3); ctx.lineTo(14, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(10, -6, 1, 0, 7); ctx.fill();
+            // cheek
+            ctx.fillStyle = "#ff8db455"; ctx.beginPath(); ctx.arc(8, 3, 3.5, 0, 7); ctx.fill();
+            // beak + wattle
+            ctx.fillStyle = "#ffa62e"; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 3); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#ff3b4e"; ctx.beginPath(); ctx.ellipse(15, 7, 3, 4.5, 0.2, 0, 7); ctx.fill();
             ctx.restore();
             fx.draw(ctx);
             if (state === "play" || state === "dead") Kit.text(ctx, score, W / 2, 70, 54, "#ffffff", "center", "'Press Start 2P', monospace", 400);
@@ -170,7 +192,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 @media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
-        <section><h2>About Sky Hopper</h2><p>Guide a little bird through a sky full of pipes. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.</p></section>
+        <section><h2>About Flappy Chicken</h2><p>Help a brave little chicken fly through a sky full of pipes. Chickens aren't great at flying, so every flap counts. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.</p></section>
         <section><h3>How to play</h3><table><tr><td>Space / click / tap</td><td>Flap</td></tr></table></section>
         <section><h3>Tips</h3><ul><li>Tap gently and often instead of big jumps.</li><li>Aim for the middle of each gap, not the edges.</li><li>Stay calm after a high score. Rushing is what usually ends a run.</li></ul></section><!-- guide --><style>
 .gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
@@ -179,7 +201,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-guide ul{display:grid;gap:6px}
 .gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
 .gh-guide a{color:#2ee6c9}
-</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Sky Hopper</h3><p>Sky Hopper is hard because every tap moves the bird a lot and gravity never stops. The secret is small, regular taps. Instead of letting the bird fall far and then tapping hard to save it, keep it floating around the middle of the next gap with gentle taps. A calm bird is easy to steer. A bird swinging up and down is not.</p><p>Aim for the middle of each gap, not the bottom or the top. As you pass one pair of pipes, look straight at the next gap and start lining up while you're still between the pipes. Many runs end right after a new high score, when players get excited and tap too fast. Take a breath, keep the same rhythm, and treat every pipe the same.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score your first 10 points by keeping the bird low and tapping softly.</li><li><b>Getting good:</b> Learn to line up with the next gap early and keep a steady rhythm.</li><li><b>Expert:</b> Play long runs without changing your tapping speed, even after a new record.</li></ul><h3>Did you know?</h3><p>This game is inspired by Flappy Bird, made by Vietnamese developer Dong Nguyen in 2013. It became one of the most downloaded mobile games of early 2014, and then its creator removed it from app stores because he felt people were playing it too much.</p><h3>Questions players ask</h3><h4>Why is it so hard?</h4><p>Every tap gives the same small hop and gravity is always pulling the bird down, so even tiny timing mistakes matter. That's the challenge.</p><h4>Can I play with the keyboard?</h4><p>Yes. Press Space, or click with the mouse.</p><h4>Does it get harder?</h4><p>Yes. As your score climbs, the gaps between the pipes get smaller and some pipes start to move up and down. Keep your taps gentle and you'll adapt.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Flappy Chicken</h3><p>Flappy Chicken is hard because every tap moves the chicken a lot and gravity never stops. The secret is small, regular taps. Instead of letting the chicken fall far and then tapping hard to save it, keep it floating around the middle of the next gap with gentle taps. A calm chicken is easy to steer. A chicken swinging up and down is not.</p><p>Aim for the middle of each gap, not the bottom or the top. As you pass one pair of pipes, look straight at the next gap and start lining up while you're still between the pipes. Many runs end right after a new high score, when players get excited and tap too fast. Take a breath, keep the same rhythm, and treat every pipe the same.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score your first 10 points by keeping the chicken low and tapping softly.</li><li><b>Getting good:</b> Learn to line up with the next gap early and keep a steady rhythm.</li><li><b>Expert:</b> Play long runs without changing your tapping speed, even after a new record.</li></ul><h3>Did you know?</h3><p>This game is inspired by Flappy Bird, but with a chicken, which is funny because real chickens can only fly in short bursts. Flappy Bird was made by Vietnamese developer Dong Nguyen in 2013. It became one of the most downloaded mobile games of early 2014, and then its creator removed it from app stores because he felt people were playing it too much.</p><h3>Questions players ask</h3><h4>Why is it so hard?</h4><p>Every tap gives the same small hop and gravity is always pulling the chicken down, so even tiny timing mistakes matter. That's the challenge.</p><h4>Can I play with the keyboard?</h4><p>Yes. Press Space, or click with the mouse.</p><h4>Does it get harder?</h4><p>Yes. As your score climbs, the gaps between the pipes get smaller and some pipes start to move up and down. Keep your taps gentle and you'll adapt.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/Snake/snake">Snake</a><a href="/Tetris/tetris">Block Drop</a><a href="/Chess/chess">Chess</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>

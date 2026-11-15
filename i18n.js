@@ -19,7 +19,7 @@ export function setLang(l) {
 // ---------- Game names ----------
 const NAMES = {
     "Noametry": "נועמטרי", "Space Shooter": "יורה החלל", "2048": "2048", "Brick Smash": "מנפץ הלבנים", "Memory Match": "משחק הזיכרון",
-    "Subway Runner": "רץ הרכבת", "Dino Run": "ריצת הדינו", "Sky Hopper": "קופץ השמיים", "Snake": "נחש", "Maze Muncher": "זולל המבוך",
+    "Subway Runner": "רץ הרכבת", "Dino Run": "ריצת הדינו", "Flappy Chicken": "התרנגולת המעופפת", "Sky Hopper": "קופץ השמיים", "Snake": "נחש", "Maze Muncher": "זולל המבוך",
     "Block Drop": "נפילת הבלוקים", "Pixel Jumper": "קופץ הפיקסלים", "Bubble Blaster": "מפוצץ הבועות", "Chess": "שחמט",
     "Paddle Battle": "קרב המחבטים", "Four in a Row": "ארבע בשורה", "Tic-Tac-Toe": "איקס עיגול", "Mine Finder": "מוצא המוקשים", "Mole Mash": "הכה את החפרפרת",
     "Color Echo": "הד הצבעים", "Stack Tower": "מגדל הבלוקים", "Space Rocks": "סלעי החלל", "Math Blitz": "בליץ חשבון", "Typing Rain": "גשם של מילים",
@@ -95,7 +95,7 @@ const TEXT = {
     "Jump and dodge your way through geometric levels.": "קופצים ומתחמקים בשלבים גאומטריים.", "Blast alien waves, grab power-ups, beat the boss.": "יורים בגלי חייזרים, אוספים שדרוגים ומביסים את הבוס.",
     "Slide and merge the tiles to reach 2048.": "מחליקים ומחברים אריחים עד 2048.", "Smash every brick — level after level.": "מנפצים כל לבנה, שלב אחרי שלב.",
     "Flip cards and find every pair.": "הופכים קלפים ומוצאים כל זוג.", "Switch lanes, jump barriers, dodge the trains.": "מחליפים מסלולים, קופצים מעל מחסומים ומתחמקים מרכבות.",
-    "Jump the cacti and duck under the birds.": "קופצים מעל קקטוסים ומתכופפים מתחת לציפורים.", "Tap to flap and fly through the gaps.": "נוגעים כדי לנפנף ועפים בין הרווחים.",
+    "Jump the cacti and duck under the birds.": "קופצים מעל קקטוסים ומתכופפים מתחת לציפורים.", "Tap to flap and fly through the gaps.": "נוגעים כדי לנפנף ועפים בין הרווחים.", "Tap to flap and help the chicken fly through the gaps.": "נוגעים כדי לנפנף ועוזרים לתרנגולת לעוף דרך הרווחים.",
     "The classic — eat and grow longer.": "הקלאסיקה: אוכלים וגדלים.", "Eat all the dots and avoid the ghosts.": "אוכלים את כל הנקודות ובורחים מהרוחות.",
     "Arrange falling blocks to clear lines.": "מסדרים בלוקים נופלים ומעלימים שורות.", "Run, jump and stomp across new levels.": "רצים, קופצים ומועכים אויבים בשלבים חדשים.",
     "Blow bubbles to trap the monsters.": "מנפחים בועות ולוכדים מפלצות.", "Play chess against the computer or a friend.": "משחקים שחמט נגד המחשב או נגד חבר.",
@@ -240,8 +240,8 @@ const INFO = {
         "רוצו לאורך מסילה עם שלושה מסלולים הכי מהר שאפשר. רכבות מגיעות ישר אליכם, אז החליפו מסלול כדי לזוז מהדרך, וקפצו מעל המחסומים האדומים־לבנים. אספו מטבעות לנקודות נוספות. ככל ששורדים יותר, הרכבות מגיעות מהר יותר.",
     "A little dinosaur runs across the desert at night and day. Jump over cacti and duck under flying birds. The desert speeds up the longer you survive, and the sky switches between day and night as your score grows.":
         "דינוזאור קטן רץ במדבר ביום ובלילה. קפצו מעל קקטוסים והתכופפו מתחת לציפורים מעופפות. המדבר מאיץ ככל ששורדים יותר, והשמיים מתחלפים בין יום ללילה ככל שהניקוד עולה.",
-    "Guide a little bird through a sky full of pipes. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.":
-        "הובילו ציפור קטנה בשמיים מלאי צינורות. כל נגיעה מקפיצה אותה קצת למעלה, וכוח המשיכה מושך אותה בחזרה למטה. עופו דרך הרווח בין כל זוג צינורות כדי לקבל נקודה. קל ללמוד וקשה מאוד לשלוט.",
+    "Help a brave little chicken fly through a sky full of pipes. Chickens aren't great at flying, so every flap counts. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.":
+        "עזרו לתרנגולת קטנה ואמיצה לעוף בשמיים מלאי צינורות. תרנגולות לא ממש יודעות לעוף, אז כל נפנוף חשוב. כל נגיעה מקפיצה אותה קצת למעלה, וכוח המשיכה מושך אותה בחזרה למטה. עופו דרך הרווח בין כל זוג צינורות כדי לקבל נקודה. קל ללמוד וקשה מאוד לשלוט.",
     "Steer a growing snake around the board and eat the food. Every bite makes the snake longer and adds to your score. Crash into a wall or into your own tail and the game is over.":
         "הזיזו נחש שגדל על הלוח ואכלו את האוכל. כל ביס מאריך את הנחש ומוסיף נקודות. אם נתקלים בקיר או בזנב של עצמכם, המשחק נגמר.",
     "Race through the maze eating every dot while colourful ghosts chase you. Eat all the dots to win the level. If a ghost catches you, you lose a life. You have three lives to clear the board.":

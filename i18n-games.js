@@ -23,9 +23,10 @@ export const TEXT = {
     "Eat 🍎 to grow. Golden ★ apples are worth 50!": "אכלו 🍎 כדי לגדול. תפוחי זהב ★ שווים 50!",
     "Space or tap to pause.": "רווח או נגיעה להפסקה.",
     "The snake speeds up with every apple. Don't hit the walls or your tail!": "הנחש מאיץ עם כל תפוח. אל תתנגשו בקירות או בזנב!",
-    // ---- Sky Hopper ----
+    // ---- Flappy Chicken ----
     "Space, ⬆ or tap to flap.": "רווח, ⬆ או נגיעה כדי לנפנף.",
     "Fly through the gaps. Win a 🥉 at 5 pipes, 🥈 at 12, 🥇 at 25!": "עופו דרך הרווחים. 🥉 ב־5 צינורות, 🥈 ב־12, 🥇 ב־25!",
+    "Help the chicken fly through the gaps. Win a 🥉 at 5 pipes, 🥈 at 12, 🥇 at 25!": "עזרו לתרנגולת לעוף דרך הרווחים. 🥉 ב־5 צינורות, 🥈 ב־12, 🥇 ב־25!",
     "The gaps get smaller and some pipes start to move as your score climbs.": "ככל שהניקוד עולה, הרווחים קטנים וחלק מהצינורות מתחילים לזוז.",
     // ---- Block Drop ----
     "⬅ ➡ move": "⬅ ➡ תזוזה", "⬆ / X rotate": "⬆ / X סיבוב", "Z rotate back": "Z סיבוב אחורה", "⬇ soft drop": "⬇ הורדה איטית",

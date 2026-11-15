@@ -10,7 +10,7 @@ export const GAMES = {
     memory:       { name: "Memory Match",  path: "/Memory/memory",             img: "/thumbs/memory.png",       tags: ["puzzle"],           desc: "Flip cards and find every pair." },
     subwaysurfer: { name: "Subway Runner", path: "/SubwaySurfer/subwaysurf",   img: "/thumbs/subway.png",       tags: ["runner"],           desc: "Switch lanes, jump barriers, dodge the trains." },
     dinogame:     { name: "Dino Run",      path: "/DinoGame/dinogame",         img: "/thumbs/dino.png",         tags: ["runner", "arcade"], desc: "Jump the cacti and duck under the birds." },
-    flappybird:   { name: "Sky Hopper",    path: "/FlappyBird/flappybird",     img: "/thumbs/flappybird.png",  tags: ["arcade"],           desc: "Tap to flap and fly through the gaps." },
+    flappybird:   { name: "Flappy Chicken", path: "/FlappyBird/flappybird",     img: "/thumbs/flappybird.png",  tags: ["arcade"],           desc: "Tap to flap and help the chicken fly through the gaps." },
     snake:        { name: "Snake",         path: "/Snake/snake",               img: "/thumbs/snake.png",              tags: ["arcade"],           desc: "The classic — eat and grow longer." },
     pacman:       { name: "Maze Muncher",        path: "/Pacman/pacman",             img: "/thumbs/pacman.png",             tags: ["arcade"],           desc: "Eat all the dots and avoid the ghosts." },
     tetris:       { name: "Block Drop",        path: "/Tetris/tetris",             img: "/thumbs/tetris.png",             tags: ["puzzle"],           desc: "Arrange falling blocks to clear lines." },
