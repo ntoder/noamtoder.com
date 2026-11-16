@@ -48,8 +48,8 @@ const BLOCKS = {
         'ב־10 ₪, פעם אחת, אין פרסומות ויש עוד משחקים. <a href="/premium">מה מקבלים?</a>',
     "How do I report a bug or suggest a game?": "איך מדווחים על באג או מציעים משחק?",
     "Email noam@noamtoder.com. Ideas for new games are always welcome!": 'שלחו מייל ל־<a href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>. רעיונות למשחקים חדשים תמיד מתקבלים בשמחה!',
-    "Made with ❤️ by Noam · About me · NoamChat · More websites · Articles · Leaderboards · Premium · Terms · Privacy · Contact":
-        'נבנה באהבה ❤️ על ידי נועם · <a href="/about">עליי</a> · <a href="/chat/">NoamChat</a> · <a href="/Websites/">עוד אתרים</a> · <a href="/articles/">כתבות</a> · <a href="/leaderboard">טבלאות שיאים</a> · <a href="/premium">פרימיום</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a> · <a href="mailto:noam@noamtoder.com">צור קשר</a>',
+    "Made with ❤️ by Noam · About me · NoamChat · NoamBrowser · More websites · Articles · Leaderboards · Premium · Terms · Privacy · Contact":
+        'נבנה באהבה ❤️ על ידי נועם · <a href="/about">עליי</a> · <a href="/chat/">NoamChat</a> · <a href="/noambrowser">NoamBrowser</a> · <a href="/Websites/">עוד אתרים</a> · <a href="/articles/">כתבות</a> · <a href="/leaderboard">טבלאות שיאים</a> · <a href="/premium">פרימיום</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a> · <a href="mailto:noam@noamtoder.com">צור קשר</a>',
     "Made with ❤️ by Noam · Back to the Game Hub · Terms · Privacy":
         'נבנה באהבה ❤️ על ידי נועם · <a href="/">חזרה למשחקים</a> · <a href="/terms">תנאי שימוש</a> · <a href="/privacy">פרטיות</a>',
     // premium page

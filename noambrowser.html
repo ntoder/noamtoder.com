@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoamBrowser · a free, private web browser for Windows, Mac and Linux</title>
+    <meta name="description" content="NoamBrowser is a free, private web browser for Windows, macOS and Linux with a built-in ad blocker, free VPN, password manager, encrypted chat and Focus mode. No telemetry. Download the newest version.">
+    <link rel="canonical" href="https://noamtoder.com/noambrowser">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="NoamBrowser · a free, private web browser">
+    <meta property="og:description" content="Built-in ad blocker and free VPN, no telemetry, for Windows, Mac and Linux.">
+    <meta property="og:url" content="https://noamtoder.com/noambrowser">
+    <meta property="og:image" content="https://noamtoder.com/noambrowser-icon.png">
+    <link rel="icon" type="image/png" href="/noambrowser-icon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "NoamBrowser",
+      "alternateName": "Noam Browser",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "description": "A free, private web browser with a built-in ad blocker, free VPN, password manager, end-to-end encrypted chat and Focus mode.",
+      "url": "https://noamtoder.com/noambrowser",
+      "downloadUrl": "https://github.com/ntoder/NoamBrowser/releases/latest",
+      "image": "https://noamtoder.com/noambrowser-icon.png",
+      "author": { "@type": "Person", "name": "Noam", "url": "https://noamtoder.com/about" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 72px; width: 100%; }
+        .hero { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; margin-bottom: 40px; }
+        .hero img { width: 132px; height: 132px; border-radius: 30px; box-shadow: 0 16px 50px #7c5cff55; }
+        .hero h2 { font-size: clamp(34px, 6vw, 54px); line-height: 1.05; font-weight: 800; margin-bottom: 10px; }
+        .hero p { color: var(--muted); font-size: 19px; line-height: 1.5; max-width: 620px; }
+        .dl { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+        .dl .big { display: inline-flex; flex-direction: column; background: var(--accent); color: #fff; text-decoration: none; border-radius: 14px; padding: 14px 24px; font-weight: 800; font-size: 18px; box-shadow: 0 10px 30px #7c5cff55; }
+        .dl .big small { font-weight: 600; font-size: 12px; opacity: .85; }
+        .dl .alt { color: var(--accent-2); font-weight: 700; text-decoration: none; }
+        .ver { color: var(--muted); font-size: 13px; margin-top: 10px; }
+        h3.sec { font-size: 26px; margin: 46px 0 16px; }
+        .feat { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+        .feat div { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+        .feat b { display: block; font-size: 17px; margin-bottom: 6px; }
+        .feat span { color: #cfd3f5; line-height: 1.55; font-size: 15px; }
+        .more { color: var(--muted); margin-top: 14px; line-height: 1.6; }
+        .install { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+        .install div { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+        .install h4 { font-size: 18px; margin-bottom: 8px; }
+        .install ol { padding-left: 20px; color: #cfd3f5; line-height: 1.6; display: grid; gap: 6px; font-size: 15px; }
+        code { background: #0b0d1a; border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-size: 13px; word-break: break-all; }
+        .files { display: grid; gap: 8px; }
+        .files a { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; color: var(--text); text-decoration: none; font-weight: 700; }
+        .files a:hover { border-color: var(--accent); }
+        .files a span { color: var(--muted); font-weight: 500; font-size: 13px; }
+        .faq h4 { font-size: 17px; margin: 18px 0 4px; }
+        .faq p { color: #cfd3f5; line-height: 1.65; }
+        a.inl { color: var(--accent-2); }
+        @media (max-width: 620px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero img { margin: 0 auto; width: 104px; height: 104px; } .dl { justify-content: center; } }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Game Hub</a>
+        <h1>Noam<span>Browser</span></h1>
+        <a class="back" href="#download">Download</a>
+    </div>
+    <main>
+        <section class="hero">
+            <img src="/noambrowser-icon.png" alt="NoamBrowser icon" width="132" height="132">
+            <div>
+                <h2>NoamBrowser</h2>
+                <p>A free, private and fast web browser for Windows, Mac and Linux. Ads and trackers are blocked, a free VPN is built in, and the browser itself never tracks you.</p>
+                <div class="dl">
+                    <a class="big" id="main" href="https://github.com/ntoder/NoamBrowser/releases/latest">⬇ Download NoamBrowser<small id="mainSub">Free · Windows, macOS, Linux</small></a>
+                    <a class="alt" href="#download">All downloads →</a>
+                </div>
+                <div class="ver" id="ver">Always the newest version</div>
+            </div>
+        </section>
+
+        <h3 class="sec">Why NoamBrowser?</h3>
+        <div class="feat">
+            <div><b>🛡️ Shields</b><span>Blocks ads, trackers, malware sites, cookie banners and YouTube ads. Upgrades sites to HTTPS, blocks fingerprinting and strips tracking tags from links.</span></div>
+            <div><b>🌐 Built-in free VPN</b><span>Free Cloudflare WARP (WireGuard) with a kill switch, or use your own SOCKS5 or HTTP proxy.</span></div>
+            <div><b>🔒 Private by design</b><span>No telemetry, no required account and encrypted DNS. NoamBrowser doesn't collect what you do.</span></div>
+            <div><b>💬 NoamChat</b><span>Chat with friends who use NoamBrowser, right in the sidebar. Messages are end-to-end encrypted and go straight between computers, with no phone number needed.</span></div>
+            <div><b>👤 Optional account with sync</b><span>Sign in on any computer and your bookmarks, passwords, settings, history and chats sync. Everything is encrypted on your computer before upload, so the server can't read it.</span></div>
+            <div><b>🔑 Password manager</b><span>Encrypted on your computer, with autofill, import and export, and alerts for leaked, reused or weak passwords.</span></div>
+            <div><b>🍅 Focus mode</b><span>A Pomodoro timer that pauses or blocks distracting sites, holds notifications and gives every session a focus score.</span></div>
+            <div><b>🎧 Music & ambient sounds</b><span>14 music styles and sounds like rain, waves and fireplace, all made on your computer: no internet, no ads.</span></div>
+            <div><b>⚡ Speed & memory</b><span>Unused tabs go to sleep to free memory, Energy saver kicks in on battery, and there's a Speed mode for older computers.</span></div>
+            <div><b>🧩 Chrome extensions</b><span>Add extensions from the Chrome Web Store, with a plain-language safety check before anything is installed.</span></div>
+            <div><b>🧑‍💻 Dev Lab & Code Buddy</b><span>Friendly developer tools that explain everything in simple words, with missions for learning web development.</span></div>
+            <div><b>🕯️ Zmanim & Hebrew date</b><span>New-tab widgets with the Hebrew date, zmanim, candle lighting and the parasha, plus optional reminders.</span></div>
+        </div>
+        <p class="more">Plus vertical tabs, split view, tab groups, workspaces, reader view, on-device translation, a highlighter, screenshots with annotation, a price tracker, a Hebrew ⇄ English dictionary, a blue light filter, screen time, themes and automatic updates. The full list is on <a class="inl" href="https://github.com/ntoder/NoamBrowser">GitHub</a>.</p>
+
+        <h3 class="sec" id="download">Download</h3>
+        <div class="files" id="list"><a href="https://github.com/ntoder/NoamBrowser/releases/latest">All files on GitHub <span>Windows · macOS · Linux</span></a></div>
+
+        <h3 class="sec">How to install</h3>
+        <div class="install">
+            <div><h4>🪟 Windows</h4><ol>
+                <li>Download the <b>Setup .exe</b> file.</li>
+                <li>Open it from your Downloads folder.</li>
+                <li>If a blue box says <b>"Windows protected your PC"</b>, click <b>More info</b>, then <b>Run anyway</b>. This shows up because the app is new, not because something is wrong.</li>
+                <li>NoamBrowser installs and opens by itself.</li></ol></div>
+            <div><h4>🍎 Mac</h4><ol>
+                <li>Check <b>Apple menu → About This Mac</b>. Apple M chip: download the <b>arm64</b> file. Intel: download the <b>x64</b> file.</li>
+                <li>Double-click the zip and drag <b>NoamBrowser</b> into <b>Applications</b>.</li>
+                <li>Open Terminal, paste <code>xattr -cr /Applications/NoamBrowser.app</code> and press Enter (only once).</li>
+                <li>Open NoamBrowser from Applications.</li></ol></div>
+            <div><h4>🐧 Linux</h4><ol>
+                <li>On Ubuntu, Debian, Mint and similar, download the <b>.deb</b> file.</li>
+                <li>Open Terminal and run <code>sudo apt install ~/Downloads/noambrowser_*_amd64.deb</code></li>
+                <li>Other Linux: download the <b>AppImage</b>, allow it to run as a program, and double-click it.</li></ol></div>
+        </div>
+        <p class="more">You only install once. After that, NoamBrowser updates itself.</p>
+
+        <h3 class="sec">Questions</h3>
+        <div class="faq">
+            <h4>Is NoamBrowser free?</h4>
+            <p>Yes, completely free, including the VPN, the ad blocker and the account.</p>
+            <h4>Is it safe?</h4>
+            <p>Windows and Mac show a warning for any app that hasn't paid Microsoft or Apple for a signing certificate. NoamBrowser's full source code is public on <a class="inl" href="https://github.com/ntoder/NoamBrowser">GitHub</a>, so anyone can check what it does.</p>
+            <h4>Do I need an account?</h4>
+            <p>No. The account is optional and only needed if you want to sync between computers or use NoamChat on more than one device.</p>
+            <h4>Who makes it?</h4>
+            <p>NoamBrowser is made by Noam, who also makes the free games on <a class="inl" href="/">Noam's Game Hub</a>. Questions or ideas: <a class="inl" href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>.</p>
+        </div>
+    </main>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam · <a href="/" style="color:inherit">Game Hub</a> · <a href="/about" style="color:inherit">About</a> · <a href="/privacy" style="color:inherit">Privacy</a> · </footer>
+    <script>
+    (async () => {
+        const OS = [
+            { key: "win", name: "Windows (installer)", icon: "🪟", test: /setup.*\.exe$|\.msi$/i, rank: 0 },
+            { key: "win", name: "Windows (portable, no install)", icon: "🪟", test: /\.exe$/i, rank: 1 },
+            { key: "mac", name: "macOS (Apple chip M1/M2/M3/M4)", icon: "🍎", test: /arm64.*\.(dmg|zip)$/i, rank: 2 },
+            { key: "mac", name: "macOS (Intel)", icon: "🍎", test: /(x64|intel).*mac.*\.(dmg|zip)$|mac.*x64.*\.(dmg|zip)$/i, rank: 3 },
+            { key: "mac", name: "macOS", icon: "🍎", test: /\.(dmg|pkg)$|mac.*\.zip$|darwin.*\.zip$/i, rank: 3 },
+            { key: "linux", name: "Linux (.deb)", icon: "🐧", test: /\.deb$/i, rank: 4 },
+            { key: "linux", name: "Linux (AppImage)", icon: "🐧", test: /\.appimage$/i, rank: 5 },
+            { key: "linux", name: "Linux (.rpm)", icon: "🐧", test: /\.rpm$/i, rank: 6 }
+        ];
+        const ua = navigator.userAgent, mine = /Windows/i.test(ua) ? "win" : /Mac/i.test(ua) && !/iPhone|iPad/i.test(ua) ? "mac" : /Linux/i.test(ua) && !/Android/i.test(ua) ? "linux" : null;
+        const size = (b) => (b > 1e6 ? (b / 1e6).toFixed(0) + " MB" : Math.round(b / 1e3) + " KB");
+        const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        try {
+            const r = await fetch("https://api.github.com/repos/ntoder/NoamBrowser/releases/latest", { headers: { Accept: "application/vnd.github+json" } });
+            if (!r.ok) throw new Error(r.status);
+            const rel = await r.json();
+            const files = rel.assets.filter((a) => !/\.(blockmap|yml|yaml|sha256|sig)$/i.test(a.name)).map((a) => ({ a, os: OS.find((o) => o.test.test(a.name)) })).filter((f) => f.os).sort((x, y) => x.os.rank - y.os.rank);
+            document.getElementById("ver").textContent = `Version ${rel.tag_name.replace(/^v/i, "")} · released ${new Date(rel.published_at).toLocaleDateString()}`;
+            if (files.length) {
+                document.getElementById("list").innerHTML = files.map((f) => `<a href="${esc(f.a.browser_download_url)}">${f.os.icon} ${esc(f.os.name)} <span>${esc(f.a.name)} · ${size(f.a.size)}</span></a>`).join("");
+                // Macs: we can't tell Apple chip from Intel, so send Mac users to the list instead of guessing
+                const best = mine === "mac" ? null : files.find((f) => f.os.key === mine);
+                const m = document.getElementById("main");
+                if (best) { m.href = best.a.browser_download_url; m.firstChild.textContent = `⬇ Download for ${best.os.name.replace(/ \(.+\)/, "")}`; document.getElementById("mainSub").textContent = `Free · ${best.a.name} · ${size(best.a.size)}`; }
+                else if (mine === "mac" && files.some((f) => f.os.key === "mac")) { m.href = "#download"; m.firstChild.textContent = "⬇ Download for Mac"; document.getElementById("mainSub").textContent = "Free · choose Apple chip or Intel below"; }
+                else if (mine === "mac") { m.href = "https://github.com/ntoder/NoamBrowser/releases"; m.firstChild.textContent = "⬇ Download for Mac"; document.getElementById("mainSub").textContent = "Free · Mac files are on the releases page"; }
+            }
+        } catch (e) { /* the button still goes to the newest release on GitHub */ }
+    })();
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
