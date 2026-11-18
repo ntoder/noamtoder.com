@@ -211,6 +211,62 @@ service cloud.firestore {
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.host.uid);
     }
 
+    // Noametry levels made in the Level Maker: levels/{id}
+    function bumpOnly(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field])
+        && request.resource.data[field] == resource.data[field] + 1;
+    }
+    match /levels/{id} {
+      allow read: if true;
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'avatar', 'title', 'code', 'plays', 'clears', 'likes', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.author == me().name
+        && request.resource.data.title is string && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 40
+        && request.resource.data.code is string && request.resource.data.code.size() <= 14000
+        && request.resource.data.plays == 0 && request.resource.data.clears == 0 && request.resource.data.likes == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && (bumpOnly('plays') || bumpOnly('clears')
+        || (bumpOnly('likes') && exists(/databases/$(database)/documents/levels/$(id)/likes/$(request.auth.uid))));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // Games made in the Game Studio: creations/{id}. Only approved ones are public.
+    function creationFields() {
+      return ['uid', 'author', 'avatar', 'title', 'desc', 'emoji', 'code', 'status', 'plays', 'likes', 'createdAt', 'updatedAt'];
+    }
+    function goodCreation() {
+      return request.resource.data.keys().hasOnly(creationFields())
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.author == me().name
+        && request.resource.data.status == 'pending'
+        && request.resource.data.title is string && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 40
+        && request.resource.data.get('desc', '') is string && request.resource.data.get('desc', '').size() <= 200
+        && request.resource.data.get('emoji', '') is string && request.resource.data.get('emoji', '').size() <= 8
+        && request.resource.data.code is string && request.resource.data.code.size() <= 60000;
+    }
+    match /creations/{id} {
+      allow read: if resource.data.status == 'approved' || isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && notBanned() && goodCreation()
+        && request.resource.data.plays == 0 && request.resource.data.likes == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        // the maker can change their game, and it goes back to Noam for checking
+        || (signedIn() && notBanned() && resource.data.uid == request.auth.uid && goodCreation()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plays', 'likes', 'createdAt']))
+        || (signedIn() && resource.data.status == 'approved' && (bumpOnly('plays')
+            || (bumpOnly('likes') && exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
     // Everything else is locked by default
     match /{document=**} {
       allow read, write: if false;

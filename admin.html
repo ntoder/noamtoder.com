@@ -197,6 +197,10 @@
                 <tbody id="gameStats"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
             </table></div>
 
+            <h2 class="section-title" id="studioSec">🧑‍💻 Games waiting for approval</h2>
+            <p class="section-sub">Games players made in the Game Studio. Press Preview to play one safely, then Approve to put it in Made by Players, or Reject. Also check the name and description.</p>
+            <div id="studioQueue" style="display:grid;gap:12px;margin-bottom:28px"><p class="empty">Loading…</p></div>
+
             <h2 class="section-title" id="commentsSec">💬 Comments</h2>
             <p class="section-sub">The newest comments from every game. 🚩 means a player reported it. Delete anything rude.</p>
             <div class="save-row" style="margin-bottom:12px;flex-wrap:wrap;gap:10px">
@@ -270,7 +274,7 @@
                 $("app").classList.remove("hidden");
                 await load();
                 await setupGames();
-                setupAnnouncement(); setupComments();
+                setupAnnouncement(); setupComments(); setupStudio();
                 loadCodes();
                 loadGameStats();
             } catch {
@@ -420,6 +424,36 @@
             } catch (err) {
                 $("gameStats").innerHTML = `<tr><td colspan="5" class="empty">Stats unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</td></tr>`;
             }
+        }
+
+        // ---- Game Studio approvals ----
+        async function setupStudio() {
+            const fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+            const { db } = await import("/firebase-config.js");
+            const { buildDoc } = await import("/studio-run.js");
+            const box = $("studioQueue");
+            const load = async () => {
+                try {
+                    const snap = await fs.getDocs(fs.query(fs.collection(db, "creations"), fs.where("status", "==", "pending"), fs.limit(50)));
+                    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                    box.innerHTML = rows.length ? rows.map((g) => `<div data-id="${esc(g.id)}" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px">
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:30px">${esc(g.emoji)}</span><div><b>${esc(g.title)}</b><div class="email">by ${esc(g.author)} · ${(g.code || "").length.toLocaleString()} characters</div></div>
+                        <span style="margin-left:auto;display:flex;gap:6px"><button class="btn" data-a="preview">▶ Preview</button><button class="btn" data-a="code">&lt;/&gt; Code</button><button class="btn" data-a="approve" style="background:#2ee6a0;color:#0b0d1a">✅ Approve</button><button class="btn danger" data-a="reject">❌ Reject</button></span></div>
+                        <p style="color:var(--muted);margin:8px 0 0">${esc(g.desc || "")}</p><div class="pv"></div></div>`).join("") : '<p class="empty">Nothing waiting. 🎉</p>';
+                    box._rows = Object.fromEntries(rows.map((r) => [r.id, r]));
+                } catch (err) { box.innerHTML = `<p class="empty">Unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</p>`; }
+            };
+            box.onclick = async (e) => {
+                const b = e.target.closest("[data-a]"); if (!b) return;
+                const card = b.closest("[data-id]"), g = box._rows[card.dataset.id], pv = card.querySelector(".pv");
+                if (b.dataset.a === "preview") { pv.innerHTML = '<iframe sandbox="allow-scripts" style="width:100%;height:460px;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff"></iframe>'; pv.firstChild.srcdoc = buildDoc(g.code); }
+                if (b.dataset.a === "code") { pv.innerHTML = '<pre style="max-height:380px;overflow:auto;background:#0b0d1a;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;font-size:12px;white-space:pre-wrap"></pre>'; pv.firstChild.textContent = g.code; }
+                if (b.dataset.a === "approve" || b.dataset.a === "reject") {
+                    try { await fs.updateDoc(fs.doc(db, "creations", g.id), { status: b.dataset.a === "approve" ? "approved" : "rejected" }); card.remove(); toast(b.dataset.a === "approve" ? "Approved! It's in Made by Players now." : "Rejected."); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+            };
+            load();
         }
 
         // ---- Comments ----

@@ -86,6 +86,7 @@ function nextAchievement() {
     achBusy = true;
     const [a, more] = n;
     ensureStyles();
+    import("./pet.js").then((m) => m.bonus(20)).catch(() => {});
     const el = document.createElement("div");
     el.className = "gh-ach";
     el.innerHTML = `<div class="ic">${a.icon}</div><div><small>${T("ACHIEVEMENT UNLOCKED", "הישג חדש!")}</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span>

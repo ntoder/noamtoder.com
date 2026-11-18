@@ -208,6 +208,9 @@ export async function saveScore(score, game = CURRENT_GAME) {
     score = Math.floor(Number(score));
     if (!game || !Number.isFinite(score) || score < 0) return { saved: false };
     markRecent(game);
+    import("./share.js").then((m) => m.offerShare(game, score)).catch(() => {});
+    notePlayedSignedOut(score);
+    import("./pet.js").then((m) => m.fed(game)).catch(() => {});
     if (!state.user) { nudgeLogin(); return { saved: false }; }
     if (isBanned()) return { saved: false };
     try {
@@ -235,6 +238,8 @@ export async function recordPlay(game = CURRENT_GAME) {
     await ready;
     if (!game) return { saved: false };
     markRecent(game);
+    import("./pet.js").then((m) => m.fed(game)).catch(() => {});
+    if (PLAY_ONLY.includes(game) && performance.now() > 20000) notePlayedSignedOut(0);
     if (!state.user || isBanned()) return { saved: false };
     try {
         await setDoc(gameRef(state.user.uid, game), { plays: increment(1), lastPlayed: serverTimestamp() }, { merge: true });
@@ -274,6 +279,7 @@ async function checkDaily(game, score) {
     if (state.profile?.daily?.[c.day]) return null;
     try {
         await updateMe({ [`daily.${c.day}`]: true });
+        import("./pet.js").then((m) => m.bonus(30)).catch(() => {});
         return `📅 Daily challenge complete! +40 XP`;
     } catch (e) { return null; }
 }
@@ -462,6 +468,39 @@ export function toast(html, ms = 3200) {
 }
 
 let nudged = false;
+// ---------- "Save your progress?" when leaving a game without an account ----------
+let playedSignedOut = 0, bestThisVisit = 0;
+function notePlayedSignedOut(score) { if (!state.user) { playedSignedOut++; if (score > bestThisVisit) bestThisVisit = score; } }
+function leaveAsk(dest) {
+    ensureStyles();
+    const he = LANG === "he", T = (e, h) => (he ? h : e);
+    const next = encodeURIComponent(dest.pathname + dest.search);
+    const m = document.createElement("div");
+    m.style.cssText = "position:fixed;inset:0;z-index:99996;display:grid;place-items:center;padding:16px;background:rgba(11,13,26,.85);backdrop-filter:blur(5px);font-family:Inter,Rubik,system-ui,sans-serif";
+    m.innerHTML = `<div style="width:min(440px,100%);background:#171b36;border:1px solid #2a3060;border-radius:20px;padding:26px 24px;text-align:center;color:#eef0ff;direction:${he ? "rtl" : "ltr"}">
+        <div style="font-size:44px;margin-bottom:6px">💾</div>
+        <h2 style="font-size:22px;margin:0 0 8px">${T("Save your progress?", "לשמור את ההתקדמות?")}</h2>
+        <p style="color:#9aa0c8;margin:0 0 18px;line-height:1.55;font-size:15px">${bestThisVisit > 0 ? T(`You scored <b style="color:#ffc94d">${bestThisVisit.toLocaleString("en")}</b>! `, `השגתם <b style="color:#ffc94d">${bestThisVisit.toLocaleString("en")}</b>! `) : ""}${T("Make a free account to keep your scores, get on the leaderboard, earn achievements and keep your Hub pet on every device.", "צרו חשבון חינמי כדי לשמור את השיאים, להיכנס לטבלת השיאים, לקבל הישגים ולשמור את חיית המחמד בכל מכשיר.")}</p>
+        <a href="/login?next=${next}#signup" style="display:block;background:#7c5cff;color:#fff;text-decoration:none;border-radius:12px;padding:13px;font-weight:800;font-size:16px;margin-bottom:8px">${T("✨ Create a free account", "✨ יצירת חשבון חינמי")}</a>
+        <a href="/login?next=${next}" style="display:block;background:#12152b;border:1px solid #2a3060;color:#eef0ff;text-decoration:none;border-radius:12px;padding:11px;font-weight:700;margin-bottom:10px">${T("I already have an account", "כבר יש לי חשבון")}</a>
+        <button data-leave style="background:none;border:0;color:#9aa0c8;font:600 14px Inter,Rubik,sans-serif;cursor:pointer;text-decoration:underline">${T("No thanks, just leave", "לא תודה, רק לצאת")}</button></div>`;
+    m.querySelector("[data-leave]").onclick = () => { location.href = dest.href; };
+    m.addEventListener("click", (e) => { if (e.target === m) m.remove(); });
+    document.body.appendChild(m);
+    try { window.gtag && window.gtag("event", "leave_signup_prompt", { game_id: CURRENT_GAME }); } catch (e) {}
+}
+if (CURRENT_GAME) document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || a.target === "_blank") return;
+    if (state.user || !playedSignedOut) return;
+    let dest; try { dest = new URL(a.href, location.href); } catch (x) { return; }
+    if (dest.origin !== location.origin || dest.pathname === location.pathname || dest.pathname.startsWith("/login")) return;
+    let shown = false; try { shown = sessionStorage.getItem("gh_leave_ask") === "1"; sessionStorage.setItem("gh_leave_ask", "1"); } catch (x) {}
+    if (shown) return;
+    e.preventDefault();
+    leaveAsk(dest);
+}, true);
+
 function nudgeLogin() {
     if (nudged || !CURRENT_GAME) return;
     nudged = true;
@@ -496,6 +535,7 @@ if (CURRENT_GAME) {
     ready.then(() => {
         if (isLockedGame(CURRENT_GAME)) showLock();
         else if (PLAY_ONLY.includes(CURRENT_GAME)) recordPlay();
+        import("./share.js").then((m) => m.showChallenge()).catch(() => {});
         showGameExtras().finally(() => social().then((m) => { m.mountGamePage({ getFavorites, toggleFavorite }); m.checkAchievements(); }).catch((e) => console.warn("[GameHub] social failed", e)));
     });
 }
@@ -530,6 +570,9 @@ async function showGameExtras() {
             : "No scores yet this week. Be the first!";
     } catch (e) { sec.querySelector(".gh-lb").textContent = "Leaderboard unavailable right now."; }
 }
+
+// the Hub pet waves from the corner of the homepage
+if (location.pathname === "/" || location.pathname === "/index.html") domReady.then(() => import("./pet.js").then((m) => m.mountBuddy()).catch(() => {}));
 
 // ---------- Cookie notice ----------
 // Visitors in Europe/UK/Switzerland get Google's own consent message (set up in AdSense), so this

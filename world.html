@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade World · walk around the Game Hub arcade · Noam's Game Hub</title>
+    <meta name="description" content="Walk around a pixel arcade with your Hub pet, visit the classics room, sports arena, puzzle library and creative corner, play any of 52 games, and find the hidden coins that open the secret room.">
+    <link rel="canonical" href="https://noamtoder.com/world">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        .ww { max-width: 1200px; margin: 0 auto; padding: 12px 16px 40px; width: 100%; }
+        .frame { position: relative; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: #0b0d1a; }
+        #wc { width: 100%; height: auto; display: block; touch-action: none; image-rendering: pixelated; }
+        .hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; font: 800 14px Inter, Rubik, sans-serif; }
+        .hud span { background: #0b0d1acc; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+        .act { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; border: 0; border-radius: 14px; padding: 12px 22px; font: 800 16px Inter, Rubik, sans-serif; cursor: pointer; box-shadow: 0 10px 30px #7c5cff77; display: none; }
+        .act.show { display: block; }
+        .tip { color: var(--muted); font-size: 14px; margin-top: 10px; text-align: center; }
+        .intro { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(11,13,26,.85); text-align: center; padding: 16px; }
+        .intro.hidden { display: none; }
+        .intro h2 { font-size: 30px; margin-bottom: 8px; }
+        .intro p { color: var(--muted); margin-bottom: 16px; max-width: 520px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Arcade <span>World</span></h1>
+        <a class="back" href="/pet">🐾 My pet →</a>
+    </div>
+    <div class="ww">
+        <div class="frame">
+            <canvas id="wc" width="960" height="576" aria-label="Arcade world"></canvas>
+            <div class="hud"><span id="room">🏠 Lobby</span><span id="coins">🪙 0 / 5</span></div>
+            <button class="act" id="act">▶ Play</button>
+            <div class="intro" id="intro"><div>
+                <h2>🕹️ Welcome to the Arcade!</h2>
+                <p>Walk around with the arrow keys or WASD, or tap where you want to go. Walk up to a machine and press <b>E</b>, <b>Space</b> or the Play button to play it. There are <b>5 hidden coins</b> somewhere in the arcade. Find them all to open the secret room!</p>
+                <button class="btn" id="go">▶ Start exploring</button>
+            </div></div>
+        </div>
+        <p class="tip">Arrow keys / WASD to walk · E or Space to play · or tap anywhere to walk there</p>
+    </div>
+    <script type="module">
+        import { GAMES, LANG, toast, todaysChallenge, ready } from "/hub.js";
+        import { NAMES } from "/i18n.js";
+        const gname = (id) => (LANG === "he" && NAMES[GAMES[id].name]) || GAMES[id].name;
+        import * as P from "/pet.js";
+        const he = LANG === "he", tr = (e, h) => (he ? h : e), $ = (id) => document.getElementById(id);
+        const cv = $("wc"), ctx = cv.getContext("2d"), VW = 960, VH = 576, TS = 32, MW = 40, MH = 26;
+
+        // ---------- the map ----------
+        const grid = Array.from({ length: MH }, () => Array(MW).fill(0)); // 0 = wall, otherwise floor type
+        const carve = (x1, y1, x2, y2, f) => { for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) grid[y][x] = f; };
+        const ROOMS = [
+            { id: "classics", x1: 1, y1: 1, x2: 12, y2: 10, f: 1, en: "🕹️ Classics room", he: "🕹️ חדר הקלאסיקות" },
+            { id: "puzzle", x1: 27, y1: 1, x2: 38, y2: 10, f: 2, en: "🧩 Puzzle library", he: "🧩 ספריית הפאזלים" },
+            { id: "sports", x1: 1, y1: 15, x2: 12, y2: 24, f: 3, en: "⚽ Sports arena", he: "⚽ זירת הספורט" },
+            { id: "creative", x1: 27, y1: 15, x2: 38, y2: 24, f: 4, en: "🎨 Creative corner", he: "🎨 פינת היצירה" },
+            { id: "secret", x1: 16, y1: 1, x2: 23, y2: 5, f: 5, en: "🏆 Secret room!", he: "🏆 החדר הסודי!" },
+            { id: "lobby", x1: 14, y1: 8, x2: 25, y2: 18, f: 6, en: "🏠 Lobby", he: "🏠 לובי" },
+            { id: "hall", x1: 1, y1: 12, x2: 38, y2: 13, f: 7, en: "🚶 Hallway", he: "🚶 מסדרון" }
+        ];
+        for (const r of ROOMS) carve(r.x1, r.y1, r.x2, r.y2, r.f);
+        // doors from rooms to the hallway
+        for (const x of [5, 6, 7, 31, 32, 33]) { grid[11][x] = 7; grid[14][x] = 7; }
+        // the secret door (locked until you have all 5 coins)
+        const SECRET = [[19, 6], [20, 6], [19, 7], [20, 7]];
+        let coinsGot = []; try { coinsGot = JSON.parse(localStorage.getItem("gh_world_coins")) || []; } catch (e) {}
+        const unlocked = () => coinsGot.length >= 5;
+        function openSecret() { for (const [x, y] of SECRET) grid[y][x] = 6; }
+        if (unlocked()) openSecret();
+
+        // ---------- machines ----------
+        const machines = [];
+        const place = (id, x, y, face) => { if (GAMES[id] || id.startsWith("@")) machines.push({ id, x, y, face }); };
+        const row = (ids, y, x0, face) => ids.forEach((id, i) => place(id, x0 + i, y, face));
+        row(["noametry", "snake", "tetris", "pacman", "breakout", "spaceshooter", "spacerocks", "flappybird", "dinogame", "mario"], 1, 2, "down");
+        place("bubblebobble", 1, 4, "right"); place("paddlebattle", 1, 7, "right");
+        row(["chess", "checkers", "sudoku", "game2048", "minefinder", "memory", "solitaire", "seabattle", "fourinarow", "tictactoe"], 1, 28, "down");
+        [["wordguess", 3], ["wordsearch", 5], ["mathblitz", 7], ["flagquiz", 9]].forEach(([id, y]) => place(id, 38, y, "left"));
+        place("maze", 27, 4, "right");
+        row(["soccer", "penalty", "fiveaside", "headerhero", "keepyuppy", "tennis", "bowling", "minigolf", "hoopshot", "airhockey"], 24, 2, "up");
+        place("motorracing", 1, 18, "right"); place("molemash", 1, 21, "right");
+        row(["pixelpaint", "rhythmtap", "idlebakery", "castledefense", "typingrain", "colorecho", "@maker", "@levels", "@studio", "@made"], 24, 28, "up");
+        place("@pet", 38, 18, "left"); place("@world", 38, 21, "left");
+        const placed = new Set(machines.map((m) => m.id));
+        const rest = Object.keys(GAMES).filter((id) => !placed.has(id));
+        // lobby: the daily challenge machine and everything else
+        const lob = [15, 16, 17, 22, 23, 24];
+        rest.slice(0, 6).forEach((id, i) => place(id, lob[i], 8, "down"));
+        rest.slice(6).forEach((id, i) => place(id, 15 + i, 18, "up"));
+        place("@daily", 25, 13, "left");
+        machines.push({ id: "@mystery", x: 19, y: 1, face: "down" }, { id: "@trophy", x: 20, y: 1, face: "down" });
+        const SPECIAL = {
+            "@maker": { en: "Level Maker", he: "יוצר השלבים", path: "/maker", e: "🛠️", c: "#2ee6c9" },
+            "@levels": { en: "Player levels", he: "שלבי שחקנים", path: "/levels", e: "🗺️", c: "#2ee6c9" },
+            "@studio": { en: "Game Studio", he: "סטודיו משחקים", path: "/studio", e: "🧑‍💻", c: "#ff4d8d" },
+            "@made": { en: "Made by players", he: "נוצר ע״י שחקנים", path: "/made", e: "🎁", c: "#ff4d8d" },
+            "@pet": { en: "Visit your pet", he: "לבקר את חיית המחמד", path: "/pet", e: "🐾", c: "#ffc94d" },
+            "@world": { en: "Leaderboards", he: "טבלאות שיאים", path: "/leaderboard", e: "🏆", c: "#ffc94d" },
+            "@daily": { en: "Daily challenge", he: "האתגר היומי", path: null, e: "📅", c: "#ffc94d" },
+            "@mystery": { en: "Mystery machine", he: "המכונה המסתורית", path: null, e: "❓", c: "#ffc94d" },
+            "@trophy": { en: "Golden trophy", he: "גביע הזהב", path: null, e: "🏆", c: "#ffc94d" }
+        };
+        const solid = new Set(machines.map((m) => m.x + "," + m.y));
+        const free = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH && grid[y][x] > 0 && !solid.has(x + "," + y);
+        // hidden coins
+        const COINS = [[11, 10], [1, 24], [38, 1], [38, 24], [1, 12]];
+        // signs in front of each room
+        const SIGNS = [["classics", 6, 12], ["puzzle", 32, 12], ["sports", 6, 13], ["creative", 32, 13]];
+
+        // thumbnails for the machine screens
+        const thumbs = {};
+        for (const m of machines) if (GAMES[m.id]) { const i = new Image(); i.src = GAMES[m.id].img; thumbs[m.id] = i; }
+
+        // ---------- player and pet ----------
+        const me = { x: 19.5 * TS, y: 15.5 * TS, dir: "down", walk: 0 };
+        const trail = []; let petPos = { x: me.x - 20, y: me.y + 10 };
+        let path = null, keys = {}, near = null, roomNow = "", started = false, t = 0;
+        let avatar = "";
+        ready.then(async () => { const { state } = await import("/hub.js"); avatar = state.profile?.avatar || ""; });
+
+        const tileAt = (px, py) => [Math.floor(px / TS), Math.floor(py / TS)];
+        function canStand(px, py) {
+            const r = 9;
+            for (const [dx, dy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) { const [tx, ty] = tileAt(px + dx, py + dy + 6); if (!free(tx, ty)) return false; }
+            return true;
+        }
+        function bfs(from, to) {
+            const key = (p) => p[0] + "," + p[1], prev = new Map([[key(from), null]]), q = [from];
+            while (q.length) {
+                const c = q.shift();
+                if (c[0] === to[0] && c[1] === to[1]) { const out = []; let k = key(c), n = c; while (n) { out.unshift(n); n = prev.get(key(n)); } return out; }
+                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = [c[0] + dx, c[1] + dy]; if (!prev.has(key(n)) && free(n[0], n[1])) { prev.set(key(n), c); q.push(n); } }
+            }
+            return null;
+        }
+        // ---------- input ----------
+        const KM = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
+        addEventListener("keydown", (e) => {
+            if (KM[e.code]) { keys[KM[e.code]] = true; path = null; e.preventDefault(); }
+            if (["KeyE", "Space", "Enter"].includes(e.code) && started) { e.preventDefault(); use(); }
+        });
+        addEventListener("keyup", (e) => { if (KM[e.code]) keys[KM[e.code]] = false; });
+        let cam = { x: 0, y: 0 };
+        cv.addEventListener("pointerdown", (e) => {
+            if (!started) return;
+            const r = cv.getBoundingClientRect(), wx = (e.clientX - r.left) * VW / r.width + cam.x, wy = (e.clientY - r.top) * VH / r.height + cam.y;
+            const [tx, ty] = tileAt(wx, wy);
+            const m = machines.find((mm) => mm.x === tx && mm.y === ty);
+            if (m && near === m) return use();
+            let goal = [tx, ty];
+            if (m) { const d = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] }[m.face]; goal = [tx + d[0], ty + d[1]]; }
+            if (!free(goal[0], goal[1])) return;
+            const p = bfs(tileAt(me.x, me.y + 6), goal);
+            if (p) path = p.slice(1).map(([x, y]) => [x * TS + TS / 2, y * TS + TS / 2 - 6]);
+        });
+        $("act").onclick = () => use();
+        $("go").onclick = () => { $("intro").classList.add("hidden"); started = true; };
+
+        function info(m) {
+            if (m.id === "@daily") { const c = todaysChallenge(); const g = GAMES[c.game]; return { name: tr("Daily challenge", "האתגר היומי"), path: g && g.path, e: "📅" }; }
+            if (SPECIAL[m.id]) return { name: he ? SPECIAL[m.id].he : SPECIAL[m.id].en, path: SPECIAL[m.id].path, e: SPECIAL[m.id].e };
+            return { name: gname(m.id), path: GAMES[m.id].path };
+        }
+        function use() {
+            if (!near) return;
+            if (near.id === "@trophy") { toast(tr("🏆 You found the secret room! You're a true explorer.", "🏆 מצאתם את החדר הסודי! אתם חוקרים אמיתיים."), 4000); return; }
+            if (near.id === "@mystery") { const ids = Object.keys(GAMES); location.href = GAMES[ids[Math.floor(Math.random() * ids.length)]].path; return; }
+            const i = info(near); if (i.path) location.href = i.path;
+        }
+
+        // ---------- update ----------
+        function update(dt) {
+            t += dt;
+            let dx = 0, dy = 0;
+            if (keys.up) dy -= 1; if (keys.down) dy += 1; if (keys.left) dx -= 1; if (keys.right) dx += 1;
+            if (path && path.length) {
+                const [tx, ty] = path[0], ddx = tx - me.x, ddy = ty - me.y, d = Math.hypot(ddx, ddy);
+                if (d < 4) path.shift(); else { dx = ddx / d; dy = ddy / d; }
+            }
+            const sp = 170 * dt, len = Math.hypot(dx, dy) || 1;
+            if (dx || dy) {
+                const nx = me.x + (dx / len) * sp, ny = me.y + (dy / len) * sp;
+                if (canStand(nx, me.y)) me.x = nx; if (canStand(me.x, ny)) me.y = ny;
+                me.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+                me.walk += dt * 10;
+                trail.push({ x: me.x, y: me.y }); if (trail.length > 18) trail.shift();
+            }
+            // pet follows a little behind
+            const target = trail[0] || me;
+            petPos.x += (target.x - 18 - petPos.x) * 0.08; petPos.y += (target.y + 8 - petPos.y) * 0.08;
+            // nearest machine in front of us
+            near = null; let best = 1e9;
+            for (const m of machines) {
+                const fx = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] }[m.face];
+                const cx = (m.x + fx[0] + 0.5) * TS, cy = (m.y + fx[1] + 0.5) * TS, d = Math.hypot(cx - me.x, cy - me.y);
+                if (d < 30 && d < best) { best = d; near = m; }
+            }
+            $("act").classList.toggle("show", !!near && started);
+            if (near) $("act").textContent = near.id === "@trophy" ? "🏆 " + tr("Look", "הסתכלו") : `▶ ${info(near).name}`;
+            // coins
+            for (const [i, [cx, cy]] of COINS.entries()) {
+                if (coinsGot.includes(i)) continue;
+                if (Math.hypot((cx + 0.5) * TS - me.x, (cy + 0.5) * TS - me.y) < 22) {
+                    coinsGot.push(i); try { localStorage.setItem("gh_world_coins", JSON.stringify(coinsGot)); } catch (e) {}
+                    Kit.tune([988, 1319], 0.08, "square", 0.04);
+                    if (unlocked()) { openSecret(); toast(tr("🔓 All 5 coins! A secret door opened at the top of the lobby…", "🔓 כל 5 המטבעות! דלת סודית נפתחה בראש הלובי…"), 5000); import("/social.js").then((m) => m.bumpStat("secret")).catch(() => {}); P.bonus(50, tr("Your pet loves treasure", "חיית המחמד אוהבת אוצרות")); }
+                    else toast(tr(`🪙 Coin found! ${coinsGot.length} of 5`, `🪙 מצאתם מטבע! ${coinsGot.length} מתוך 5`), 2000);
+                }
+            }
+            $("coins").textContent = `🪙 ${coinsGot.length} / 5`;
+            // which room are we in
+            const [tx, ty] = tileAt(me.x, me.y + 6);
+            const room = ROOMS.find((r) => tx >= r.x1 && tx <= r.x2 && ty >= r.y1 && ty <= r.y2);
+            const name = room ? (he ? room.he : room.en) : tr("🚪 Doorway", "🚪 פתח");
+            if (name !== roomNow) { roomNow = name; $("room").textContent = name; }
+            cam.x = Math.max(0, Math.min(MW * TS - VW, me.x - VW / 2)); cam.y = Math.max(0, Math.min(MH * TS - VH, me.y - VH / 2));
+        }
+
+        // ---------- drawing ----------
+        const FLOORS = { 1: ["#2a1d55", "#31236a"], 2: ["#16284f", "#1b3060"], 3: ["#14432a", "#185033"], 4: ["#4a1840", "#561c4b"], 5: ["#4a3a10", "#5a4714"], 6: ["#1d2142", "#232852"], 7: ["#1a1d38", "#1a1d38"] };
+        function draw() {
+            ctx.fillStyle = "#07080f"; ctx.fillRect(0, 0, VW, VH);
+            ctx.save(); ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+            const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS);
+            for (let y = y0; y <= y0 + VH / TS + 1 && y < MH; y++) for (let x = x0; x <= x0 + VW / TS + 1 && x < MW; x++) {
+                const f = grid[y][x], px = x * TS, py = y * TS;
+                if (f > 0) {
+                    const [a, b] = FLOORS[f]; ctx.fillStyle = (x + y) % 2 ? a : b; ctx.fillRect(px, py, TS, TS);
+                    if (f === 3 && x % 6 === 0) { ctx.fillStyle = "#ffffff18"; ctx.fillRect(px + 15, py, 2, TS); }
+                } else {
+                    const below = y + 1 < MH && grid[y + 1][x] > 0;
+                    ctx.fillStyle = "#0e1024"; ctx.fillRect(px, py, TS, TS);
+                    if (below) { ctx.fillStyle = "#262b55"; ctx.fillRect(px, py + TS - 12, TS, 12); ctx.fillStyle = "#3a4080"; ctx.fillRect(px, py + TS - 12, TS, 2); }
+                    // the secret door glows when locked
+                    if (SECRET.some(([sx, sy]) => sx === x && sy === y) && !unlocked()) { ctx.fillStyle = `rgba(255,201,77,${0.12 + Math.sin(t * 3) * 0.06})`; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4); }
+                }
+            }
+            // signs
+            for (const [id, sx, sy] of SIGNS) { const r = ROOMS.find((rr) => rr.id === id); Kit.text(ctx, (he ? r.he : r.en), sx * TS + TS / 2, sy * TS + 18, 13, "#ffffffaa", "center"); }
+            // coins
+            for (const [i, [cx, cy]] of COINS.entries()) { if (coinsGot.includes(i)) continue; const bob = Math.sin(t * 4 + i) * 3; ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(cx * TS + 16, cy * TS + 16 + bob, 7 * Math.abs(Math.cos(t * 2 + i)) + 1.5, 8, 0, 0, 7); ctx.fill(); }
+            // machines, then people, sorted by y so things overlap properly
+            const things = machines.map((m) => ({ y: m.y * TS + TS, d: () => drawMachine(m) }));
+            things.push({ y: me.y + 12, d: drawMe }, { y: petPos.y + 10, d: () => P.draw(ctx, petPos.x, petPos.y, 0.24, t, P.getPet(), {}) });
+            things.push({ y: 11 * TS, d: drawRobo });
+            things.sort((a, b) => a.y - b.y).forEach((th) => th.d());
+            ctx.restore();
+            if (near) {
+                const i = info(near), sx = (near.x + 0.5) * TS - cam.x;
+                let sy = near.y * TS - cam.y - 14;
+                if (sy < 70) sy = near.y * TS - cam.y + TS + 70;   // too close to the top: show the label under the machine
+                ctx.font = "700 14px Inter, Rubik, sans-serif"; const w = ctx.measureText(i.name).width + 20;
+                ctx.fillStyle = "#ffffffee"; Kit.rr(ctx, sx - w / 2, sy - 22, w, 26, 8); ctx.fill();
+                Kit.text(ctx, i.name, sx, sy - 9, 14, "#0b0d1a", "center", "Inter, Rubik, sans-serif", 700);
+            }
+        }
+        function drawMachine(m) {
+            const px = m.x * TS, py = m.y * TS, sp = SPECIAL[m.id], isDaily = m.id === "@daily";
+            const glow = near === m;
+            if (m.id === "@trophy") { ctx.font = "26px serif"; ctx.textAlign = "center"; ctx.fillText("🏆", px + 16, py + 26 + Math.sin(t * 3) * 2); ctx.textAlign = "left"; return; }
+            const col = sp ? sp.c : (GAMES[m.id].tags.includes("sports") ? "#2ee6a0" : GAMES[m.id].tags.includes("arcade") ? "#7c5cff" : "#4da3ff");
+            ctx.fillStyle = "#00000055"; ctx.fillRect(px + 3, py + TS - 4, TS - 6, 6);
+            ctx.fillStyle = glow ? col : "#2b3066"; ctx.fillRect(px + 3, py - 10, TS - 6, TS + 8);
+            ctx.fillStyle = "#14172e"; ctx.fillRect(px + 6, py - 6, TS - 12, 18);
+            const th = thumbs[m.id];
+            if (th && th.complete && th.naturalWidth) ctx.drawImage(th, px + 6, py - 6, TS - 12, 18);
+            else { ctx.font = "13px serif"; ctx.textAlign = "center"; ctx.fillText(sp ? sp.e : "🎮", px + 16, py + 8); ctx.textAlign = "left"; }
+            ctx.fillStyle = col; ctx.fillRect(px + 3, py - 10, TS - 6, 3);
+            ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(px + 12, py + 18, 2.5, 0, 7); ctx.fill(); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(px + 20, py + 18, 2.5, 0, 7); ctx.fill();
+            if (isDaily || m.id === "@mystery") { ctx.strokeStyle = `rgba(255,201,77,${0.5 + Math.sin(t * 4) * 0.4})`; ctx.lineWidth = 2; ctx.strokeRect(px + 2, py - 11, TS - 4, TS + 10); }
+        }
+        function drawMe() {
+            const bob = Math.abs(Math.sin(me.walk)) * 2, x = me.x, y = me.y - bob;
+            ctx.fillStyle = "#00000066"; ctx.beginPath(); ctx.ellipse(me.x, me.y + 14, 10, 4, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#2ee6c9"; Kit.rr(ctx, x - 8, y - 4, 16, 16, 5); ctx.fill();
+            ctx.fillStyle = "#1b9e88"; const leg = Math.sin(me.walk) * 3; ctx.fillRect(x - 6, y + 10, 4, 5 + leg); ctx.fillRect(x + 2, y + 10, 4, 5 - leg);
+            if (avatar) { ctx.font = "20px serif"; ctx.textAlign = "center"; ctx.fillText(avatar, x, y - 6); ctx.textAlign = "left"; }
+            else { ctx.fillStyle = "#ffd9b8"; ctx.beginPath(); ctx.arc(x, y - 12, 9, 0, 7); ctx.fill(); ctx.fillStyle = "#3a2a1a"; ctx.beginPath(); ctx.arc(x, y - 15, 9, Math.PI, 0); ctx.fill();
+                if (me.dir !== "up") { ctx.fillStyle = "#0b0d1a"; const ox = me.dir === "left" ? -3 : me.dir === "right" ? 3 : 0; ctx.fillRect(x - 4 + ox, y - 12, 2, 3); ctx.fillRect(x + 2 + ox, y - 12, 2, 3); } }
+        }
+        // Robo the guide stands in the lobby
+        const ROBO = { x: 19 * TS + 16, y: 10 * TS + 16 };
+        const roboLines = [tr("Welcome to the arcade! 👋", "ברוכים הבאים לארקייד! 👋"), tr("5 coins are hidden here…", "5 מטבעות מוחבאים כאן…"), tr("Try the gold Daily machine!", "נסו את מכונת האתגר היומי!"), tr("Make your own game in the Creative corner", "צרו משחק משלכם בפינת היצירה")];
+        function drawRobo() {
+            const x = ROBO.x, y = ROBO.y + Math.sin(t * 2) * 2;
+            ctx.fillStyle = "#00000066"; ctx.beginPath(); ctx.ellipse(ROBO.x, ROBO.y + 14, 10, 4, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#9aa0c8"; Kit.rr(ctx, x - 10, y - 18, 20, 16, 4); ctx.fill(); Kit.rr(ctx, x - 8, y - 2, 16, 14, 3); ctx.fill();
+            ctx.fillStyle = "#2ee6c9"; ctx.fillRect(x - 6, y - 13, 4, 4); ctx.fillRect(x + 2, y - 13, 4, 4);
+            ctx.strokeStyle = "#9aa0c8"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.lineTo(x, y - 25); ctx.stroke(); ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(x, y - 26, 3, 0, 7); ctx.fill();
+            if (Math.hypot(me.x - ROBO.x, me.y - ROBO.y) < 70) {
+                const line = roboLines[Math.floor(t / 3) % roboLines.length];
+                ctx.font = "700 13px Inter, Rubik, sans-serif"; const w = ctx.measureText(line).width + 18;
+                ctx.fillStyle = "#ffffffee"; Kit.rr(ctx, x - w / 2, y - 56, w, 24, 8); ctx.fill();
+                Kit.text(ctx, line, x, y - 44, 13, "#0b0d1a", "center", "Inter, Rubik, sans-serif", 700);
+            }
+        }
+        solid.add("19,10");
+        const loop = Kit.loop((dt) => { update(Math.min(dt, 0.05)); draw(); });
+        loop.start();
+        window.__world = { me, machines, coins: () => coinsGot, grab: (i) => { me.x = (COINS[i][0] + 0.5) * TS; me.y = (COINS[i][1] + 0.5) * TS; } };
+    </script>
+    <script src="/game-kit.js"></script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
