@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The moles are digging up the garden! Bop each one on the head as it pops out of its hole before it hides again. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Mole Mash · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Mole <span>Mash</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="time">60</b><small>Time</small></div><div class="stat"><b id="combo">x1</b><small>Combo</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Mole Mash</h2>
+                <p id="startText">Click or tap the moles as they pop up!<br>🟡 Golden moles = 50 points and +3 seconds. ⛑ Helmet moles need two hits.<br>💣 Never hit a bomb: it costs 5 seconds!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's Up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Hit 5 in a row to raise your combo. On a keyboard use Q W E / A S D / Z X C.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "moleBest", N = 3, CELL = W / N;
+        Kit.stat("best", Kit.best(BEST));
+        let holes, score, time, combo, state = "ready", t = 0, spawnT = 0, fx = Kit.particles(), floats = [], hammer = null, misses = 0;
+        function reset() {
+            holes = Array.from({ length: N * N }, (_, i) => ({ x: (i % N) * CELL + CELL / 2, y: Math.floor(i / N) * CELL + CELL / 2 + 40, up: 0, kind: null, life: 0, hit: 0 }));
+            score = 0; time = 60; combo = 0; misses = 0; spawnT = 0.6; floats = []; Kit.stat("score", 0); Kit.stat("time", 60); Kit.stat("combo", "x1");
+        }
+        function spawn() {
+            const free = holes.filter((h) => !h.kind); if (!free.length) return;
+            const h = Kit.pick(free), prog = 1 - time / 60, r = Math.random();
+            h.kind = r < 0.1 ? "gold" : r < 0.1 + 0.12 + prog * 0.1 ? "bomb" : r < 0.35 + prog * 0.1 ? "helmet" : "mole";
+            h.life = Math.max(0.55, 1.35 - prog * 0.7) * (h.kind === "gold" ? 0.7 : 1); h.up = 0; h.hit = 0; h.hp = h.kind === "helmet" ? 2 : 1;
+        }
+        function whack(px, py) {
+            hammer = { x: px, y: py, t: 0.15 };
+            for (const h of holes) {
+                if (!h.kind || h.hit || h.up < 0.4) continue;
+                if (Math.hypot(px - h.x, py - (h.y - 30)) > CELL * 0.36) continue;
+                if (h.kind === "bomb") {
+                    h.hit = 0.5; combo = 0; time = Math.max(0, time - 5); score = Math.max(0, score - 50);
+                    fx.burst(h.x, h.y - 30, "#ff4d4d", 30, 6); fx.burst(h.x, h.y - 30, "#ffc94d", 20, 5); beep(90, 0.4, "sawtooth", 0.08, -40);
+                    floats.push({ x: h.x, y: h.y - 60, s: "-5s", c: "#ff4d4d", t: 1 }); updateStats(); return;
+                }
+                if (--h.hp > 0) { beep(900, 0.05, "square", 0.05); fx.burst(h.x, h.y - 50, "#c8ccdf", 8, 3); floats.push({ x: h.x, y: h.y - 70, s: "CLANG!", c: "#c8ccdf", t: 0.6 }); return; }
+                combo++; const mult = Math.min(5, 1 + Math.floor(combo / 5)), pts = (h.kind === "gold" ? 50 : h.kind === "helmet" ? 20 : 10) * mult;
+                score += pts; h.hit = 0.35;
+                fx.burst(h.x, h.y - 30, h.kind === "gold" ? "#ffc94d" : "#c47a3a", 16, 4);
+                floats.push({ x: h.x, y: h.y - 60, s: "+" + pts, c: h.kind === "gold" ? "#ffc94d" : "#ffffff", t: 0.8 });
+                if (h.kind === "gold") { time = Math.min(60, time + 3); tune([988, 1319], 0.05, "square", 0.05); } else beep(240 + combo * 15, 0.08, "square", 0.06, -80);
+                updateStats(); return;
+            }
+            combo = 0; misses++; beep(140, 0.05, "triangle", 0.03); updateStats();
+        }
+        function updateStats() { Kit.stat("score", score); Kit.stat("time", Math.ceil(time)); Kit.stat("combo", "x" + Math.min(5, 1 + Math.floor(combo / 5))); }
+        function update(dt) {
+            time -= dt; if (time <= 0) { time = 0; updateStats(); return end(); }
+            spawnT -= dt;
+            if (spawnT <= 0) { spawn(); if (Math.random() < 0.25 + (1 - time / 60) * 0.35) spawn(); spawnT = Math.max(0.35, 0.85 - (1 - time / 60) * 0.5); }
+            for (const h of holes) {
+                if (!h.kind) continue;
+                if (h.hit) { h.hit -= dt; h.up = Math.max(0, h.up - dt * 4); if (h.hit <= 0) h.kind = null; continue; }
+                h.life -= dt;
+                if (h.life > 0) h.up = Math.min(1, h.up + dt * 7); else { h.up -= dt * 6; if (h.up <= 0) { if (h.kind !== "bomb") combo = 0; h.kind = null; updateStats(); } }
+            }
+            for (const f of floats) { f.t -= dt; f.y -= 50 * dt; } floats = floats.filter((f) => f.t > 0);
+            if (hammer) { hammer.t -= dt; if (hammer.t <= 0) hammer = null; }
+            Kit.stat("time", Math.ceil(time));
+        }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${score.toLocaleString()} points<br>Best ${best.toLocaleString()}`;
+            tune([784, 659, 523], 0.12, "triangle", 0.05); Kit.show("over");
+        }
+        function drawMole(h) {
+            const k = h.kind, rise = Math.sin(h.up * Math.PI / 2), y = h.y + 10 - rise * 70;
+            ctx.save(); ctx.beginPath(); ctx.rect(h.x - CELL / 2, h.y - CELL, CELL, CELL + 6); ctx.clip();
+            if (k === "bomb") {
+                ctx.fillStyle = "#1a1d33"; ctx.beginPath(); ctx.arc(h.x, y, 30, 0, 7); ctx.fill();
+                ctx.fillStyle = "#ffffff33"; ctx.beginPath(); ctx.arc(h.x - 10, y - 10, 8, 0, 7); ctx.fill();
+                ctx.strokeStyle = "#c47a3a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(h.x + 14, y - 24); ctx.quadraticCurveTo(h.x + 30, y - 44, h.x + 22, y - 52); ctx.stroke();
+                ctx.fillStyle = Math.floor(t * 12) % 2 ? "#ffc94d" : "#ff4d4d"; ctx.beginPath(); ctx.arc(h.x + 22, y - 54, 6, 0, 7); ctx.fill();
+            } else {
+                const body = k === "gold" ? "#ffc94d" : "#9a6a40";
+                ctx.fillStyle = body; Kit.rr(ctx, h.x - 34, y - 34, 68, 90, 32); ctx.fill();
+                ctx.fillStyle = k === "gold" ? "#ffe9a8" : "#d9a77a"; ctx.beginPath(); ctx.ellipse(h.x, y + 10, 20, 16, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = "#ff8fb0"; ctx.beginPath(); ctx.ellipse(h.x, y + 2, 9, 6, 0, 0, 7); ctx.fill();
+                const hurt = h.hit > 0;
+                ctx.fillStyle = "#0b0d1a";
+                if (hurt) { ctx.lineWidth = 3; ctx.strokeStyle = "#0b0d1a"; for (const ex of [-13, 13]) { ctx.beginPath(); ctx.moveTo(h.x + ex - 5, y - 18); ctx.lineTo(h.x + ex + 5, y - 8); ctx.moveTo(h.x + ex + 5, y - 18); ctx.lineTo(h.x + ex - 5, y - 8); ctx.stroke(); } }
+                else { ctx.beginPath(); ctx.arc(h.x - 13, y - 12, 5, 0, 7); ctx.arc(h.x + 13, y - 12, 5, 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(h.x - 5, y + 18, 4, 6); ctx.fillRect(h.x + 1, y + 18, 4, 6); }
+                if (k === "helmet" && h.hp > 1) { ctx.fillStyle = "#c8ccdf"; ctx.beginPath(); ctx.ellipse(h.x, y - 24, 38, 22, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(h.x - 42, y - 26, 84, 6); }
+                if (k === "gold") { ctx.fillStyle = "#ffffff"; ctx.font = "18px serif"; ctx.textAlign = "center"; ctx.fillText("✨", h.x + 30 * Math.sin(t * 5), y - 40); }
+            }
+            ctx.restore();
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#3ccf6b"); g.addColorStop(1, "#1f7a4a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffffff10"; for (let i = 0; i < 40; i++) ctx.fillRect((i * 97) % W, (i * 61) % H, 3, 8);
+            for (const h of holes) {
+                ctx.fillStyle = "#4a2e18"; ctx.beginPath(); ctx.ellipse(h.x, h.y + 4, CELL * 0.36, CELL * 0.13, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = "#1a0f08"; ctx.beginPath(); ctx.ellipse(h.x, h.y, CELL * 0.31, CELL * 0.1, 0, 0, 7); ctx.fill();
+                if (h.kind) drawMole(h);
+                ctx.fillStyle = "#3a8a3a"; ctx.beginPath(); ctx.ellipse(h.x, h.y + 10, CELL * 0.37, CELL * 0.07, 0, 0, Math.PI); ctx.fill();
+            }
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.max(0, f.t); Kit.text(ctx, f.s, f.x, f.y, 22, f.c); }
+            ctx.globalAlpha = 1;
+            if (hammer) { ctx.save(); ctx.translate(hammer.x + 20, hammer.y - 20); ctx.rotate(-0.8 + (0.15 - hammer.t) * 6); ctx.fillStyle = "#8a5a30"; ctx.fillRect(-4, -10, 8, 60); ctx.fillStyle = "#ff4d8d"; Kit.rr(ctx, -24, -30, 48, 26, 8); ctx.fill(); ctx.restore(); }
+            // time bar
+            ctx.fillStyle = "#0b0d1a66"; Kit.rr(ctx, 20, 14, W - 40, 12, 6); ctx.fill();
+            ctx.fillStyle = time < 10 ? "#ff4d8d" : "#ffc94d"; Kit.rr(ctx, 20, 14, (W - 40) * time / 60, 12, 6); ctx.fill();
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (state !== "play") return; const p = Kit.point(cv, e); whack(p.x, p.y); });
+        // keyboard: number pad layout 7 8 9 / 4 5 6 / 1 2 3
+        const KEYMAP = { Numpad7: 0, Numpad8: 1, Numpad9: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5, Numpad1: 6, Numpad2: 7, Numpad3: 8, KeyQ: 0, KeyW: 1, KeyE: 2, KeyA: 3, KeyS: 4, KeyD: 5, KeyZ: 6, KeyX: 7, KeyC: 8 };
+        addEventListener("keydown", (e) => { if (state === "play" && KEYMAP[e.code] !== undefined) { const h = holes[KEYMAP[e.code]]; whack(h.x, h.y - 30); } });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([523, 659, 784], 0.08, "square", 0.05); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Mole Mash</h2><p>The moles are digging up the garden! Bop each one on the head as it pops out of its hole before it hides again. Golden moles give bonus points and extra time, helmet moles need two hits, and bombs must be left alone. You have 60 seconds, and the moles get faster as the clock runs down.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap</td><td>Bop a mole</td></tr><tr><td>Q W E / A S D / Z X C</td><td>Bop with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Keep your eyes on the middle so you can see every hole.</li><li>Never rush into a hole without checking for a bomb.</li><li>Five hits in a row raise your combo multiplier.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Mole Mash</h3><p>Mole Mash is about attention more than speed. Keep your eyes on the middle of the garden, not on the last hole you hit, so you notice movement anywhere on the board. Your hand will follow your eyes, so the earlier you spot a mole, the more relaxed your tap can be.</p><p>Not every mole should be hit. Before you tap, take a split second to check what popped up: golden moles are worth bonus points and extra time, but a bomb costs you. Hitting five moles in a row raises your combo, so a steady run of accurate hits is worth more than wild tapping. On a keyboard, the keys Q W E, A S D and Z X C match the nine holes, which can be faster than a mouse once you learn them.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Watch the whole garden and only tap when you see a mole clearly.</li><li><b>Getting good:</b> Build combos by not missing, and always go for golden moles.</li><li><b>Expert:</b> Use the keyboard layout and keep your combo going through the fastest part of the round.</li></ul><h3>Did you know?</h3><p>Mole Mash is inspired by Whac-A-Mole, a fairground game from the 1970s where players hit plastic moles with a soft mallet. The name is now also an everyday expression for a problem that keeps popping up somewhere else as soon as you fix it.</p><h3>Questions players ask</h3><h4>Can I use the keyboard?</h4><p>Yes. Q W E, A S D and Z X C match the holes from top to bottom.</p><h4>What are the golden moles?</h4><p>They give bonus points and extra time. Hit them fast.</p><h4>How do combos work?</h4><p>Hit five moles in a row to raise your combo multiplier. A miss resets it.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/ColorEcho/colorecho">Color Echo</a><a href="/SpaceRocks/spacerocks">Space Rocks</a><a href="/GemSwap/gemswap">Gem Swap</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

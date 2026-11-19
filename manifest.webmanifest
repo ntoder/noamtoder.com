@@ -1,0 +1,15 @@
+{
+  "name": "Noam's Game Hub",
+  "short_name": "Game Hub",
+  "description": "Free browser games made by Noam. Save your scores, climb the leaderboards and finish the daily challenge.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0d1a",
+  "theme_color": "#0b0d1a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

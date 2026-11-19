@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A short, friendly guide to building a tiny catch-the-star game that runs in any browser.">
+    <title>Make your first game in 30 lines of JavaScript · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🧑‍💻</div>
+        <h1 class="t">Make your first game in 30 lines of JavaScript</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 4 November 2026 · 6 min read</div>
+        
+<p>You don't need special software to make a game. A text editor and a web browser are enough. In this guide you'll build <b>Catch the Star</b>: a basket at the bottom of the screen and a star falling from the top. Catch it to score a point.</p>
+
+<h2>Step 1: make the file</h2>
+<p>Open any text editor (Notepad works, but <a href="https://code.visualstudio.com" target="_blank" rel="noopener">VS Code</a> is nicer) and save an empty file called <code>game.html</code>. Paste in the code below, save, and double-click the file to open it in your browser.</p>
+
+<pre><code>&lt;canvas id="c" width="400" height="500" style="background:#12152b"&gt;&lt;/canvas&gt;
+&lt;script&gt;
+const ctx = document.getElementById("c").getContext("2d");
+let basketX = 170, starX = 200, starY = 0, score = 0;
+
+// 1. Input: move the basket with the arrow keys
+addEventListener("keydown", (e) =&gt; {
+  if (e.key === "ArrowLeft")  basketX -= 25;
+  if (e.key === "ArrowRight") basketX += 25;
+});
+
+function loop() {
+  // 2. Update: the star falls
+  starY += 4 + score * 0.3;
+  if (starY &gt; 460 &amp;&amp; starX &gt; basketX &amp;&amp; starX &lt; basketX + 60) {
+    score++; starY = 0; starX = Math.random() * 380 + 10;  // caught it!
+  }
+  if (starY &gt; 500) { score = 0; starY = 0; }             // missed: start again
+
+  // 3. Draw: clear, then paint everything
+  ctx.clearRect(0, 0, 400, 500);
+  ctx.fillStyle = "#ffc94d"; ctx.font = "28px sans-serif"; ctx.fillText("★", starX - 10, starY);
+  ctx.fillStyle = "#2ee6c9"; ctx.fillRect(basketX, 470, 60, 14);
+  ctx.fillStyle = "#fff"; ctx.font = "18px sans-serif"; ctx.fillText("Score: " + score, 10, 24);
+
+  requestAnimationFrame(loop);   // do it all again next frame
+}
+loop();
+&lt;/script&gt;</code></pre>
+
+<h2>Step 2: understand what you wrote</h2>
+<ul>
+  <li><b>The canvas</b> is the game screen: 400 pixels wide and 500 tall.</li>
+  <li><b>The variables</b> remember where the basket and star are, and the score.</li>
+  <li><b>The keydown listener</b> moves the basket when you press the arrow keys.</li>
+  <li><b>The loop</b> moves the star down, checks whether it landed in the basket, and draws everything. <code>requestAnimationFrame</code> runs the loop again about 60 times a second.</li>
+</ul>
+<p>Notice the three steps from <a href="/articles/how-browser-games-work">How a browser game works</a>: input, update, draw.</p>
+
+<h2>Step 3: make it yours</h2>
+<p>Here are some ideas to try. Change one thing at a time, save, and refresh the browser to see what happens:</p>
+<ul>
+  <li>Change the colours (<code>#ffc94d</code> is yellow, <code>#ff4d8d</code> is pink).</li>
+  <li>Make the basket wider, or the star fall faster.</li>
+  <li>Keep a <b>best score</b> that doesn't reset when you miss.</li>
+  <li>Add a second star, or a "bad" star you must avoid.</li>
+  <li>Add a sound when you catch a star (search for "Web Audio API beep").</li>
+</ul>
+
+<h2>Where to go next</h2>
+<p>Every game on Noam's Game Hub started with the same idea, just with more objects and more rules. Play a few games and think about what each one is doing in its loop. What does Snake update each frame? How does Brick Smash know which brick the ball hit? Thinking like that is the first step to making your own.</p>
+
+        <div class="cta"><a class="btn" href="/Memory/memory">▶ Play Memory Match</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/chess-for-beginners">♟️ Chess for beginners: 10 rules that win your first games<span>You don&#x27;t need to memorise openings to start winning. These ten simple rules fix the mistakes almost every new player makes.</span></a><a href="/articles/how-to-solve-sudoku">🔢 How to solve Sudoku: techniques from easy to hard<span>Sudoku never needs guessing. Learn the logical techniques that solve easy puzzles in minutes and hard puzzles without a hint.</span></a><a href="/articles/word-guess-strategy">🟩 Word Guess strategy: the best first words and how to think<span>Why CRANE and SLATE are great starting words, how to use yellow letters properly, and the trick for when many words are still possible.</span></a><a href="/articles/learn-world-flags">🌍 How to learn the world&#x27;s flags: tricks for telling similar flags apart<span>Chad or Romania? Ireland or Ivory Coast? Simple tricks for remembering flags, and the best way to practise them.</span></a><a href="/articles/touch-typing-for-kids">⌨️ Learn to touch type: a simple guide for kids and beginners<span>Typing without looking is one of the most useful computer skills there is. Here&#x27;s how to start, and how to practise without getting bored.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

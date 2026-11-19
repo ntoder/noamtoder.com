@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="robots" content="noindex, follow">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b0d1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/noam/noam.css">
+  <title>NoamBrowser Account · Noam's Game Hub</title>
+  <meta name="description" content="Your NoamBrowser account: sign in, see your computers, change your password.">
+  <style>
+    .hero { display: flex; gap: 16px; align-items: center; }
+    .av { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; font-weight: 800; background: var(--accent); color: #fff; flex: none; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
+    .dot.busy { background: #f5b942; } .dot.bad { background: var(--hot); }
+    .dev { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .dev:first-of-type { border-top: 0; }
+    .dev .ic { font-size: 22px; } .dev .n { flex: 1; min-width: 0; } .dev small { display: block; color: var(--muted); }
+    .tag { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--accent-soft); color: #cfc4ff; margin-left: 6px; }
+    .sw { position: relative; width: 44px; height: 26px; border-radius: 13px; background: var(--surface-3); flex: none; transition: background .2s; }
+    .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .sw[aria-checked="true"] { background: var(--accent); } .sw[aria-checked="true"]::after { transform: translateX(18px); }
+    .set { display: flex; align-items: center; gap: 12px; } .set .t { flex: 1; } .set .t span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .box { display: none; margin-top: 14px; } .box.open { display: block; }
+    ul.syncs { margin: 0; padding-left: 20px; line-height: 1.8; color: var(--muted); font-size: 14px; } ul.syncs b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <main class="page"><div id="app"></div></main>
+  <script src="/noam/noam-core.js"></script>
+  <script src="/noam/glue.js"></script>
+  <script src="/noam/noam-ui.js"></script>
+  <script type="module" src="/noam/noam-link.js"></script>
+  <script>
+    NoamUI.shell('account');
+    const C = NoamCore;
+    const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+    const icon = (n) => (/Web/.test(n) ? '🌐' : /Mac/.test(n) ? '🍎' : /Linux/.test(n) ? '🐧' : /Windows/.test(n) ? '🪟' : '💻');
+    function signedIn(el) {
+      const paint = () => {
+        const st = C.status(); if (!st.user) return;
+        const gh = window.GameHubLink ? window.GameHubLink.get() : {};
+        const dot = st.state === 'syncing' || st.state === 'working' ? 'busy' : st.state === 'error' ? 'bad' : '';
+        el.innerHTML = `
+          <div class="card hero"><div class="av">${esc(st.user[0].toUpperCase())}</div><div class="grow"><h1 style="margin:0">@${esc(st.user)}</h1>
+            <div class="muted" style="font-size:14px;margin-top:4px"><span class="dot ${dot}"></span>${st.state === 'syncing' ? 'Syncing…' : st.state === 'error' ? esc(st.error) : 'Synced ' + ago(st.last)}</div></div>
+            <button class="btn" id="sync">🔄 Sync now</button></div>
+          <div class="card"><h2>🎮 Game Hub</h2>${gh.signedIn ? `<p class="muted" style="margin:0">Signed in to the Game Hub as <b style="color:var(--text)">${esc(gh.name || 'you')}</b>. ${gh.noamAccount === st.user ? '✅ Linked to this NoamBrowser account.' : 'Linking…'}</p>` : `<p class="muted" style="margin:0 0 10px">Sign in to the Game Hub too and your two accounts are linked: your Game Hub profile shows your NoamBrowser username.</p><a class="btn" href="/login">Sign in to the Game Hub</a>`}</div>
+          <div class="card"><h2>What syncs on the web</h2><ul class="syncs"><li><b>💬 NoamChat</b>: your chat name, friends, groups and messages</li><li><b>⭐ Bookmarks and to-dos</b></li><li>Your <b>passwords and history</b> stay in the NoamBrowser app and never come to the website.</li></ul>
+            <div class="set" style="margin-top:14px"><div class="t"><b>🔎 Let friends find me by my username</b><span>Friends can add you in NoamChat by typing @${esc(st.user)}</span></div><button class="sw" role="switch" id="find" aria-checked="${st.findable !== false}"></button></div></div>
+          <div class="card"><h2>Your computers and devices</h2>${(st.devices || []).length ? st.devices.map((d) => `<div class="dev"><span class="ic">${icon(d.name)}</span><div class="n"><b>${esc(d.name)}</b>${d.me ? '<span class="tag">This device</span>' : ''}<small>Last synced ${ago(d.updated)}</small></div>${d.me ? '' : `<button class="btn ghost" data-rm="${esc(d.device)}">Remove</button>`}</div>`).join('') : '<p class="muted">Syncing…</p>'}</div>
+          <div class="card"><h2>Account</h2><div class="acts"><button class="btn" id="pw">🔒 Change password</button><button class="btn" id="out">Sign out</button><button class="btn ghost danger" id="del">Delete account…</button></div>
+            <div class="box" id="pwbox"><label class="field">Current password<input type="password" id="pw0" autocomplete="current-password"></label><label class="field">New password<input type="password" id="pw1" autocomplete="new-password"></label><button class="btn primary" id="pwgo">Change password</button><div class="err" id="pwerr"></div></div>
+            <div class="box" id="outbox"><label class="check"><input type="checkbox" id="forget"> Also remove this device from my account</label><button class="btn primary" id="outgo">Sign out</button></div>
+            <div class="box" id="delbox"><p class="err" style="margin:0 0 10px">This deletes your account and everything synced with it, on every device. It can’t be undone.</p><label class="field">Type your password to confirm<input type="password" id="delpw" autocomplete="current-password"></label><button class="btn danger" id="delgo">Delete my account</button><div class="err" id="delerr"></div></div></div>`;
+        const $ = (s) => el.querySelector(s);
+        $('#sync').onclick = () => C.sync();
+        $('#find').onclick = async () => { await C.setFindable($('#find').getAttribute('aria-checked') !== 'true'); paint(); };
+        el.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => { b.disabled = true; try { await C.removeDevice(b.dataset.rm); toast('Device removed'); } catch (e) { toast(e.message); } paint(); }));
+        const toggle = (id) => ['#pwbox', '#outbox', '#delbox'].forEach((s) => $(s).classList.toggle('open', s === id && !$(s).classList.contains('open')));
+        $('#pw').onclick = () => toggle('#pwbox'); $('#out').onclick = () => toggle('#outbox'); $('#del').onclick = () => toggle('#delbox');
+        $('#pwgo').onclick = async () => { const b = $('#pwgo'); b.disabled = true; $('#pwerr').textContent = ''; try { await C.changePassword({ current: $('#pw0').value, password: $('#pw1').value }); toast('🔒 Password changed on all your devices'); paint(); } catch (e) { $('#pwerr').textContent = e.message; b.disabled = false; } };
+        $('#outgo').onclick = async () => { await C.signOut({ forgetDevice: $('#forget').checked }); };
+        $('#delgo').onclick = async () => { const b = $('#delgo'); b.disabled = true; $('#delerr').textContent = ''; try { await C.deleteAccount({ password: $('#delpw').value }); toast('Your account was deleted'); } catch (e) { $('#delerr').textContent = e.message; b.disabled = false; } };
+      };
+      paint();
+      let t = null; const later = () => { if (el.querySelector('input:focus')) return; clearTimeout(t); t = setTimeout(paint, 100); };
+      C.on('account:status', later); addEventListener('gamehub-user', later);
+    }
+    NoamUI.gate(document.getElementById('app'), signedIn, { title: 'Your NoamBrowser account' });
+  </script>
+</body>
+</html>

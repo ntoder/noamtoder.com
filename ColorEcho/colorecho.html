@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A memory game of colours and sounds. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Color Echo · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Color <span>Echo</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Round</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Color Echo</h2>
+                <p id="startText">Watch the colours light up, then repeat the pattern.<br>Each round adds one more step. How far can you go?</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Keys: Q W (top) and A S (bottom). The pattern speeds up as it grows!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, CX = W / 2, CY = W / 2, R1 = W * 0.2, R2 = W * 0.46, BEST = "echoBest";
+        const PADS = [{ c: "#2ee6a0", f: 329.6, k: "↖" }, { c: "#ff4d6d", f: 440, k: "↗" }, { c: "#ffc94d", f: 277.2, k: "↙" }, { c: "#4da3ff", f: 164.8, k: "↘" }];
+        // angle ranges: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right
+        const ANG = [[Math.PI, Math.PI * 1.5], [Math.PI * 1.5, Math.PI * 2], [Math.PI * 0.5, Math.PI], [0, Math.PI * 0.5]];
+        Kit.stat("best", Kit.best(BEST));
+        let gen = 0, seq, pos, phase = "idle", lit = [0, 0, 0, 0], t = 0, msg = "", round = 0, fx = Kit.particles(), timeout = null;
+        function reset() { gen++; clearTimeout(timeout); seq = []; round = 0; Kit.stat("score", 0); next(); }
+        function flash(i, dur) { lit[i] = dur; beep(PADS[i].f, dur * 0.9, "triangle", 0.08); }
+        function next() {
+            seq.push(Kit.randi(0, 3)); pos = 0; phase = "show"; msg = "Watch…";
+            const gap = Math.max(0.22, 0.6 - seq.length * 0.025);
+            const g = gen;
+            seq.forEach((p, i) => setTimeout(() => g === gen && flash(p, gap * 0.75), 700 + i * gap * 1000));
+            setTimeout(() => { if (g !== gen) return; phase = "input"; msg = "Your turn!"; armTimeout(); }, 700 + seq.length * gap * 1000);
+        }
+        function armTimeout() { clearTimeout(timeout); timeout = setTimeout(() => { if (phase === "input") fail(); }, 5000); }
+        function press(i) {
+            if (phase !== "input") return;
+            flash(i, 0.25);
+            if (i !== seq[pos]) return fail();
+            pos++; armTimeout();
+            if (pos === seq.length) {
+                round = seq.length; Kit.stat("score", round); phase = "wait"; msg = "Nice!";
+                fx.burst(CX, CY, PADS[i].c, 16, 4);
+                if (round % 5 === 0) setTimeout(() => tune([523, 659, 784, 1047], 0.07, "square", 0.04), 250);
+                { const g = gen; setTimeout(() => g === gen && next(), 900); }
+            }
+        }
+        function fail() {
+            clearTimeout(timeout); phase = "over"; msg = "Oops!";
+            beep(110, 0.6, "sawtooth", 0.07, -30);
+            Kit.save(round); const best = Kit.setBest(BEST, round);
+            setTimeout(() => { $("overText").innerHTML = `You remembered ${round} in a row.<br>Best ${best}`; Kit.show("over"); }, 700);
+        }
+        function draw() {
+            ctx.clearRect(0, 0, W, W);
+            ctx.fillStyle = "#12152b"; ctx.beginPath(); ctx.arc(CX, CY, R2 + 14, 0, 7); ctx.fill();
+            PADS.forEach((p, i) => {
+                const [a0, a1] = ANG[i], on = lit[i] > 0;
+                ctx.fillStyle = p.c; ctx.globalAlpha = on ? 1 : 0.28;
+                if (on) { ctx.shadowColor = p.c; ctx.shadowBlur = 40; }
+                ctx.beginPath(); ctx.arc(CX, CY, R2, a0 + 0.06, a1 - 0.06); ctx.arc(CX, CY, R1, a1 - 0.12, a0 + 0.12, true); ctx.closePath(); ctx.fill();
+                ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            });
+            ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(CX, CY, R1 - 8, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#2a3060"; ctx.lineWidth = 3; ctx.stroke();
+            Kit.text(ctx, seq && seq.length ? seq.length : "–", CX, CY - 12, 40, "#eef0ff", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, msg, CX, CY + 30, 15, phase === "input" ? "#2ee6c9" : "#9aa0c8");
+            fx.draw(ctx);
+        }
+        const game = Kit.loop((dt) => { t += dt; for (let i = 0; i < 4; i++) if (lit[i] > 0) lit[i] -= dt; fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => {
+            const p = Kit.point(cv, e), dx = p.x - CX, dy = p.y - CY, d = Math.hypot(dx, dy);
+            if (d < R1 || d > R2 + 10) return;
+            press(dy < 0 ? (dx < 0 ? 0 : 1) : (dx < 0 ? 2 : 3));
+        });
+        Kit.onKeys({ KeyQ: "0", KeyW: "1", KeyA: "2", KeyS: "3", Digit1: "0", Digit2: "1", Digit3: "2", Digit4: "3", Numpad7: "0", Numpad9: "1", Numpad1: "2", Numpad3: "3" }, (a) => press(+a));
+        function start() { Kit.hide("start"); Kit.hide("over"); reset(); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        seq = []; game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Color Echo</h2><p>A memory game of colours and sounds. Watch the four coloured pads light up in a pattern, then repeat it in the same order. Every round adds one more step to the pattern and plays it a little faster. See how long a pattern you can remember.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap a colour</td><td>Repeat the pattern</td></tr><tr><td>Q W A S</td><td>Press a colour with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Say the colours out loud in your head as they light up.</li><li>Each pad has its own sound, so listen as well as watch.</li><li>Group the pattern into small chunks of three or four.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Color Echo</h3><p>Color Echo gets harder in a predictable way: every round adds one more step. Nobody can remember a long list of colours one by one, so the trick is to group them. Think of the pattern in chunks of three or four, like a phone number. Red-blue-blue, green-yellow-red is much easier to hold in your head than six separate colours.</p><p>Use more than one sense. Each pad has its own sound, so listen to the tune as well as watching the lights. Many players find it helps to say the colours quietly or to tap along with a finger while the pattern plays. On a keyboard, Q and W are the top pads and A and S are the bottom ones, which lets you repeat long patterns quickly. The pattern speeds up as it grows, so stay calm and keep the same rhythm.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Say each colour to yourself and reach a pattern of 8 steps.</li><li><b>Getting good:</b> Group the pattern into chunks and listen to the notes.</li><li><b>Expert:</b> Use the keyboard and aim for patterns of 20 steps or more without a mistake.</li></ul><h3>Did you know?</h3><p>Color Echo is inspired by Simon, an electronic memory game released in 1978. Its four coloured buttons and tones became one of the best-known toys of the late 1970s, and it's still sold today.</p><h3>Questions players ask</h3><h4>Can I use the keyboard?</h4><p>Yes. Q and W are the top pads, A and S are the bottom ones.</p><h4>Does the pattern change every game?</h4><p>Yes, every game makes a new random pattern.</p><h4>Why is it getting faster?</h4><p>The pattern speeds up as it gets longer, so the game gets harder as you improve.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/StackTower/stacktower">Stack Tower</a><a href="/MathBlitz/mathblitz">Math Blitz</a><a href="/SkyClimber/skyclimber">Sky Climber</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

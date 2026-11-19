@@ -1,0 +1,63 @@
+/* noamtoder.com — Noam apps (NoamChat, Music, Focus, Bookmarks, Account). Same colours as the Game Hub. */
+:root {
+  --bg: #0b0d1a; --bg-2: #12152b; --card: #171b36; --line: #2a3060; --text: #eef0ff; --muted: #9aa0c8;
+  --accent: #7c5cff; --accent-2: #2ee6c9; --hot: #ff4d8d; --ok: #2ee6a0;
+  /* names the NoamBrowser styles use */
+  --surface: #12152b; --surface-2: #1d2246; --surface-3: #262c58; --accent-soft: rgba(124,92,255,.22); --danger: #ff4d8d;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; --shadow: 0 18px 50px rgba(0,0,0,.45); --rk: 1;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { font-family: var(--font); color: var(--text); min-height: 100vh; display: flex; flex-direction: column;
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.22), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(46,230,201,.12), transparent 60%), var(--bg); }
+a { color: var(--accent-2); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+.top { display: flex; align-items: center; gap: 14px; padding: 12px clamp(12px, 3vw, 32px); border-bottom: 1px solid var(--line); background: rgba(11,13,26,.75); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20; }
+.logo { font-family: 'Press Start 2P', monospace; font-size: 12px; text-decoration: none; color: var(--text); white-space: nowrap; }
+.logo span { color: var(--accent-2); }
+.nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a { text-decoration: none; color: var(--muted); font-weight: 700; font-size: 14px; padding: 8px 12px; border-radius: 10px; white-space: nowrap; }
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.on { background: var(--accent); color: #fff; }
+.who { font-size: 13px; color: var(--muted); white-space: nowrap; text-decoration: none; padding: 6px 10px; border-radius: 999px; background: var(--surface-2); }
+.who b { color: var(--text); }
+main.page { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: clamp(22px, 4vw, 30px); margin: 0 0 6px; }
+.lead { color: var(--muted); margin: 0 0 20px; line-height: 1.5; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 16px; }
+.card h2 { font-size: 17px; margin: 0 0 10px; }
+.muted { color: var(--muted); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
+.in, .field input, .field select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; color: var(--text); font-size: 15px; outline: none; width: 100%; }
+.in:focus, .field input:focus { border-color: var(--accent); }
+.btn { height: 40px; padding: 0 18px; border-radius: 11px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--surface-2); color: var(--text); }
+.btn:hover { background: var(--surface-3); }
+.btn.primary { background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(124,92,255,.35); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border: 1px solid var(--line); }
+.btn.danger { color: var(--hot); }
+.btn:disabled { opacity: .6; cursor: wait; }
+.err { color: #ffb3cd; font-size: 14px; min-height: 18px; margin-top: 6px; }
+.ok-msg { color: #b6ffe2; font-size: 14px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg-2); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+.tabs button { padding: 10px; border-radius: 9px; font-weight: 700; color: var(--muted); }
+.tabs button.on { background: var(--accent); color: #fff; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--text); margin: 4px 0 14px; cursor: pointer; }
+.signin { max-width: 440px; margin: 0 auto; }
+.signin .warn { font-size: 13px; color: var(--muted); background: var(--bg-2); border-radius: 10px; padding: 10px 12px; margin: 0 0 14px; line-height: 1.45; }
+.linked { font-size: 13px; color: var(--muted); margin: -6px 0 14px; }
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 600; padding: 11px 18px; border-radius: 12px; background: var(--text); color: var(--bg); font-weight: 650; box-shadow: var(--shadow); max-width: 90vw; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: 1; }
+.menu { position: fixed; z-index: 700; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px; min-width: 200px; box-shadow: var(--shadow); }
+.menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 8px; font-size: 14px; }
+.menu button:hover { background: var(--surface-2); }
+.menu button:disabled { opacity: .4; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 18px; }
+@media (max-width: 640px) { .logo { display: none; } .who { display: none; } main.page { padding: 16px 12px 40px; } .card { padding: 16px; border-radius: 14px; } }

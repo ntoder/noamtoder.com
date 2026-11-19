@@ -1,51 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Guide a little bird through a sky full of pipes. Free to play in your browser on Noam's Game Hub.">
-    <title>Sky Hopper · Noam's Game Hub</title>
-    <link rel="stylesheet" href="flappybird.css">
-      <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="description" content="Help a brave little chicken fly through a sky full of pipes. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Flappy Chicken · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <canvas id="gameCanvas" width="400" height="600"></canvas>
-        <audio id="jumpSound" preload="auto"></audio>
-        <audio id="scoreSound" preload="auto"></audio>
-        <audio id="gameOverSound" preload="auto"></audio>
-        <div class="info-panel">
-            <div class="score-display">
-                <p>Score: <span id="score">0</span></p>
-                <p>High Score: <span id="highScore">0</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Flappy <span>Chicken</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Pipes</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="420" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Flappy Chicken</h2>
+                <p id="startText">Space, ⬆ or tap to flap.<br>Help the chicken fly through the gaps. Win a 🥉 at 5 pipes, 🥈 at 12, 🥇 at 25!</p>
+                <button class="btn" id="startBtn">▶ Fly</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Ouch!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Fly again</button>
+            </div></div>
+            
             </div>
-            <div id="gameOver" class="game-over hidden">
-                <h1>Game Over!</h1>
-                <p>Final Score: <span id="finalScore">0</span></p>
-                <button id="restartBtn">Play Again</button>
-            </div>
-            <div id="startScreen" class="start-screen">
-                <h1>Sky Hopper</h1>
-                <p>Click or Press Space to start</p>
-            </div>
+            
         </div>
     </div>
+    
+    <p class="hint">The gaps get smaller and some pipes start to move as your score climbs.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, GROUND = H - 70, BEST = "skyBest";
+        Kit.stat("best", Kit.best(BEST));
+        let bird, pipes, score, speed, state = "ready", t = 0, spawn, fx = Kit.particles(), flash = 0;
+        const clouds = Array.from({ length: 6 }, () => ({ x: Kit.rand(0, W), y: Kit.rand(30, 220), s: Kit.rand(0.6, 1.3) }));
 
-    <script src="flappybird.js"></script>
+        function reset() {
+            bird = { x: 110, y: H / 2 - 40, vy: 0, r: 15 };
+            pipes = []; score = 0; speed = 150; spawn = 0.6; Kit.stat("score", 0);
+        }
+        function flap() {
+            if (state === "dead") return;
+            if (state === "ready") { state = "play"; Kit.hide("start"); }
+            bird.vy = -330; beep(620, 0.06, "triangle", 0.05, 200);
+            fx.burst(bird.x - 12, bird.y + 4, "#fffaf0cc", 4, 1.5);
+        }
+        function gapSize() { return Math.max(130, 185 - score * 2); }
+
+        const game = Kit.loop((dt) => {
+            t += dt;
+            if (state === "play") {
+                bird.vy += 980 * dt; bird.y += bird.vy * dt;
+                speed = Math.min(240, 150 + score * 3);
+                if ((spawn -= dt) <= 0) {
+                    const g = gapSize(), top = Kit.rand(70, GROUND - g - 60);
+                    pipes.push({ x: W + 40, top, g, w: 64, passed: false, wob: score > 15 && Math.random() < 0.35 ? Kit.rand(0, 6.28) : null });
+                    spawn = Math.max(1.05, 1.5 - score * 0.01);
+                }
+                for (const p of pipes) {
+                    p.x -= speed * dt;
+                    if (p.wob !== null) p.top += Math.sin(t * 2 + p.wob) * 30 * dt;
+                    if (!p.passed && p.x + p.w < bird.x) { p.passed = true; score++; Kit.stat("score", score); beep(880, 0.07, "square", 0.04); if (score % 10 === 0) tune([660, 880, 1320], 0.07, "triangle"); }
+                    const inX = bird.x + bird.r > p.x && bird.x - bird.r < p.x + p.w;
+                    if (inX && (bird.y - bird.r < p.top || bird.y + bird.r > p.top + p.g)) die();
+                }
+                pipes = pipes.filter((p) => p.x > -80);
+                if (bird.y - bird.r < 0) { bird.y = bird.r; bird.vy = Math.max(0, bird.vy); }
+                if (bird.y + bird.r > GROUND) die();
+            } else if (state === "ready") {
+                bird.y = H / 2 - 40 + Math.sin(t * 3) * 8;
+            } else if (state === "dead" && bird.y + bird.r < GROUND) {
+                bird.vy += 1400 * dt; bird.y = Math.min(GROUND - bird.r, bird.y + bird.vy * dt);
+            }
+            for (const c of clouds) { c.x -= (state === "play" ? speed : 40) * 0.15 * c.s * dt; if (c.x < -80) { c.x = W + 60; c.y = Kit.rand(30, 220); } }
+            fx.update(dt); if (flash > 0) flash -= dt * 3;
+            draw();
+        });
+
+        function die() {
+            if (state !== "play") return;
+            state = "dead"; flash = 1; beep(160, 0.35, "sawtooth", 0.06, -100);
+            fx.burst(bird.x, bird.y, "#fffaf0", 26, 4); fx.burst(bird.x, bird.y, "#ff3b4e", 6, 3);
+            const best = Kit.setBest(BEST, score);
+            const medal = score >= 40 ? "🏆 Platinum" : score >= 25 ? "🥇 Gold" : score >= 12 ? "🥈 Silver" : score >= 5 ? "🥉 Bronze" : "";
+            setTimeout(() => { $("overText").innerHTML = `${score} pipes${medal ? " · " + medal : ""}<br>Best ${best}`; Kit.show("over"); }, 500);
+            Kit.save(score);
+        }
+
+        function draw() {
+            const sky = ctx.createLinearGradient(0, 0, 0, H);
+            sky.addColorStop(0, "#1b1640"); sky.addColorStop(0.6, "#3a2a7a"); sky.addColorStop(1, "#7c5cff");
+            ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffffff18";
+            for (const c of clouds) { ctx.beginPath(); ctx.ellipse(c.x, c.y, 40 * c.s, 14 * c.s, 0, 0, 7); ctx.ellipse(c.x + 22 * c.s, c.y - 8 * c.s, 24 * c.s, 12 * c.s, 0, 0, 7); ctx.fill(); }
+            // hills
+            const off = (t * (state === "play" ? speed : 40) * 0.3) % 200;
+            ctx.fillStyle = "#2a2160";
+            for (let x = -off - 200; x < W + 200; x += 200) { ctx.beginPath(); ctx.ellipse(x + 100, GROUND + 10, 130, 70, 0, Math.PI, 0); ctx.fill(); }
+            // pipes
+            for (const p of pipes) {
+                const grad = ctx.createLinearGradient(p.x, 0, p.x + p.w, 0);
+                grad.addColorStop(0, "#1fbf8f"); grad.addColorStop(0.5, "#2ee6a0"); grad.addColorStop(1, "#17a37a");
+                ctx.fillStyle = grad;
+                ctx.fillRect(p.x, 0, p.w, p.top); ctx.fillRect(p.x, p.top + p.g, p.w, GROUND - p.top - p.g);
+                ctx.fillStyle = "#0f7a5b";
+                ctx.fillRect(p.x - 5, p.top - 22, p.w + 10, 22); ctx.fillRect(p.x - 5, p.top + p.g, p.w + 10, 22);
+            }
+            // ground
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.fillStyle = "#2ee6c9"; ctx.fillRect(0, GROUND, W, 4);
+            ctx.fillStyle = "#1e2347";
+            const go = (t * (state === "play" ? speed : 40)) % 40;
+            for (let x = -go; x < W; x += 40) ctx.fillRect(x, GROUND + 14, 20, 6);
+            // chicken
+            const ang = Math.max(-0.5, Math.min(1.2, bird.vy / 500));
+            ctx.save(); ctx.translate(bird.x, bird.y); ctx.rotate(state === "ready" ? 0 : ang);
+            const body = Kit.skin("flappybird", "#fffaf0");
+            const flapping = Math.sin(t * (state === "play" ? 30 : 10));
+            // feet tucked under
+            ctx.strokeStyle = "#ff9d2e"; ctx.lineWidth = 3; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(-6, 20); ctx.moveTo(3, 13); ctx.lineTo(2, 20); ctx.stroke();
+            // tail feathers
+            ctx.fillStyle = body; ctx.strokeStyle = "#d9cdb8"; ctx.lineWidth = 1.5;
+            for (const a of [-0.7, -0.25, 0.2]) {
+                ctx.save(); ctx.translate(-14, -2); ctx.rotate(Math.PI + a);
+                ctx.beginPath(); ctx.ellipse(7, 0, 9, 4, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+            }
+            // round body
+            ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(0, 0, bird.r + 3, bird.r + 1, 0, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#d9cdb8"; ctx.lineWidth = 1.5; ctx.stroke();
+            // comb (three red bumps on top)
+            ctx.fillStyle = "#ff3b4e";
+            for (const [cx, cy, r] of [[2, -16, 4.5], [7, -17, 5], [12, -14, 4]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); }
+            // flapping wing
+            ctx.fillStyle = "#f1e6d2"; ctx.strokeStyle = "#cbbda3";
+            ctx.save(); ctx.translate(-5, 3); ctx.rotate(-0.35 + flapping * 0.55);
+            ctx.beginPath(); ctx.ellipse(-3, 0, 10, 6, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
+            // eye
+            ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(9, -5, 3, 0, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(10, -6, 1, 0, 7); ctx.fill();
+            // cheek
+            ctx.fillStyle = "#ff8db455"; ctx.beginPath(); ctx.arc(8, 3, 3.5, 0, 7); ctx.fill();
+            // beak + wattle
+            ctx.fillStyle = "#ffa62e"; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 3); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#ff3b4e"; ctx.beginPath(); ctx.ellipse(15, 7, 3, 4.5, 0.2, 0, 7); ctx.fill();
+            ctx.restore();
+            fx.draw(ctx);
+            if (state === "play" || state === "dead") Kit.text(ctx, score, W / 2, 70, 54, "#ffffff", "center", "'Press Start 2P', monospace", 400);
+            if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.6})`; ctx.fillRect(0, 0, W, H); }
+        }
+
+        function start() { reset(); state = "ready"; Kit.hide("over"); Kit.hide("start"); flap(); }
+        Kit.onKeys({ Space: "flap", ArrowUp: "flap", KeyW: "flap", Enter: "flap" }, () => { if (state === "dead") { if (!$("over").classList.contains("hidden")) start(); } else flap(); });
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (state !== "dead") flap(); });
+        $("startBtn").onclick = (e) => { e.stopPropagation(); start(); };
+        $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -58,11 +189,19 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
-        <section><h2>About Sky Hopper</h2><p>Guide a little bird through a sky full of pipes. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.</p></section>
+        <section><h2>About Flappy Chicken</h2><p>Help a brave little chicken fly through a sky full of pipes. Chickens aren't great at flying, so every flap counts. Each tap gives it a small hop upward, and gravity pulls it back down. Fly through the gap between each pair of pipes to score a point. It's simple to learn and very hard to master.</p></section>
         <section><h3>How to play</h3><table><tr><td>Space / click / tap</td><td>Flap</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Tap gently and often instead of big jumps.</li><li>Aim for the middle of each gap, not the edges.</li><li>Stay calm after a high score. Rushing is what usually ends a run.</li></ul></section>
+        <section><h3>Tips</h3><ul><li>Tap gently and often instead of big jumps.</li><li>Aim for the middle of each gap, not the edges.</li><li>Stay calm after a high score. Rushing is what usually ends a run.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Flappy Chicken</h3><p>Flappy Chicken is hard because every tap moves the chicken a lot and gravity never stops. The secret is small, regular taps. Instead of letting the chicken fall far and then tapping hard to save it, keep it floating around the middle of the next gap with gentle taps. A calm chicken is easy to steer. A chicken swinging up and down is not.</p><p>Aim for the middle of each gap, not the bottom or the top. As you pass one pair of pipes, look straight at the next gap and start lining up while you're still between the pipes. Many runs end right after a new high score, when players get excited and tap too fast. Take a breath, keep the same rhythm, and treat every pipe the same.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score your first 10 points by keeping the chicken low and tapping softly.</li><li><b>Getting good:</b> Learn to line up with the next gap early and keep a steady rhythm.</li><li><b>Expert:</b> Play long runs without changing your tapping speed, even after a new record.</li></ul><h3>Did you know?</h3><p>This game is inspired by Flappy Bird, but with a chicken, which is funny because real chickens can only fly in short bursts. Flappy Bird was made by Vietnamese developer Dong Nguyen in 2013. It became one of the most downloaded mobile games of early 2014, and then its creator removed it from app stores because he felt people were playing it too much.</p><h3>Questions players ask</h3><h4>Why is it so hard?</h4><p>Every tap gives the same small hop and gravity is always pulling the chicken down, so even tiny timing mistakes matter. That's the challenge.</p><h4>Can I play with the keyboard?</h4><p>Yes. Press Space, or click with the mouse.</p><h4>Does it get harder?</h4><p>Yes. As your score climbs, the gaps between the pipes get smaller and some pipes start to move up and down. Keep your taps gentle and you'll adapt.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/Snake/snake">Snake</a><a href="/Tetris/tetris">Block Drop</a><a href="/Chess/chess">Chess</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
@@ -72,7 +211,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

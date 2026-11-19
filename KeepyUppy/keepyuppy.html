@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="How many times can you keep the football in the air? Tap the ball to kick it back up before it hits the grass. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Keepy Uppy · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Keepy <span>Uppy</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="kicks">0</b><small>Kicks</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Keepy Uppy</h2>
+                <p id="startText">Tap the football to kick it up. Don't let it touch the grass!<br>Hit it right in the middle for a PERFECT kick (+2).<br>Grab ★ stars for bonus points. Watch out for the wind!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Ball Dropped!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Tap the side of the ball to send it the other way. The ball gets faster as you go.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, GROUND = H - 70, BEST = "keepyBest";
+        Kit.stat("best", Kit.best(BEST));
+        let ball, kicks, score, state = "ready", t = 0, fx = Kit.particles(), floats = [], stars, wind, windT, crowd;
+        crowd = Array.from({ length: 70 }, (_, i) => ({ x: (i % 35) * 14 + 4 + (i > 34 ? 7 : 0), y: 40 + (i > 34 ? 26 : 0), c: ["#ff4d8d", "#4da3ff", "#ffc94d", "#2ee6a0", "#a15cff"][i % 5], p: Math.random() * 6 }));
+        function reset() {
+            ball = { x: W / 2, y: GROUND - 200, vx: 0, vy: -200, r: 30, rot: 0, vr: 0 };
+            kicks = 0; score = 0; stars = []; wind = 0; windT = 0; floats = [];
+            Kit.stat("score", 0); Kit.stat("kicks", 0);
+        }
+        function grav() { return 900 + Math.min(700, kicks * 14); }
+        function kick(px, py) {
+            const dx = px - ball.x, dy = py - ball.y;
+            if (Math.hypot(dx, dy) > ball.r + 22) return false;
+            ball.vy = -Math.min(900, 620 + kicks * 4);
+            ball.vx = -dx * 9 + Kit.rand(-30, 30);
+            ball.vr = -dx * 0.25;
+            kicks++;
+            let pts = 1;
+            if (Math.abs(dx) < 8) { pts = 2; floats.push({ x: ball.x, y: ball.y - 40, s: "PERFECT +2", t: 0.9, c: "#ffc94d" }); }
+            score += pts; Kit.stat("score", score); Kit.stat("kicks", kicks);
+            fx.burst(px, py, "#ffffff", 10, 3); beep(280 + Math.min(500, kicks * 8), 0.07, "square", 0.05, -80);
+            if (kicks % 10 === 0) { tune([523, 659, 784], 0.06, "triangle", 0.05); floats.push({ x: W / 2, y: 140, s: `${kicks} kicks!`, t: 1.2, c: "#2ee6c9" }); }
+            if (kicks >= 5 && Math.random() < 0.35 && stars.length < 2) stars.push({ x: Kit.rand(60, W - 60), y: Kit.rand(140, GROUND - 260), t: 6 });
+            return true;
+        }
+        function update(dt) {
+            windT -= dt;
+            if (windT <= 0) { windT = Kit.rand(4, 7); wind = kicks > 15 ? Kit.rand(-1, 1) * Math.min(220, kicks * 4) : 0; }
+            ball.vy += grav() * dt; ball.vx += wind * dt;
+            ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.rot += ball.vr * dt;
+            if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.8; beep(200, 0.03, "triangle", 0.03); }
+            if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.8; beep(200, 0.03, "triangle", 0.03); }
+            if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy) * 0.5; }
+            for (const s of stars) { s.t -= dt; if (Math.hypot(s.x - ball.x, s.y - ball.y) < ball.r + 16) { s.t = 0; score += 5; Kit.stat("score", score); floats.push({ x: s.x, y: s.y, s: "★ +5", t: 0.9, c: "#ffc94d" }); fx.burst(s.x, s.y, "#ffc94d", 16, 3); tune([988, 1319], 0.05, "square", 0.04); } }
+            stars = stars.filter((s) => s.t > 0);
+            if (ball.y > GROUND - ball.r) { ball.y = GROUND - ball.r; return lose(); }
+        }
+        function lose() {
+            state = "dead"; beep(120, 0.4, "sawtooth", 0.06, -60); fx.burst(ball.x, GROUND, "#c98a4b", 20, 3);
+            Kit.save(score); const best = Kit.setBest(BEST, score);
+            setTimeout(() => { $("overText").innerHTML = `${kicks} kicks · ${score} points<br>Best ${best}`; Kit.show("over"); }, 500);
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#14183a"); g.addColorStop(0.3, "#2a6fdb"); g.addColorStop(0.8, "#8fd3ff");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#1e2347"; ctx.fillRect(0, 20, W, 70);
+            for (const c of crowd) { const jump = state === "play" && kicks > 0 ? Math.max(0, Math.sin(t * 8 + c.p)) * 4 : 0; ctx.fillStyle = c.c; ctx.beginPath(); ctx.arc(c.x, c.y - jump, 6, 0, 7); ctx.fill(); ctx.fillRect(c.x - 5, c.y + 4 - jump, 10, 10); }
+            ctx.fillStyle = "#2fa95d"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            for (let x = 0; x < W; x += 40) { ctx.fillStyle = "#35b765"; ctx.fillRect(x, GROUND, 20, H - GROUND); }
+            ctx.fillStyle = "#ffffffcc"; ctx.fillRect(0, GROUND, W, 3);
+            if (wind) { const dir = Math.sign(wind); for (let i = 0; i < 5; i++) { const x = ((t * 200 * dir + i * 110) % (W + 100) + W + 100) % (W + 100) - 50, y = 180 + i * 70; ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - dir * 40, y); ctx.stroke(); } Kit.text(ctx, `Wind ${dir > 0 ? "→" : "←"}`, W / 2, 120, 15, "#ffffffcc"); }
+            for (const s of stars) { ctx.globalAlpha = Math.min(1, s.t); Kit.text(ctx, "★", s.x, s.y + Math.sin(t * 4) * 4, 32, "#ffc94d"); }
+            ctx.globalAlpha = 1;
+            // shadow + ball
+            const hgt = Math.max(0, GROUND - ball.y), sh = Math.max(0.2, 1 - hgt / 600);
+            ctx.fillStyle = "#00000044"; ctx.beginPath(); ctx.ellipse(ball.x, GROUND + 6, ball.r * sh, 8 * sh, 0, 0, 7); ctx.fill();
+            ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot);
+            ctx.fillStyle = Kit.skin("keepyuppy", "#ffffff"); ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, 7); ctx.fill();
+            ctx.fillStyle = "#1a1d33";
+            const pent = (cx, cy, r) => { ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 1.2566; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.fill(); };
+            pent(0, 0, 10); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 1.2566; pent(Math.cos(a) * 22, Math.sin(a) * 22, 7); }
+            ctx.restore();
+            ctx.strokeStyle = "#1a1d3355"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, 7); ctx.stroke();
+            fx.draw(ctx);
+            for (const f of floats) { f.t -= 1 / 60; f.y -= 0.7; ctx.globalAlpha = Math.max(0, f.t); Kit.text(ctx, f.s, f.x, f.y, 20, f.c); }
+            floats = floats.filter((f) => f.t > 0); ctx.globalAlpha = 1;
+            if (state === "play") Kit.text(ctx, kicks, W / 2, GROUND + 36, 30, "#ffffff", "center", "'Press Start 2P', monospace", 400);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => {
+            e.preventDefault(); if (state !== "play") return;
+            const p = Kit.point(cv, e); if (!kick(p.x, p.y)) beep(120, 0.03, "triangle", 0.02);
+        });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        Kit.onKeys({ Enter: "go", Space: "go" }, () => { if (state !== "play" && (state === "ready" || !$("over").classList.contains("hidden"))) start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+        if (window.__test) window.__test.ball = () => ball;
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Keepy Uppy</h2><p>How many times can you keep the football in the air? Tap the ball to kick it back up before it hits the grass. Kick it right in the middle for a perfect kick worth double points, or tap the side to send it the other way. The ball falls faster as your count goes up, the wind starts to blow, and bonus stars appear for you to collect.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap the ball</td><td>Kick it up</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Tap the middle of the ball for perfect kicks.</li><li>Tapping the left side sends the ball right, and the other way round.</li><li>Watch for the wind arrow and kick against it.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Keepy Uppy</h3><p>In Keepy Uppy, where you tap the ball decides where it goes. Tap the middle for a straight kick, the left side to send it right, and the right side to send it left. A tap right in the middle counts as a perfect kick and is worth more, so precise taps beat quick ones.</p><p>The ball gets faster as you go, and wind starts to push it sideways. Watch the wind arrow and kick slightly against it to keep the ball over the middle of the screen. If the ball drifts toward an edge, tap its outer side to bring it back. Small corrections early are much easier than saving a ball that's about to leave the screen.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Tap the middle of the ball and keep it up for 10 kicks.</li><li><b>Getting good:</b> Use the sides of the ball to steer it back toward the middle.</li><li><b>Expert:</b> Chain perfect kicks while correcting for the wind.</li></ul><h3>Did you know?</h3><p>Keepy uppy, also called juggling, is one of the first skills young footballers practise. It builds touch and balance. Some freestyle footballers can keep a ball in the air for many hours without letting it touch the ground.</p><h3>Questions players ask</h3><h4>What is a perfect kick?</h4><p>A tap right in the middle of the ball. It's worth extra points.</p><h4>How do I steer the ball?</h4><p>Tap the left side to send it right, and the right side to send it left.</p><h4>Why is the ball moving sideways?</h4><p>That's the wind. Check the wind arrow and kick against it.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MiniGolf/minigolf">Mini Golf</a><a href="/Tennis/tennis">Tennis</a><a href="/Checkers/checkers">Checkers</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

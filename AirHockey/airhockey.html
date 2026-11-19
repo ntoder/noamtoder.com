@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast air hockey match against the computer on a glowing table. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Air Hockey · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Air <span>Hockey</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 - 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Air Hockey</h2>
+                <p id="startText"><span class="seg" id="diff"><button data-d="easy">Easy</button><button data-d="normal">Normal</button><button data-d="hard">Hard</button></span>Move your paddle with the mouse or your finger (or arrow keys).<br>Hit the puck into the computer's goal at the top.<br>First to 7 goals wins!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Match Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Rematch</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Hit the puck while your paddle is moving to smash it harder. Bounce it off the walls to trick the computer.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "hockeyBest", WIN = 7, GW = 150, PR = 32, BR = 20, M = 18;
+        const AI = { easy: { sp: 380, aim: 0.5 }, normal: { sp: 560, aim: 0.75 }, hard: { sp: 760, aim: 0.95 } };
+        let diff = "normal", me, cpu, puck, my, their, state = "ready", t = 0, pause = 0, msg = "", fx = Kit.particles(), target = null;
+        try { diff = localStorage.getItem("hockeyDiff") || "normal"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function place(toward) {
+            me = { x: W / 2, y: H - 110, vx: 0, vy: 0 }; cpu = { x: W / 2, y: 110, vx: 0, vy: 0 };
+            puck = { x: W / 2, y: toward > 0 ? H / 2 + 70 : H / 2 - 70, vx: 0, vy: 0 }; target = null;
+        }
+        function reset() { my = 0; their = 0; Kit.stat("score", "0 - 0"); place(1); }
+        function hit(p, pad) {
+            const dx = puck.x - pad.x, dy = puck.y - pad.y, d = Math.hypot(dx, dy), min = PR + BR;
+            if (d >= min || d === 0) return;
+            const nx = dx / d, ny = dy / d;
+            puck.x = pad.x + nx * min; puck.y = pad.y + ny * min;
+            const rel = (puck.vx - pad.vx) * nx + (puck.vy - pad.vy) * ny;
+            if (rel < 0) { puck.vx -= 1.9 * rel * nx; puck.vy -= 1.9 * rel * ny; }
+            puck.vx += pad.vx * 0.35; puck.vy += pad.vy * 0.35;
+            const sp = Math.hypot(puck.vx, puck.vy); if (sp > 1500) { puck.vx *= 1500 / sp; puck.vy *= 1500 / sp; }
+            beep(p === "me" ? 520 : 380, 0.04, "square", 0.05); fx.burst(puck.x - nx * BR, puck.y - ny * BR, "#ffffff", 6, 2);
+        }
+        function goal(mine) {
+            if (mine) { my++; msg = "GOAL!"; tune([523, 659, 784, 1047], 0.07, "square", 0.05); fx.burst(W / 2, 20, "#ffc94d", 40, 6); }
+            else { their++; msg = "Computer scores"; beep(160, 0.4, "sawtooth", 0.05, -60); fx.burst(W / 2, H - 20, "#ff4d8d", 30, 5); }
+            Kit.stat("score", `${my} - ${their}`); pause = 1.3; puck.vx = 0; puck.vy = 0; puck.y = mine ? -200 : H + 200;
+            if (my >= WIN || their >= WIN) { setTimeout(end, 900); pause = 99; return; }
+            setTimeout(() => place(mine ? -1 : 1), 1200);
+        }
+        function end() {
+            state = "dead"; const win = my > their, sc = my * 100 + (win ? (WIN - their) * 50 + { easy: 0, normal: 100, hard: 300 }[diff] : 0);
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `${win ? "🏆 You win" : "😢 Computer wins"} ${my} - ${their}<br>${sc} points · best ${best}`;
+            if (win) tune([523, 659, 784, 1047], 0.1, "triangle", 0.06); Kit.show("over");
+        }
+        function update(dt) {
+            if (pause > 0) { pause -= dt; if (pause <= 0) msg = ""; }
+            // you: paddle chases your finger / mouse, only in your half
+            const ox = me.x, oy = me.y;
+            if (target) { me.x += (target.x - me.x) * Math.min(1, dt * 22); me.y += (target.y - me.y) * Math.min(1, dt * 22); }
+            const kx = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0), ky = (Kit.keys.has("down") ? 1 : 0) - (Kit.keys.has("up") ? 1 : 0);
+            if (kx || ky) { me.x += kx * 520 * dt; me.y += ky * 520 * dt; }
+            me.x = Math.max(M + PR, Math.min(W - M - PR, me.x)); me.y = Math.max(H / 2 + PR, Math.min(H - M - PR, me.y));
+            me.vx = (me.x - ox) / dt; me.vy = (me.y - oy) / dt;
+            // computer
+            const L = AI[diff], cx0 = cpu.x, cy0 = cpu.y;
+            let tx, ty;
+            if (puck.y < H / 2 && pause <= 0) { // attack: get behind the puck and push it toward your goal
+                const aimX = W / 2 + Kit.rand(-1, 1) * (1 - L.aim) * 200;
+                const ang = Math.atan2(H - puck.y, aimX - puck.x);
+                tx = puck.x - Math.cos(ang) * (PR + BR - 6); ty = puck.y - Math.sin(ang) * (PR + BR - 6);
+                if (cpu.y > puck.y) { tx = puck.x + (puck.x < W / 2 ? 50 : -50); ty = puck.y - 60; }
+            } else { tx = W / 2 + (puck.x - W / 2) * 0.5; ty = 90; }
+            const dx = tx - cpu.x, dy = ty - cpu.y, d = Math.hypot(dx, dy), step = Math.min(d, L.sp * dt);
+            if (d > 0) { cpu.x += dx / d * step; cpu.y += dy / d * step; }
+            cpu.x = Math.max(M + PR, Math.min(W - M - PR, cpu.x)); cpu.y = Math.max(M + PR, Math.min(H / 2 - PR, cpu.y));
+            cpu.vx = (cpu.x - cx0) / dt; cpu.vy = (cpu.y - cy0) / dt;
+            // puck
+            for (let s = 0; s < 4 && puck.y > -100 && puck.y < H + 100; s++) {
+                puck.x += puck.vx * dt / 4; puck.y += puck.vy * dt / 4;
+                if (puck.x < M + BR) { puck.x = M + BR; puck.vx = Math.abs(puck.vx) * 0.9; beep(300, 0.02, "triangle", 0.03); }
+                if (puck.x > W - M - BR) { puck.x = W - M - BR; puck.vx = -Math.abs(puck.vx) * 0.9; beep(300, 0.02, "triangle", 0.03); }
+                const inGoal = Math.abs(puck.x - W / 2) < GW / 2;
+                if (puck.y < M + BR) { if (inGoal && pause <= 0) { if (puck.y < -BR) return goal(true); } else { puck.y = M + BR; puck.vy = Math.abs(puck.vy) * 0.9; beep(300, 0.02, "triangle", 0.03); } }
+                if (puck.y > H - M - BR) { if (inGoal && pause <= 0) { if (puck.y > H + BR) return goal(false); } else { puck.y = H - M - BR; puck.vy = -Math.abs(puck.vy) * 0.9; beep(300, 0.02, "triangle", 0.03); } }
+                hit("me", me); hit("cpu", cpu);
+            }
+            const f = Math.pow(0.6, dt); puck.vx *= f; puck.vy *= f;
+            // stuck puck on computer side? nudge it
+            if (Math.hypot(puck.vx, puck.vy) < 15 && pause <= 0 && puck.y < H / 2) puck.vy += 40 * dt;
+        }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a2a5a"); g.addColorStop(1, "#122048");
+            ctx.fillStyle = g; Kit.rr(ctx, M / 2, M / 2, W - M, H - M, 30); ctx.fill();
+            ctx.strokeStyle = "#ffffff22"; ctx.lineWidth = 1; for (let x = 40; x < W; x += 40) for (let y = 40; y < H; y += 40) { ctx.beginPath(); ctx.arc(x, y, 1.2, 0, 7); ctx.stroke(); }
+            ctx.strokeStyle = "#ff4d8d88"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(M, H / 2); ctx.lineTo(W - M, H / 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(W / 2, H / 2, 70, 0, 7); ctx.stroke();
+            ctx.strokeStyle = "#4da3ff88"; ctx.beginPath(); ctx.arc(W / 2, 0, GW / 2 + 30, 0, Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(W / 2, H, GW / 2 + 30, Math.PI, 0); ctx.stroke();
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(W / 2 - GW / 2, 0, GW, M); ctx.fillRect(W / 2 - GW / 2, H - M, GW, M);
+            ctx.strokeStyle = "#eef0ff"; ctx.lineWidth = 3; Kit.rr(ctx, M / 2, M / 2, W - M, H - M, 30); ctx.stroke();
+            // puck
+            ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.arc(puck.x + 3, puck.y + 4, BR, 0, 7); ctx.fill();
+            ctx.fillStyle = "#1a1d33"; ctx.beginPath(); ctx.arc(puck.x, puck.y, BR, 0, 7); ctx.fill(); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.stroke();
+            for (const [p, c] of [[cpu, "#ff4d8d"], [me, Kit.skin("airhockey", "#2ee6c9")]]) {
+                ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.arc(p.x + 3, p.y + 5, PR, 0, 7); ctx.fill();
+                ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 16; ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+                ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.arc(p.x, p.y, PR * 0.55, 0, 7); ctx.fill();
+                ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p.x, p.y, PR * 0.35, 0, 7); ctx.fill();
+            }
+            Kit.text(ctx, their, W - 40, H / 2 - 40, 34, "#ffffff33", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, my, W - 40, H / 2 + 44, 34, "#ffffff33", "center", "'Press Start 2P', monospace", 400);
+            fx.draw(ctx);
+            if (msg) Kit.text(ctx, msg, W / 2, H / 2, msg === "GOAL!" ? 40 : 22, msg === "GOAL!" ? "#ffc94d" : "#ffffff", "center", "'Press Start 2P', monospace", 400);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        const setT = (e) => { const p = Kit.point(cv, e); target = { x: p.x, y: p.y }; };
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); setT(e); });
+        cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" || e.buttons) setT(e); });
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", Enter: "go" }, (a) => { if (a === "go" && state !== "play") start(); if (a !== "go") target = null; });
+        document.querySelectorAll("#diff button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.d === diff);
+            b.onclick = () => { diff = b.dataset.d; try { localStorage.setItem("hockeyDiff", diff); } catch (e) {} document.querySelectorAll("#diff button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        function start() { reset(); state = "play"; pause = 0.6; Kit.hide("start"); Kit.hide("over"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Air Hockey</h2><p>A fast air hockey match against the computer on a glowing table. Move your paddle in the bottom half of the table and smash the puck into the computer's goal at the top. The puck bounces off the walls and slides with very little friction, so matches move quickly. Pick easy, normal or hard. The first player to seven goals wins.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse / finger</td><td>Move your paddle</td></tr><tr><td>Arrow keys / WASD</td><td>Move with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hit the puck while your paddle is moving for a much faster shot.</li><li>Bank shots off the side walls are hard for the computer to stop.</li><li>Stay between the puck and your goal when the computer has it.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Air Hockey</h3><p>In Air Hockey, the speed of your shot comes from the speed of your paddle. Hitting the puck while your paddle is moving toward it sends it flying. Tapping it from a standstill barely moves it. So don't wait for the puck to arrive: move into it.</p><p>Straight shots are easy for the computer to block. Bank shots, bounced off a side wall, come at the goal from an angle and are much harder to stop. When the computer has the puck, get back between the puck and your goal. Staying in front of your goal is a better defence than chasing the puck around the table.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Keep your paddle between the puck and your goal, and hit back.</li><li><b>Getting good:</b> Move into the puck for faster shots and try a few bank shots.</li><li><b>Expert:</b> Mix straight shots and bank shots so the computer can't guess where the next one goes.</li></ul><h3>Did you know?</h3><p>Air hockey was invented in 1972 by engineers at the Brunswick Billiards company. The table blows air through hundreds of tiny holes, so the puck floats and glides almost without friction.</p><h3>Questions players ask</h3><h4>Can I use the keyboard?</h4><p>Yes, the arrow keys or WASD move your paddle.</p><h4>How do I hit harder?</h4><p>Hit the puck while your paddle is moving toward it.</p><h4>Why can I only use half the table?</h4><p>Just like the real game, each player stays in their own half.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/HoopShot/hoopshot">Hoop Shot</a><a href="/KeepyUppy/keepyuppy">Keepy Uppy</a><a href="/Tennis/tennis">Tennis</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -6,14 +6,17 @@
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+      gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js', new Date());
       gtag('config', 'G-RX7DB1FEWY');
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Noam's Game Hub — Over 50 free browser games made by Noam: Noametry, Space Shooter, 2048, Block Drop, Snake and more. No downloads, scores saved to your free account.">
-    <title>Noam's Game Hub</title>
+    <meta name="description" content="52 free browser games made by Noam, from Chess, Sudoku and Snake to soccer and word games, each with a full guide. No downloads, works on phones, scores saved to your free account.">
+    <title>Noam's Game Hub · 52 free browser games with guides</title>
     <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0b0d1a">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -62,7 +65,19 @@
         }
         .logo img { width: 30px; height: 30px; border-radius: 8px; }
         .logo span { color: var(--accent-2); }
-        .navbar ul { display: flex; list-style: none; gap: 4px; flex-wrap: wrap; }
+        .navbar ul { display: flex; list-style: none; gap: 2px; flex-wrap: nowrap; }
+        .navbar ul a, .more-btn { white-space: nowrap; }
+        .logo { white-space: nowrap; flex: none; }
+        .more { position: relative; }
+        .more-btn { display: block; padding: 8px 14px; border-radius: 999px; border: 0; background: none; cursor: pointer;
+            font: 600 14px 'Inter', sans-serif; color: var(--muted); }
+        .more-btn:hover, .more.open .more-btn { background: var(--card); color: var(--text); }
+        .more-drop { display: none; position: absolute; top: calc(100% + 8px); left: 0; min-width: 180px; z-index: 60;
+            background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+        .more.open .more-drop { display: block; }
+        .navbar .more-drop a { border-radius: 8px; color: var(--text); }
+        .navbar .more-drop a:hover { background: var(--card-hover); }
+        .navbar .gh-lang { padding: 6px 10px; margin: 0 4px; }
         .navbar ul a {
             display: block; padding: 8px 14px; border-radius: 999px;
             text-decoration: none; font-weight: 600; font-size: 14px; color: var(--muted);
@@ -114,7 +129,9 @@
             color: var(--text); font: 600 14px 'Inter', sans-serif; text-decoration: none; cursor: pointer;
         }
         .navbar .dropdown a:hover, .navbar .dropdown button:hover { background: var(--card-hover); }
-        @media (max-width: 760px) {
+        @media (max-width: 1080px) {
+            .more-drop { position: static; display: block; border: 0; box-shadow: none; background: none; padding: 0 0 0 12px; }
+            .more-btn { display: none; }
             .user-menu, .navbar ul a.login-btn { margin: 8px 0 0; }
             .dropdown { position: static; margin-top: 6px; }
         }
@@ -166,6 +183,32 @@
             font: inherit; padding: 11px 0; width: 100%;
         }
         .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+        .tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .sort { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: 600 14px 'Inter', sans-serif; padding: 11px 12px; cursor: pointer; }
+        .sort:focus { outline: 0; border-color: var(--accent); }
+        .card-meta { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); font-weight: 700; margin-top: auto; padding-top: 4px; }
+        .card-meta .st { color: var(--gold); }
+        .create { margin: 30px 0 6px; }
+        .create h2 { font-size: 24px; margin-bottom: 14px; }
+        .cx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+        .cx { position: relative; overflow: hidden; display: grid; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 16px; color: var(--text); text-decoration: none; transition: transform .15s, border-color .15s; }
+        .cx::before { content: ""; position: absolute; inset: auto -30px -40px auto; width: 120px; height: 120px; border-radius: 50%; background: var(--c); opacity: .18; filter: blur(10px); }
+        .cx:hover { transform: translateY(-3px); border-color: var(--c); }
+        .cx .e { font-size: 34px; }
+        .cx b { font-size: 17px; }
+        .cx .d { color: var(--muted); font-size: 13px; line-height: 1.4; }
+        .arts { margin: 40px 0 10px; }
+        .arts-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+        .arts-head h2 { font-size: 24px; }
+        .arts-head a { color: var(--accent-2); font-weight: 700; text-decoration: none; }
+        .arts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .art-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; color: var(--text); text-decoration: none; font-weight: 700; line-height: 1.35; transition: border-color .15s, transform .15s; }
+        .art-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .art-card .e { font-size: 30px; flex: none; }
+        .mini h3 .clear { float: right; background: none; border: 0; color: var(--muted); font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+        html.he .mini h3 .clear { float: left; }
+        .mini h3 .clear:hover { color: var(--text); }
+        #userAvatar.emoji { font-size: 18px; background: var(--bg-2); }
         .chip {
             padding: 7px 16px; border-radius: 999px; cursor: pointer;
             background: var(--bg-2); color: var(--muted); border: 1px solid var(--line);
@@ -234,6 +277,28 @@
         .featured p { color: var(--muted); }
         .featured .btn { align-self: flex-start; }
 
+        /* ---------- Today ---------- */
+        .today { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); margin-bottom: 40px; }
+        .daily-card { display: flex; gap: 16px; align-items: center; background: linear-gradient(135deg, rgba(255,201,77,.16), rgba(124,92,255,.12));
+            border: 1px solid rgba(255,201,77,.45); border-radius: 18px; padding: 20px; flex-wrap: wrap; }
+        .dc-icon { font-size: 40px; }
+        .dc-body { flex: 1; min-width: 180px; display: grid; gap: 4px; }
+        .dc-body small { color: var(--gold); font-weight: 800; letter-spacing: 1px; font-size: 11px; }
+        .dc-body b { font-size: 17px; } .dc-body span { color: var(--muted); font-size: 14px; }
+        .rows { display: grid; gap: 12px; align-content: start; }
+        .mini h3 { font-size: 15px; margin-bottom: 8px; }
+        .mini-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+        .mini-card { flex: none; width: 110px; text-decoration: none; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+        .mini-card:hover { border-color: var(--accent); }
+        .mini-card img { width: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; background: var(--bg-2); }
+        .mini-card span { display: block; padding: 6px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .heart { position: absolute; bottom: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; border: 0;
+            background: rgba(11,13,26,.75); cursor: pointer; font-size: 16px; display: grid; place-items: center; transition: transform .15s; }
+        .heart:hover { transform: scale(1.15); }
+        .lvl-pill { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; margin-left: 4px; }
+        .lvl-pill:empty { display: none; }
+        @media (max-width: 760px) { .today { grid-template-columns: 1fr; } }
+
         /* ---------- About ---------- */
         .about { margin-top: 56px; display: grid; gap: 16px; }
         .about-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; }
@@ -255,7 +320,7 @@
         footer a { color: var(--accent-2); text-decoration: none; }
 
         /* ---------- Responsive ---------- */
-        @media (max-width: 760px) {
+        @media (max-width: 1080px) {
             .menu-btn { display: block; }
             .navbar { flex-wrap: wrap; }
             .navbar ul { display: none; width: 100%; flex-direction: column; padding-top: 8px; }
@@ -265,6 +330,48 @@
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+        }
+
+        /* ---------- Bigger layout ---------- */
+        body { font-size: 17px; }
+        .hero, .section { max-width: 1480px; }
+        .badge { font-size: 15px; padding: 8px 18px; }
+        .hero h1 { font-size: clamp(26px, 5.6vw, 64px); }
+        .hero p { font-size: clamp(16px, 2.1vw, 21px); max-width: 720px; }
+        .btn { padding: 16px 30px; font-size: 18px; border-radius: 14px; }
+        .section-head h2 { font-size: clamp(26px, 3vw, 34px); }
+        .section-head h2 small { font-size: 16px; }
+        .chip { font-size: 16px; padding: 10px 20px; }
+        .search input { padding: 14px 0; font-size: 16px; }
+        .grid { gap: 26px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+        .card-body { padding: 20px 22px 24px; gap: 8px; }
+        .card h3 { font-size: 21px; }
+        .card p { font-size: 15.5px; }
+        .tag { font-size: 12px; padding: 5px 12px; }
+        .thumb::after { font-size: 16px; }
+        .heart { width: 40px; height: 40px; font-size: 19px; }
+        .featured .f-img { min-height: 340px; }
+        .featured h2 { font-size: clamp(20px, 3.2vw, 32px); }
+        .featured p { font-size: 18px; }
+        .daily-card { padding: 26px; }
+        .dc-icon { font-size: 52px; }
+        .dc-body small { font-size: 13px; }
+        .dc-body b { font-size: 21px; }
+        .dc-body span { font-size: 16px; }
+        .mini h3 { font-size: 17px; }
+        .mini-card { width: 140px; }
+        .mini-card span { font-size: 13.5px; }
+        .about-card { padding: 26px 28px; }
+        .about-card h2 { font-size: 28px; }
+        .about-card h3 { font-size: 19px; }
+        footer { font-size: 15px; }
+        @media (min-width: 1280px) {
+            .navbar { padding-top: 16px; padding-bottom: 16px; }
+            .logo { font-size: 16px; }
+            .logo img { width: 38px; height: 38px; }
+            .navbar ul a, .more-btn { font-size: 16px; padding: 10px 16px; }
+            .user-btn { font-size: 15px; }
+            .avatar { width: 32px; height: 32px; }
         }
     </style>
 </head>
@@ -278,9 +385,27 @@
         <ul id="navLinks">
             <li><a href="/" class="active">Home</a></li>
             <li><a href="#games">Games</a></li>
-            <li><a href="/Websites/">Websites</a></li>
-            <li><a href="/mybio">My Bio</a></li>
+            <li><a href="/leaderboard">🏆 Leaderboards</a></li>
             <li><a href="/premium" class="prem-link">★ Premium</a></li>
+            <li><a href="/chat/">💬 NoamChat</a></li>
+            <li class="more" id="moreMenu">
+                <button class="more-btn" id="moreBtn" aria-haspopup="true" aria-expanded="false">More ▾</button>
+                <div class="more-drop">
+                    <a href="/world">🕹️ Arcade World</a>
+                    <a href="/pet">🐣 My Hub pet</a>
+                    <a href="/maker">🛠️ Level Maker</a>
+                    <a href="/studio">🧑‍💻 Game Studio</a>
+                    <a href="/made">🎁 Made by players</a>
+                    <a href="/app">🍎 Mac app</a>
+                    <a href="/music/">🎧 Music &amp; sounds</a>
+                    <a href="/focus/">🍅 Focus timer</a>
+                    <a href="/bookmarks/">⭐ Bookmarks</a>
+                    <a href="/articles/">📚 Articles</a>
+                    <a href="/Websites/">🌐 Websites</a>
+                    <a href="/about">👋 About</a>
+                    <a href="#" class="hidden" id="installBtn">📲 Install app</a>
+                </div>
+            </li>
             <li class="account" id="account">
                 <a href="/login" class="login-btn" id="loginBtn">Log in</a>
                 <div class="user-menu hidden" id="userMenu">
@@ -291,7 +416,9 @@
                         <span aria-hidden="true">▾</span>
                     </button>
                     <div class="dropdown" id="dropdown" role="menu">
-                        <a href="/profile" role="menuitem">👤 My profile</a>
+                        <a href="/profile" role="menuitem">👤 My profile <span class="lvl-pill" id="lvlPill"></span></a>
+                        <a href="/pet" role="menuitem">🐣 My Hub pet</a>
+                        <a href="/leaderboard" role="menuitem">🏆 Leaderboards</a>
                         <a href="/admin" class="hidden" id="adminLink" role="menuitem">🛠️ Admin dashboard</a>
                         <button id="logoutBtn" role="menuitem">Log out</button>
                     </div>
@@ -312,7 +439,20 @@
 
     <main class="section">
         <!-- Featured -->
+        <section class="today" id="today">
+            <div class="daily-card" id="dailyCard"></div>
+            <div class="rows">
+                <div class="mini hidden" id="recentWrap"><h3>🕹️ Continue playing <button class="clear" id="clearRecent">Clear</button></h3><div class="mini-row" id="recentRow"></div></div>
+                <div class="mini hidden" id="favWrap"><h3>❤️ Your favorites</h3><div class="mini-row" id="favRow"></div></div>
+            </div>
+        </section>
+
         <div data-ad="banner"></div>
+
+        <section class="create" aria-label="Create and explore">
+            <h2>✨ Create &amp; explore</h2>
+            <div class="cx-grid"><a class="cx" href="/world" style="--c:#7c5cff"><span class="e">🕹️</span><b>Arcade World</b><span class="d">Walk around the arcade with your pet and find the secret room</span></a><a class="cx" href="/pet" style="--c:#ffc94d"><span class="e">🐣</span><b>My Hub pet</b><span class="d">Hatch a pet that grows every time you play</span></a><a class="cx" href="/maker" style="--c:#2ee6c9"><span class="e">🛠️</span><b>Level Maker</b><span class="d">Build your own Noametry levels and share them</span></a><a class="cx" href="/studio" style="--c:#ff4d8d"><span class="e">🧑‍💻</span><b>Game Studio</b><span class="d">Code your own game and publish it</span></a><a class="cx" href="/made" style="--c:#2ee6a0"><span class="e">🎁</span><b>Made by players</b><span class="d">Play games and levels other players made</span></a></div>
+        </section>
 
         <section class="featured" aria-label="Featured game">
             <div class="f-img"><img src="/Noametry.png" alt="Noametry Game Image" onerror="this.style.display='none'"></div>
@@ -327,10 +467,19 @@
         <!-- All games -->
         <div class="section-head" id="games">
             <h2>All Games <small id="count"></small></h2>
-            <label class="search">
-                <span aria-hidden="true">🔍</span>
-                <input type="search" id="search" placeholder="Search games…" aria-label="Search games">
-            </label>
+            <div class="tools">
+                <select class="sort" id="sort" aria-label="Sort games">
+                    <option value="default">Sort: Featured</option>
+                    <option value="rated">⭐ Top rated</option>
+                    <option value="popular">🔥 Most popular</option>
+                    <option value="new">🆕 Newest</option>
+                    <option value="az">🔤 A to Z</option>
+                </select>
+                <label class="search">
+                    <span aria-hidden="true">🔍</span>
+                    <input type="search" id="search" placeholder="Search games…" aria-label="Search games">
+                </label>
+            </div>
         </div>
 
         <div class="filters" role="group" aria-label="Filter by category">
@@ -340,7 +489,12 @@
             <button class="chip" data-filter="runner">Runner</button>
             <button class="chip" data-filter="platformer">Platformer</button>
             <button class="chip" data-filter="sports">Sports</button>
+            <button class="chip" data-filter="brain">🧠 Brain</button>
+            <button class="chip" data-filter="word">🔤 Word</button>
+            <button class="chip" data-filter="strategy">🏰 Strategy</button>
+            <button class="chip" data-filter="creative">🎨 Creative</button>
             <button class="chip" data-filter="premium">★ Premium</button>
+            <button class="chip" data-filter="fav">❤️ Favorites</button>
         </div>
 
         <div class="grid" id="grid"></div>
@@ -377,20 +531,34 @@
                 <h3>Questions</h3>
                 <details><summary>Is it really free?</summary><p>Yes. Almost every game is free to play without an account. Premium is optional.</p></details>
                 <details><summary>Do the games work on phones?</summary><p>Yes, most games have touch controls: tap, swipe or use the on-screen buttons.</p></details>
-                <details><summary>How do I report a bug or suggest a game?</summary><p>Email <a href="mailto:noam@rbscode.com">noam@rbscode.com</a>. Ideas for new games are always welcome!</p></details>
+                <details><summary>How do I report a bug or suggest a game?</summary><p>Email <a href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>. Ideas for new games are always welcome!</p></details>
             </div>
+        </section>
+        <section class="arts" aria-label="Guides and articles">
+            <div class="arts-head"><h2>📚 Guides &amp; articles</h2><a href="/articles/">All articles →</a></div>
+            <div class="arts-grid"><a class="art-card" href="/articles/chess-for-beginners"><span class="e">♟️</span><span class="t" data-noi18n>Chess for beginners: 10 rules that win your first games</span></a><a class="art-card" href="/articles/how-to-solve-sudoku"><span class="e">🔢</span><span class="t" data-noi18n>How to solve Sudoku: techniques from easy to hard</span></a><a class="art-card" href="/articles/word-guess-strategy"><span class="e">🟩</span><span class="t" data-noi18n>Word Guess strategy: the best first words</span></a><a class="art-card" href="/articles/history-of-arcade-games"><span class="e">🕹️</span><span class="t" data-noi18n>From Pong to phones: a short history of arcade games</span></a></div>
         </section>
         <div data-ad="banner"></div>
     </main>
 
     <footer>
-        Made with ❤️ by Noam · <a href="/mybio">About me</a> · <a href="/Websites/">More websites</a> · <a href="/premium">Premium</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:noam@rbscode.com">Contact</a>
+        Made with ❤️ by Noam · <a href="/about">About me</a> · <a href="/chat/">NoamChat</a> · <a href="/noambrowser">NoamBrowser</a> · <a href="/app">Mac app</a> · <a href="/Websites/">More websites</a> · <a href="/articles/">Articles</a> · <a href="/leaderboard">Leaderboards</a> · <a href="/premium">Premium</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:noam@noamtoder.com">Contact</a>
     </footer>
 
     <script type="module">
         import { GAMES, DEFAULT_PREMIUM } from "/games.js";
+        import { dailyChallenge, xpFor, levelFor } from "/progress.js";
         // Firebase-powered parts load afterwards; the game list works even if they're blocked
-        let isPremiumGame = (id) => DEFAULT_PREMIUM.includes(id), isLockedGame = isPremiumGame;
+        const early = (id) => GAMES[id].earlyUntil && Date.now() < Date.parse(GAMES[id].earlyUntil);
+        let isPremiumGame = (id) => DEFAULT_PREMIUM.includes(id) || early(id), isLockedGame = isPremiumGame;
+        const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+        let getFavs = () => lsGet("gh_favs", []), toggleFav = async (id) => {
+            const f = new Set(getFavs()); f.has(id) ? f.delete(id) : f.add(id);
+            try { localStorage.setItem("gh_favs", JSON.stringify([...f])); } catch (e) {}
+            return f.has(id);
+        };
+        let getRecent = () => lsGet("gh_recent", []);
+        let todayChallenge = () => dailyChallenge(new Date(), DEFAULT_PREMIUM), dailyDone = () => false;
 
         const $ = (id) => document.getElementById(id);
         const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -398,21 +566,47 @@
         $("gameCount").textContent = ids.length;
 
         // ---------- Game grid ----------
-        let filter = "all";
+        let filter = "all", sortBy = "default", summary = {};
+        try { sortBy = localStorage.getItem("gh_sort") || "default"; } catch (e) {}
+        $("sort").value = sortBy;
+        function sorted() {
+            const pos = Object.fromEntries(ids.map((id, i) => [id, i]));
+            const r = (id) => summary[id] || {};
+            const by = {
+                default: (a, b) => pos[a] - pos[b],
+                rated: (a, b) => ((r(b).n ? r(b).avg : 0) - (r(a).n ? r(a).avg : 0)) || ((r(b).n || 0) - (r(a).n || 0)) || pos[a] - pos[b],
+                popular: (a, b) => ((r(b).players || 0) - (r(a).players || 0)) || pos[a] - pos[b],
+                new: (a, b) => pos[b] - pos[a],
+                az: (a, b) => GAMES[a].name.localeCompare(GAMES[b].name)
+            }[sortBy] || ((a, b) => pos[a] - pos[b]);
+            return [...ids].sort(by);
+        }
         function renderGrid() {
-            $("grid").innerHTML = ids.map((id) => {
+            $("grid").innerHTML = sorted().map((id) => {
                 const g = GAMES[id], prem = isPremiumGame(id), locked = isLockedGame(id);
                 const tag = g.original ? '<span class="tag original">Original</span>'
                           : g.isNew ? '<span class="tag new">New</span>'
                           : `<span class="tag">${esc(g.tags[0])}</span>`;
-                return `<a class="card${locked ? " locked" : ""}" href="${g.path}" data-tags="${g.tags.join(" ")}${prem ? " premium" : ""}">
-                    <div class="thumb">${tag}${prem ? '<span class="tag prem">★ Premium</span>' : ""}
+                const fav = getFavs().includes(id);
+                return `<a class="card${locked ? " locked" : ""}" href="${g.path}" data-id="${id}" data-tags="${g.tags.join(" ")}${prem ? " premium" : ""}${fav ? " fav" : ""}">
+                    <div class="thumb">${tag}${early(id) ? '<span class="tag prem">🚀 Early access</span>' : prem ? '<span class="tag prem">★ Premium</span>' : ""}
+                        <button class="heart${fav ? " on" : ""}" data-fav="${id}" aria-label="${fav ? "Remove from" : "Add to"} favorites" title="Favorite">${fav ? "❤️" : "🤍"}</button>
                         <img src="${g.img}" alt="${esc(g.name)}" loading="lazy" onerror="this.style.display='none'"></div>
-                    <div class="card-body"><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p></div>
+                    <div class="card-body"><h3>${esc(g.name)}</h3><p>${esc(g.desc)}</p>${meta(id)}</div>
                 </a>`;
             }).join("");
             apply();
         }
+        function meta(id) {
+            const r = summary[id];
+            if (!r || (!r.n && !r.players)) return "";
+            return `<div class="card-meta">${r.n ? `<span class="st">★ ${r.avg.toFixed(1)}</span><span>(${r.n})</span>` : ""}${r.players ? `<span>👥 ${r.players}</span>` : ""}</div>`;
+        }
+        $("sort").addEventListener("change", () => {
+            sortBy = $("sort").value;
+            try { localStorage.setItem("gh_sort", sortBy); } catch (e) {}
+            renderGrid();
+        });
         function apply() {
             const q = $("search").value.trim().toLowerCase();
             let shown = 0;
@@ -429,6 +623,53 @@
             filter = chip.dataset.filter; apply();
         }));
         renderGrid();
+
+        // Install as an app (shows only when the browser supports it)
+        let installEvt;
+        addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").classList.remove("hidden"); });
+        $("moreBtn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            $("moreBtn").setAttribute("aria-expanded", $("moreMenu").classList.toggle("open"));
+        });
+        document.addEventListener("click", () => $("moreMenu").classList.remove("open"));
+        $("installBtn").addEventListener("click", async (e) => {
+            e.preventDefault(); if (!installEvt) return;
+            installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").classList.add("hidden");
+        });
+
+        // Favorite hearts
+        $("grid").addEventListener("click", async (e) => {
+            const b = e.target.closest("[data-fav]");
+            if (!b) return;
+            e.preventDefault(); e.stopPropagation();
+            await toggleFav(b.dataset.fav);
+            renderGrid(); renderToday();
+        });
+
+        // Daily challenge + continue playing + favorites
+        function miniCard(id) {
+            const g = GAMES[id];
+            return `<a class="mini-card" href="${g.path}"><img src="${g.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span>${esc(g.name)}</span></a>`;
+        }
+        function renderToday() {
+            const c = todayChallenge(), done = dailyDone(c.day);
+            $("dailyCard").innerHTML = `<div class="dc-icon">📅</div>
+                <div class="dc-body"><small>DAILY CHALLENGE</small>
+                    <b>Score ${c.target.toLocaleString()} ${c.unit} in ${esc(GAMES[c.game].name)}</b>
+                    <span>${done ? "✅ Done for today! A new challenge comes tomorrow." : "Finish it today for +40 XP and keep your streak going."}</span></div>
+                ${done ? "" : `<a class="btn btn-primary" href="${GAMES[c.game].path}">▶ Play</a>`}`;
+            const recent = getRecent().filter((id) => GAMES[id]).slice(0, 6);
+            $("recentWrap").classList.toggle("hidden", !recent.length);
+            $("recentRow").innerHTML = recent.map(miniCard).join("");
+            const favs = getFavs().filter((id) => GAMES[id]).slice(0, 6);
+            $("favWrap").classList.toggle("hidden", !favs.length);
+            $("favRow").innerHTML = favs.map(miniCard).join("");
+        }
+        renderToday();
+        $("clearRecent").addEventListener("click", () => {
+            if (hubMod) hubMod.clearRecent(); else try { localStorage.setItem("gh_recent", "[]"); } catch (e) {}
+            renderToday();
+        });
 
         // ---------- Mobile menu ----------
         $("menuBtn").addEventListener("click", () => {
@@ -447,14 +688,27 @@
         if (hubMod) {
         const { onAccount, isPremium } = hubMod;
         isPremiumGame = hubMod.isPremiumGame; isLockedGame = hubMod.isLockedGame;
+        getFavs = hubMod.getFavorites; toggleFav = hubMod.toggleFavorite; getRecent = hubMod.getRecent;
+        // star ratings + player counts (one small document, cached)
+        hubMod.social().then(async (soc) => {
+            summary = await soc.getSummary(); renderGrid();
+            await hubMod.ready;
+            if (hubMod.state.profile?.role === "admin") { await soc.maybeRebuildSummary(); summary = await soc.getSummary(); renderGrid(); }
+        }).catch(() => {});
+        todayChallenge = hubMod.todaysChallenge; dailyDone = (day) => !!hubMod.state.profile?.daily?.[day];
         onAccount(({ user, profile }) => {
-            renderGrid();
+            renderGrid(); renderToday();
+            if (user && profile) hubMod.getMyGames(user.uid).then((g) => {
+                $("lvlPill").textContent = "Lv " + levelFor(xpFor(g, profile)).level;
+            }).catch(() => {});
             if (!user) { $("loginBtn").classList.remove("hidden"); menu.classList.add("hidden"); return; }
             profile = profile || {};
             const name = profile.name || user.displayName || user.email.split("@")[0];
             $("userName").textContent = name;
             const avatar = $("userAvatar");
-            if (user.photoURL) {
+            avatar.classList.toggle("emoji", !!profile.avatar);
+            if (profile.avatar) avatar.textContent = profile.avatar;
+            else if (user.photoURL) {
                 avatar.textContent = "";
                 const img = document.createElement("img");
                 img.src = user.photoURL; img.alt = ""; img.referrerPolicy = "no-referrer";

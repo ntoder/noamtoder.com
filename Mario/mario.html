@@ -1,58 +1,278 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="A colourful 3D platform adventure. Free to play in your browser on Noam's Game Hub.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A colourful side-scrolling platform adventure starring a brave little robot. Free to play in your browser on Noam&#x27;s Game Hub.">
     <title>Pixel Jumper · Noam's Game Hub</title>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css">
-    <link rel="stylesheet" href="mario.css">
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-
-<div class="ui-overlay">
-    <div>JUMPER<br><span id="score">000000</span></div>
-    <div class="text-center">COINS<br>🪙 x <span id="coins">0</span></div>
-    <div class="text-center">LIVES<br>❤️ x <span id="lives">3</span></div>
-    <div class="text-left">WORLD<br>1-1</div>
-</div>
-
-<div id="modal">
-    <div class="bg-white p-8 rounded-3xl text-center max-w-sm w-full mx-4">
-        <h2 id="modal-title" class="text-4xl font-black mb-4 text-red-600">GAME OVER</h2>
-        <p id="modal-text" class="text-xl mb-8">הניקוד שלך: 0</p>
-        <button onclick="location.reload()" class="bg-blue-500 hover:bg-blue-600 text-white text-2xl font-bold py-4 px-12 rounded-full transition-transform active:scale-95 shadow-xl">
-            נסה שוב
-        </button>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Pixel <span>Jumper</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="time">300</b><small>Time</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
     </div>
-</div>
-
-<div class="controls md:hidden">
-    <div class="joystick-container" id="joy-container">
-        <div class="joystick-knob" id="joy-knob"></div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="448"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Pixel Jumper</h2>
+                <p id="startText">⬅ ➡ / A D to run, Space / ⬆ to jump (hold for higher). Shift to sprint.<br>Stomp the green slimes, but never touch the pink spiky ones!<br>Hit ★ boxes from below, grab coins and reach the flag.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
     </div>
-    <div class="jump-btn" id="mobile-jump">A</div>
-</div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button><button data-k="run">⚡</button><button data-k="jump">⤒</button></div>
+    <p class="hint">Every level is new and a bit harder. Time left on the clock becomes bonus points!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, T = 32, ROWS = 14, BEST = "jumperBest";
+        Kit.stat("best", Kit.best(BEST));
+        let map, cols, pl, enemies, coins, pops, camX, score, lives, level, time, state = "ready", t = 0, fx = Kit.particles(), flagX, endT = 0;
 
-<script src="mario.js"></script>
+        // ---- seeded random so each level is always the same course
+        function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+        function makeLevel(n) {
+            const R = rng(n * 7919 + 13), len = 110 + n * 20;
+            const m = Array.from({ length: ROWS }, () => Array(len).fill(0));   // 0 air, 1 ground, 2 brick, 3 star box, 4 used box, 5 crate
+            const en = [], cn = [];
+            let h = 3, x = 0;
+            const set = (cx, cy, v) => { if (cy >= 0 && cy < ROWS && cx >= 0 && cx < len) m[cy][cx] = v; };
+            const col = (cx, hh) => { for (let y = ROWS - hh; y < ROWS; y++) set(cx, y, 1); };
+            while (x < len) {
+                const safe = x < 12 || x > len - 16;
+                const r = R();
+                if (!safe && r < 0.16) {                                   // gap
+                    const g = 2 + Math.floor(R() * (n > 1 ? 2.5 : 2)); x += g;
+                    for (let i = 0; i < g; i++) if (R() < 0.5) cn.push([x - g + i, ROWS - h - 3]);
+                    continue;
+                }
+                const seg = 5 + Math.floor(R() * 7);
+                if (!safe && R() < 0.4) h = Math.max(2, Math.min(6, h + (R() < 0.5 ? -1 : 1) * (1 + Math.floor(R() * 2))));
+                for (let i = 0; i < seg && x < len; i++, x++) col(x, h);
+                const sx = x - seg, top = ROWS - h;
+                if (!safe) {
+                    if (R() < 0.55) {                                       // floating bricks with a star box
+                        const py = top - 4, pl0 = sx + 1 + Math.floor(R() * 2), plen = 3 + Math.floor(R() * 3);
+                        for (let i = 0; i < plen; i++) set(pl0 + i, py, i === 1 ? 3 : 2);
+                        for (let i = 0; i < plen; i++) cn.push([pl0 + i, py - 1]);
+                    }
+                    if (R() < 0.3) set(sx + seg - 2, top - 1, 5), set(sx + seg - 2, top - 2, R() < 0.5 ? 5 : 0);
+                    if (seg >= 6 && R() < 0.75) en.push({ x: (sx + 3) * T, y: (top - 1) * T, kind: n > 1 && R() < 0.3 ? "spiky" : "slime" });
+                    if (n > 2 && seg >= 8 && R() < 0.4) en.push({ x: (sx + 6) * T, y: (top - 1) * T, kind: "slime" });
+                    if (R() < 0.5) for (let i = 1; i < seg - 1; i += 2) cn.push([sx + i, top - 2]);
+                }
+            }
+            // end stairs and flag
+            const fx0 = len - 12;
+            for (let i = 0; i < 4; i++) for (let k = 0; k <= i; k++) set(fx0 + i, ROWS - h - 1 - k, 5);
+            return { m, en, cn, len, flag: (len - 5) * T, h: 3 };
+        }
+        function load(n) {
+            const L = makeLevel(n);
+            map = L.m; cols = L.len; flagX = L.flag;
+            enemies = L.en.map((e) => ({ ...e, w: 28, h: 26, vx: -50 - level * 6, vy: 0, dead: 0 }));
+            coins = L.cn.filter(([x, y]) => y >= 0 && map[y] && !map[y][x]).map(([x, y]) => ({ x: x * T + 8, y: y * T + 8, got: false }));
+            pops = [];
+            pl = { x: 3 * T, y: (ROWS - L.h - 2) * T, w: 24, h: 30, vx: 0, vy: 0, ground: false, face: 1, coyote: 0, jumpBuf: 0, inv: 0 };
+            camX = 0; time = 300; endT = 0;
+            Kit.stat("level", level);
+        }
+        function solid(cx, cy) { if (cx < 0 || cx >= cols) return true; if (cy < 0) return false; if (cy >= ROWS) return false; return map[cy][cx] > 0; }
+        function collide(o, axis, onHead) {
+            const x0 = Math.floor(o.x / T), x1 = Math.floor((o.x + o.w - 1) / T), y0 = Math.floor(o.y / T), y1 = Math.floor((o.y + o.h - 1) / T);
+            for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+                if (!solid(cx, cy)) continue;
+                if (axis === "x") { if (o.vx > 0) o.x = cx * T - o.w; else if (o.vx < 0) o.x = (cx + 1) * T; o.vx = o.vx2 !== undefined ? -o.vx : 0; return true; }
+                if (o.vy > 0) { o.y = cy * T - o.h; o.vy = 0; o.ground = true; return true; }
+                if (o.vy < 0) { o.y = (cy + 1) * T; o.vy = 0; onHead && onHead(cx, cy); return true; }
+            }
+            return false;
+        }
+        function bump(cx, cy) {
+            const v = map[cy] && map[cy][cx];
+            if (v === 3) { map[cy][cx] = 4; addScore(100, cx * T + 16, cy * T - 10); pops.push({ x: cx * T + 16, y: cy * T, t: 0.5 }); beep(988, 0.08, "square", 0.05); setTimeout(() => beep(1319, 0.12, "square", 0.05), 70); }
+            else if (v === 2) { beep(180, 0.06, "square", 0.04); fx.burst(cx * T + 16, cy * T + 30, "#c47a3a", 5, 2); }
+            else beep(140, 0.05, "square", 0.03);
+            for (const e of enemies) if (!e.dead && Math.abs(e.x + 14 - (cx * T + 16)) < 30 && Math.abs(e.y + e.h - cy * T) < 6) kill(e);
+        }
+        const floats = [];
+        function addScore(n, x, y) { score += n; Kit.stat("score", score); floats.push({ x, y, s: "+" + n, t: 0.8 }); }
+        function kill(e) { e.dead = 0.4; addScore(200, e.x + 14, e.y); fx.burst(e.x + 14, e.y + 14, e.kind === "spiky" ? "#ff4d8d" : "#2ee6a0", 14, 3); beep(400, 0.1, "square", 0.05, 400); }
+        function hurt() {
+            if (pl.inv > 0 || state !== "play") return;
+            lives--; Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—");
+            beep(220, 0.3, "sawtooth", 0.06, -150); fx.burst(pl.x + 12, pl.y + 15, "#ffffff", 16, 3);
+            if (lives <= 0) return gameOver();
+            pl.inv = 2; pl.vy = -420;
+            if (pl.y > H) { // fell: put back on last safe ground
+                let cx = Math.max(2, Math.floor(pl.x / T) - 3);
+                while (cx > 0 && !colTop(cx)) cx--;
+                pl.x = cx * T + 4; pl.y = (colTop(cx) - 2) * T; pl.vx = 0; pl.vy = 0;
+            }
+        }
+        function colTop(cx) { for (let y = 0; y < ROWS; y++) if (map[y][cx] === 1) return y; return 0; }
+        function gameOver() {
+            state = "dead"; const best = Kit.setBest(BEST, score); Kit.save(score);
+            $("overText").innerHTML = `Score ${score.toLocaleString()} · reached level ${level}<br>Best ${best.toLocaleString()}`;
+            setTimeout(() => Kit.show("over"), 600);
+        }
+        function update(dt) {
+            const left = Kit.keys.has("left"), right = Kit.keys.has("right"), jumpHeld = Kit.keys.has("jump");
+            const acc = pl.ground ? 1600 : 1000, max = Kit.keys.has("run") ? 300 : 230;
+            if (left) { pl.vx = Math.max(-max, pl.vx - acc * dt); pl.face = -1; }
+            else if (right) { pl.vx = Math.min(max, pl.vx + acc * dt); pl.face = 1; }
+            else pl.vx *= pl.ground ? Math.pow(0.0005, dt) : Math.pow(0.2, dt);
+            pl.coyote = pl.ground ? 0.1 : pl.coyote - dt; pl.jumpBuf -= dt;
+            if (pl.jumpBuf > 0 && pl.coyote > 0) { pl.vy = -610; pl.coyote = 0; pl.jumpBuf = 0; beep(520, 0.08, "square", 0.04, 300); }
+            pl.vy += (pl.vy < 0 && jumpHeld ? 1250 : 2300) * dt; pl.vy = Math.min(pl.vy, 900);
+            pl.x += pl.vx * dt; collide(pl, "x");
+            pl.ground = false; pl.y += pl.vy * dt; collide(pl, "y", bump);
+            if (pl.x < camX) { pl.x = camX; pl.vx = 0; }
+            if (pl.y > H + 40) { pl.inv = 0; hurt(); }
+            if (pl.inv > 0) pl.inv -= dt;
+            camX = Math.max(camX, Math.min(cols * T - W, pl.x - W * 0.4));
+            // enemies
+            for (const e of enemies) {
+                if (e.dead) { e.dead -= dt; continue; }
+                if (e.x > camX + W + 100) continue;
+                e.vx2 = true; e.vy += 2000 * dt;
+                e.x += e.vx * dt; collide(e, "x");
+                // turn around at ledges
+                const ahead = Math.floor((e.vx > 0 ? e.x + e.w + 2 : e.x - 2) / T), below = Math.floor((e.y + e.h + 4) / T);
+                if (e.ground && !solid(ahead, below)) e.vx = -e.vx;
+                e.ground = false; e.y += e.vy * dt; collide(e, "y");
+                if (e.y > H + 50) e.dead = 0.01;
+                if (Kit.hit(pl, e)) {
+                    if (e.kind !== "spiky" && pl.vy > 0 && pl.y + pl.h - e.y < 16) { kill(e); pl.vy = jumpHeld ? -560 : -380; }
+                    else hurt();
+                }
+            }
+            enemies = enemies.filter((e) => e.dead === 0 || e.dead > 0);
+            for (const c of coins) if (!c.got && Kit.hit(pl, { x: c.x, y: c.y, w: 16, h: 16 })) { c.got = true; addScore(100, c.x + 8, c.y); beep(1319, 0.05, "square", 0.04); setTimeout(() => beep(1760, 0.08, "square", 0.04), 50); }
+            for (const p of pops) p.t -= dt;
+            for (const f of floats) { f.t -= dt; f.y -= 40 * dt; }
+            time -= dt; if (time <= 0) { time = 0; lives = 1; hurt(); }
+            if (pl.x + pl.w > flagX) { state = "clear"; endT = 0; const bonus = Math.ceil(time) * 10; addScore(bonus, pl.x, pl.y - 20); tune([523, 659, 784, 1047, 784, 1047], 0.1, "square", 0.05); }
+        }
+        const game = Kit.loop((dt) => {
+            t += dt;
+            if (state === "play") update(dt);
+            else if (state === "clear") {
+                endT += dt; pl.vx = 0;
+                if (endT > 2.2) { level++; load(level); state = "play"; }
+            }
+            fx.update(dt);
+            for (let i = floats.length - 1; i >= 0; i--) if (floats[i].t <= 0) floats.splice(i, 1);
+            draw();
+            Kit.stat("time", Math.ceil(time));
+        });
 
+        const SKY = [["#2a6fdb", "#8fd3ff"], ["#ff8a5c", "#ffd29d"], ["#1b1640", "#5a3fa8"], ["#0f5e5a", "#8ff0d6"]];
+        function draw() {
+            const [a, b] = SKY[(level - 1) % SKY.length];
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, a); g.addColorStop(1, b);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            // parallax hills + clouds
+            ctx.fillStyle = "#ffffff55";
+            for (let i = 0; i < 8; i++) { const x = ((i * 260 - camX * 0.2) % (W + 300) + W + 300) % (W + 300) - 150, y = 50 + (i * 47) % 110; ctx.beginPath(); ctx.ellipse(x, y, 50, 16, 0, 0, 7); ctx.ellipse(x + 30, y - 10, 30, 14, 0, 0, 7); ctx.fill(); }
+            ctx.fillStyle = "#00000022";
+            for (let i = 0; i < 10; i++) { const x = ((i * 220 - camX * 0.45) % (W + 400) + W + 400) % (W + 400) - 200; ctx.beginPath(); ctx.ellipse(x, H - 60, 170, 120 + (i % 3) * 30, 0, Math.PI, 0); ctx.fill(); }
+            ctx.save(); ctx.translate(-Math.round(camX), 0);
+            const c0 = Math.floor(camX / T), c1 = c0 + Math.ceil(W / T) + 1;
+            for (let y = 0; y < ROWS; y++) for (let x = c0; x <= c1 && x < cols; x++) {
+                const v = map[y][x]; if (!v) continue;
+                const px = x * T, py = y * T;
+                if (v === 1) {
+                    const top = y === 0 || map[y - 1][x] !== 1;
+                    ctx.fillStyle = "#7a4a2a"; ctx.fillRect(px, py, T, T);
+                    ctx.fillStyle = "#6a3e22"; ctx.fillRect(px + 4, py + 12, 6, 6); ctx.fillRect(px + 20, py + 22, 6, 5);
+                    if (top) { ctx.fillStyle = "#3ccf6b"; ctx.fillRect(px, py, T, 9); ctx.fillStyle = "#2fae58"; ctx.fillRect(px, py + 9, T, 3); }
+                } else if (v === 2) {
+                    ctx.fillStyle = "#c47a3a"; ctx.fillRect(px, py, T, T); ctx.strokeStyle = "#8a4f20"; ctx.lineWidth = 2;
+                    ctx.strokeRect(px + 1, py + 1, T - 2, T - 2); ctx.beginPath(); ctx.moveTo(px, py + 16); ctx.lineTo(px + T, py + 16); ctx.moveTo(px + 16, py); ctx.lineTo(px + 16, py + 16); ctx.stroke();
+                } else if (v === 3 || v === 4) {
+                    const lit = v === 3;
+                    ctx.fillStyle = lit ? "#7c5cff" : "#555a80"; Kit.rr(ctx, px + 1, py + 1, T - 2, T - 2, 6); ctx.fill();
+                    if (lit) Kit.text(ctx, "★", px + 16, py + 17 + Math.sin(t * 5) * 1.5, 20, "#ffc94d");
+                } else if (v === 5) {
+                    ctx.fillStyle = "#b8864b"; ctx.fillRect(px, py, T, T); ctx.strokeStyle = "#7a5428"; ctx.lineWidth = 3;
+                    ctx.strokeRect(px + 2, py + 2, T - 4, T - 4); ctx.beginPath(); ctx.moveTo(px + 3, py + 3); ctx.lineTo(px + T - 3, py + T - 3); ctx.stroke();
+                }
+            }
+            // flag
+            const fy = (ROWS - 3) * T;
+            ctx.fillStyle = "#eef0ff"; ctx.fillRect(flagX, 60, 5, H - 60);
+            ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.moveTo(flagX + 5, 64 + (state === "clear" ? Math.min(endT, 1) * (fy - 120) : 0)); ctx.lineTo(flagX + 55, 84 + (state === "clear" ? Math.min(endT, 1) * (fy - 120) : 0)); ctx.lineTo(flagX + 5, 104 + (state === "clear" ? Math.min(endT, 1) * (fy - 120) : 0)); ctx.fill();
+            // coins
+            for (const c of coins) if (!c.got) { const s = Math.abs(Math.cos(t * 4 + c.x)); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(c.x + 8, c.y + 8, 8 * s + 1, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#fff3"; ctx.fillRect(c.x + 6, c.y + 3, 2, 8); }
+            for (const p of pops) if (p.t > 0) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(p.x, p.y - (0.5 - p.t) * 120, 9, 0, 7); ctx.fill(); }
+            // enemies
+            for (const e of enemies) {
+                if (e.x > camX + W + 40 || e.x < camX - 40) continue;
+                const squish = e.dead ? 0.3 : 1 + Math.sin(t * 10 + e.x) * 0.06;
+                ctx.save(); ctx.translate(e.x + 14, e.y + e.h); ctx.scale(1 / squish, squish);
+                if (e.kind === "spiky") {
+                    ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(0, -13, 13, 0, 7); ctx.fill();
+                    ctx.fillStyle = "#ffd0e0"; for (let i = 0; i < 6; i++) { const an = -Math.PI + i * (Math.PI / 5); ctx.beginPath(); ctx.moveTo(Math.cos(an) * 10, -13 + Math.sin(an) * 10); ctx.lineTo(Math.cos(an) * 20, -13 + Math.sin(an) * 20); ctx.lineTo(Math.cos(an + 0.3) * 10, -13 + Math.sin(an + 0.3) * 10); ctx.fill(); }
+                } else {
+                    ctx.fillStyle = "#2ee6a0"; ctx.beginPath(); ctx.ellipse(0, -11, 15, 12, 0, Math.PI, 0); ctx.lineTo(15, 0); ctx.lineTo(-15, 0); ctx.fill();
+                }
+                ctx.fillStyle = "#fff"; ctx.fillRect(-8, -16, 6, 6); ctx.fillRect(3, -16, 6, 6);
+                ctx.fillStyle = "#0b0d1a"; ctx.fillRect(e.vx < 0 ? -8 : -5, -14, 3, 3); ctx.fillRect(e.vx < 0 ? 3 : 6, -14, 3, 3);
+                ctx.restore();
+            }
+            // player: a small robot
+            if (!(pl.inv > 0 && Math.floor(t * 12) % 2)) {
+                const col = Kit.skin("mario", "#4da3ff"), x = Math.round(pl.x), y = Math.round(pl.y), run = pl.ground && Math.abs(pl.vx) > 20 ? Math.sin(t * 20) * 4 : 0;
+                ctx.fillStyle = "#2b3160"; ctx.fillRect(x + 4, y + 24, 6, 6 + run); ctx.fillRect(x + 14, y + 24, 6, 6 - run);
+                ctx.fillStyle = col; Kit.rr(ctx, x, y + 6, 24, 20, 6); ctx.fill();
+                ctx.fillStyle = "#eef0ff"; Kit.rr(ctx, x + (pl.face > 0 ? 8 : 2), y + 10, 14, 9, 3); ctx.fill();
+                ctx.fillStyle = "#0b0d1a"; ctx.fillRect(x + (pl.face > 0 ? 15 : 5), y + 12, 4, 5);
+                ctx.fillStyle = "#ffc94d"; ctx.fillRect(x + 11, y, 2, 7); ctx.beginPath(); ctx.arc(x + 12, y, 3, 0, 7); ctx.fill();
+            }
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.max(0, f.t / 0.8); Kit.text(ctx, f.s, f.x, f.y, 14, "#ffffff"); }
+            ctx.globalAlpha = 1;
+            ctx.restore();
+            if (state === "clear") Kit.text(ctx, `Level ${level} clear!`, W / 2, 120, 26, "#ffffff", "center", "'Press Start 2P', monospace", 400);
+        }
+        function start() {
+            score = 0; lives = 3; level = 1; Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️");
+            load(1); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([392, 523, 659, 784], 0.08);
+        }
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "jump", KeyW: "jump", Space: "jump", KeyZ: "jump", ShiftLeft: "run", KeyX: "run", Enter: "enter" }, (a) => {
+            if (a === "jump") pl && (pl.jumpBuf = 0.12);
+            if ((a === "enter" || a === "jump") && state === "dead" && !$("over").classList.contains("hidden")) start();
+        });
+        Kit.touchButtons((k) => { if (k === "jump" && pl) pl.jumpBuf = 0.12; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        level = 1; score = 0; lives = 3; load(1); game.start();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -65,12 +285,20 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
-        <section><h2>About Pixel Jumper</h2><p>A colourful 3D platform adventure. Run and jump across the level, stomp on enemies, collect coins and reach the flag at the end to clear the course. You have three lives, so be careful near the gaps.</p></section>
-        <section><h3>How to play</h3><table><tr><td>Arrow keys / joystick</td><td>Move</td></tr><tr><td>Up / A button</td><td>Jump</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Jump on enemies from above to defeat them.</li><li>Coins are often placed above safe jumps.</li><li>Take your time near gaps. Falling costs a life.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/BubbleBobble/bubblebobble">Bubble Blaster</a><a href="/MotorRacing/motorracing">Motor Racing</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/">All games →</a></div></section>
+        <section><h2>About Pixel Jumper</h2><p>A colourful side-scrolling platform adventure starring a brave little robot. Run and jump across grassy hills, stomp the green slimes, avoid the pink spiky ones, hit star boxes for points and reach the flag at the end. Every level is a new course that is a little harder than the last, and time left on the clock turns into bonus points.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ / A D</td><td>Run</td></tr><tr><td>Space / ⬆</td><td>Jump (hold for higher)</td></tr><tr><td>Shift</td><td>Sprint</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Jump on slimes from above to defeat them. Never touch the spiky ones.</li><li>Hold jump for a higher jump and tap it for a small hop.</li><li>Bounce off an enemy while holding jump to fly extra high.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Pixel Jumper</h3><p>Pixel Jumper is a platformer, so most of the challenge is about jumps. Learn the two kinds: a quick tap gives a small hop, and holding the button gives a full jump. Small hops are great for getting over a slime without flying into a gap. Full jumps are for wide gaps and high platforms. Holding Shift to sprint makes your jumps longer, but also makes it harder to stop at the edge.</p><p>Green slimes can be stomped by landing on top of them. Pink spiky ones can't be touched at all, so jump over them or wait for them to walk away. When you bounce off an enemy while holding the jump button, you fly extra high, which is a useful trick for reaching star boxes. Remember that time left on the clock becomes bonus points, so once you're comfortable with a level, try to finish it faster.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Get used to short hops and full jumps, and reach the flag without rushing.</li><li><b>Getting good:</b> Stomp slimes on purpose, hit the star boxes, and avoid every spiky enemy.</li><li><b>Expert:</b> Sprint through levels you know well and use enemy bounces to take shortcuts for time bonus.</li></ul><h3>Did you know?</h3><p>Side-scrolling platformers became hugely popular with Super Mario Bros. in 1985, but jumping games started a few years earlier. Donkey Kong in 1981 was one of the first arcade games where jumping was the main thing you did, and the hero who jumped over barrels later became Mario.</p><h3>Questions players ask</h3><h4>How do I jump higher?</h4><p>Hold the jump button longer. Bouncing off an enemy while holding jump sends you even higher.</p><h4>Which enemies can I stomp?</h4><p>The green slimes. Never touch the pink spiky ones.</p><h4>Are the levels the same every time?</h4><p>Each level is a new course that gets a little harder than the last.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BubbleBobble/bubblebobble">Bubble Blaster</a><a href="/MotorRacing/motorracing">Motor Racing</a><a href="/FourInARow/fourinarow">Four in a Row</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
@@ -79,7 +307,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

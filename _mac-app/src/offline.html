@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>No internet — Noam's Game Hub</title>
+<style>
+  html,body{height:100%;margin:0}
+  body{display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,#2a1f6b,#0b0d1a 60%);color:#fff;
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
+  .box{max-width:420px;padding:32px}
+  .big{font-size:72px;animation:bob 2s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-10px)}}
+  h1{margin:8px 0;font-size:26px}
+  p{color:#c9c6ef;margin:0 0 24px}
+  button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:12px 28px;cursor:pointer;
+    background:linear-gradient(135deg,#ffcf3f,#ff8a3d);color:#2a1300;box-shadow:0 6px 20px rgba(255,160,60,.35)}
+  button:hover{filter:brightness(1.08)}
+  small{display:block;margin-top:18px;color:#8f8bbd}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="big">🎮</div>
+  <h1>No internet connection</h1>
+  <p>The Game Hub needs the internet to load games. Check your Wi-Fi, then try again.</p>
+  <button id="retry">↻ Try again</button>
+  <small id="auto">Trying again automatically…</small>
+</div>
+<script>
+  const back = new URLSearchParams(location.search).get("back") || "https://noamtoder.com/";
+  const target = /^https:\/\/(www\.)?noamtoder\.com\//.test(back) ? back : "https://noamtoder.com/";
+  const go = () => { location.href = target; };
+  document.getElementById("retry").onclick = go;
+  window.addEventListener("online", go);
+  setTimeout(go, 15000);
+</script>
+</body>
+</html>

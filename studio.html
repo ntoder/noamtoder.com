@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Studio · make your own game in JavaScript · Noam's Game Hub</title>
+    <meta name="description" content="A free game studio for kids: start from a ready-made game, change the code, see it run instantly, and publish it to the Made by Players arcade. HTML, CSS and JavaScript.">
+    <link rel="canonical" href="https://noamtoder.com/studio">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <link rel="stylesheet" href="/vendor/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/vendor/codemirror/dracula.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        .st { max-width: 1400px; margin: 0 auto; padding: 12px 16px 40px; width: 100%; }
+        .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .bar button, .bar select { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 8px 12px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; }
+        .bar .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .bar .pub { background: #2ee6a0; border-color: #2ee6a0; color: #0b0d1a; }
+        .bar .ttl { font-weight: 800; font-size: 17px; background: none; border: 1px dashed transparent; color: var(--text); padding: 6px 8px; border-radius: 8px; min-width: 120px; }
+        .bar .ttl:hover, .bar .ttl:focus { border-color: var(--line); outline: none; }
+        .bar .grow { flex: 1; }
+        .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: calc(100vh - 170px); min-height: 480px; }
+        .ed, .pv { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #282a36; position: relative; display: flex; flex-direction: column; }
+        .pv { background: #fff; }
+        .CodeMirror { height: 100%; font-size: 14px; font-family: "JetBrains Mono", Consolas, monospace; }
+        #code { width: 100%; height: 100%; background: #282a36; color: #f8f8f2; border: 0; padding: 12px; font: 14px/1.5 Consolas, monospace; resize: none; outline: none; }
+        iframe { flex: 1; border: 0; width: 100%; background: #fff; }
+        .err { position: absolute; left: 10px; right: 10px; bottom: 10px; background: #2a0f1d; border: 1px solid #ff4d8d; color: #ffd0e0; border-radius: 10px; padding: 8px 12px; font: 600 13px Consolas, monospace; display: none; }
+        .err.show { display: block; }
+        .modal { position: fixed; inset: 0; z-index: 99990; display: grid; place-items: center; padding: 16px; background: rgba(11,13,26,.88); }
+        .modal.hidden { display: none; }
+        .modal .box { width: min(620px, 100%); max-height: 92vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px; position: relative; }
+        .modal h2 { font-size: 22px; margin-bottom: 6px; }
+        .modal p { color: var(--muted); margin-bottom: 12px; font-size: 14px; line-height: 1.5; }
+        .modal .x { position: absolute; top: 10px; inset-inline-end: 12px; background: none; border: 0; color: var(--muted); font-size: 22px; cursor: pointer; }
+        .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+        .tpls button { text-align: start; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 14px; padding: 14px; cursor: pointer; font: 600 13px Inter, Rubik, sans-serif; }
+        .tpls button:hover { border-color: var(--accent); }
+        .tpls b { display: block; font-size: 15px; margin: 4px 0 2px; }
+        .tpls .e { font-size: 30px; }
+        .tpls span { color: var(--muted); }
+        .f label { display: block; font-weight: 700; font-size: 14px; margin: 12px 0 4px; }
+        .f input, .f textarea { width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); padding: 10px 12px; font: 600 15px Inter, Rubik, sans-serif; outline: none; }
+        .f textarea { min-height: 70px; resize: vertical; }
+        .emojis { display: flex; flex-wrap: wrap; gap: 6px; }
+        .emojis button { font-size: 22px; width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); cursor: pointer; }
+        .emojis button.on { border-color: var(--accent-2); background: #2ee6c922; }
+        .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+        .mine { margin-top: 8px; display: grid; gap: 6px; }
+        .mine div { display: flex; gap: 10px; align-items: center; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+        .mine em { margin-inline-start: auto; font-style: normal; font-weight: 700; font-size: 12px; }
+        @media (max-width: 860px) { .panes { grid-template-columns: 1fr; height: auto; } .ed { height: 380px; } .pv { height: 460px; } }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/made">← Made by players</a>
+        <h1>Game <span>Studio</span></h1>
+        <a class="back" href="/articles/first-game">Guide →</a>
+    </div>
+    <div class="st">
+        <div class="bar">
+            <select id="proj" aria-label="My projects"></select>
+            <input class="ttl" id="ttl" maxlength="40" aria-label="Game name" data-noi18n>
+            <button id="newBtn">➕ New</button>
+            <span class="grow"></span>
+            <button class="go" id="runBtn">▶ Run</button>
+            <label style="font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center"><input type="checkbox" id="auto" checked> <span>Auto-run</span></label>
+            <button id="dlBtn">💾 Download</button>
+            <button class="pub" id="pubBtn">🚀 Publish</button>
+        </div>
+        <div class="panes">
+            <div class="ed"><textarea id="code" spellcheck="false" aria-label="Code" data-noi18n></textarea></div>
+            <div class="pv"><iframe id="pv" title="Your game" sandbox="allow-scripts allow-pointer-lock"></iframe><div class="err" id="err" data-noi18n></div></div>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="tplModal"><div class="box">
+        <button class="x" data-close>✕</button>
+        <h2>🎮 Start a new game</h2>
+        <p>Pick a game to start from. Then change the code and watch your game change. Look for the comments that say <b>TRY</b> for ideas.</p>
+        <div class="tpls" id="tpls"></div>
+    </div></div>
+
+    <div class="modal hidden" id="pubModal"><div class="box f">
+        <button class="x" data-close>✕</button>
+        <h2>🚀 Publish to Made by Players</h2>
+        <p>Your game will appear in the <a href="/made" style="color:var(--accent-2)">Made by Players</a> arcade with your name, after Noam checks it. That usually takes a day or two.</p>
+        <label for="pTitle">Game name</label><input id="pTitle" maxlength="40" data-noi18n>
+        <label for="pDesc">How to play (one or two sentences)</label><textarea id="pDesc" maxlength="200" data-noi18n></textarea>
+        <label>Cover picture</label><div class="emojis" id="pEmoji"></div>
+        <p style="margin-top:12px">Please don't put your real name, address, school or photos in your game. Games with rude words or that copy someone else's game won't be approved.</p>
+        <div id="pErr" style="color:#ff8db4;font-weight:700;font-size:14px"></div>
+        <div class="row"><button class="btn ghost" data-close>Cancel</button><button class="btn" id="pSend">🚀 Send for review</button></div>
+        <div id="mineWrap" class="hidden"><label>My published games</label><div class="mine" id="mine"></div></div>
+    </div></div>
+
+    <script src="/vendor/codemirror/codemirror.js"></script>
+    <script src="/vendor/codemirror/xml.js"></script>
+    <script src="/vendor/codemirror/javascript.js"></script>
+    <script src="/vendor/codemirror/css.js"></script>
+    <script src="/vendor/codemirror/htmlmixed.js"></script>
+    <script src="/vendor/codemirror/closebrackets.js"></script>
+    <script src="/vendor/codemirror/closetag.js"></script>
+    <script type="module">
+        import { TEMPLATES } from "/studio-templates.js";
+        import { ready, state, toast, LANG, isBanned } from "/hub.js";
+        import { textProblem } from "/progress.js";
+        import { buildDoc } from "/studio-run.js";
+        import { db } from "/firebase-config.js";
+        import { doc, setDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        const he = LANG === "he", tr = (e, h) => (he ? h : e), $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const MAX = 60000;
+
+        // ---------- projects saved in this browser ----------
+        let S;
+        try { S = JSON.parse(localStorage.getItem("gh_studio")); } catch (e) {}
+        if (!S || !S.projects || !S.projects.length) S = { projects: [], cur: null };
+        const save = () => { try { localStorage.setItem("gh_studio", JSON.stringify(S)); } catch (e) { toast(tr("Your browser storage is full. Download your game to keep it.", "האחסון בדפדפן מלא. הורידו את המשחק כדי לשמור אותו.")); } };
+        const cur = () => S.projects.find((p) => p.id === S.cur);
+        function newProject(t, code, title) {
+            const p = { id: Date.now().toString(36), title: title || (he ? t.he : t.name), emoji: t.emoji, code: code || t.code, updated: Date.now(), from: t.id };
+            S.projects.unshift(p); S.cur = p.id; save(); open(p);
+        }
+
+        // ---------- editor (CodeMirror if it loaded, otherwise a plain box) ----------
+        let cm = null;
+        if (window.CodeMirror) {
+            cm = CodeMirror.fromTextArea($("code"), { mode: "htmlmixed", theme: "dracula", lineNumbers: true, lineWrapping: true, tabSize: 2, indentUnit: 2, autoCloseBrackets: true, autoCloseTags: true });
+        } else {
+            $("code").addEventListener("keydown", (e) => { if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.value = t.value.slice(0, s) + "  " + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = s + 2; onChange(); } });
+            $("code").addEventListener("input", () => onChange());
+        }
+        const getCode = () => (cm ? cm.getValue() : $("code").value);
+        const setCode = (v) => { if (cm) { cm.setValue(v); cm.clearHistory(); } else $("code").value = v; };
+        if (cm) cm.on("change", () => onChange());
+
+        let runT = 0;
+        function onChange() {
+            const p = cur(); if (!p) return;
+            p.code = getCode().slice(0, MAX); p.updated = Date.now(); save();
+            if ($("auto").checked) { clearTimeout(runT); runT = setTimeout(run, 700); }
+        }
+        // ---------- running the game in a safe box ----------
+        function run() {
+            $("err").classList.remove("show");
+            $("pv").srcdoc = buildDoc(getCode());
+        }
+        addEventListener("message", (e) => {
+            if (e.source !== $("pv").contentWindow || !e.data || !e.data.ghErr) return;
+            $("err").textContent = `⚠️ ${tr("Line", "שורה")} ${e.data.line || "?"}: ${e.data.ghErr}`;
+            $("err").classList.add("show");
+            if (cm && e.data.line) { const ln = e.data.line - 1; cm.addLineClass(ln, "background", "cm-errline"); setTimeout(() => cm.removeLineClass(ln, "background", "cm-errline"), 4000); }
+        });
+        const st = document.createElement("style"); st.textContent = ".cm-errline{background:#ff4d8d33!important}"; document.head.appendChild(st);
+
+        function open(p) {
+            S.cur = p.id; save();
+            setCode(p.code); $("ttl").value = p.title; renderProjects(); run();
+        }
+        function renderProjects() {
+            $("proj").innerHTML = S.projects.map((p) => `<option value="${esc(p.id)}" ${p.id === S.cur ? "selected" : ""}>${esc(p.emoji || "🎮")} ${esc(p.title)}</option>`).join("");
+        }
+        $("proj").onchange = () => { const p = S.projects.find((x) => x.id === $("proj").value); if (p) open(p); };
+        $("ttl").oninput = () => { const p = cur(); if (p) { p.title = $("ttl").value.slice(0, 40) || tr("My game", "המשחק שלי"); save(); renderProjects(); } };
+        $("runBtn").onclick = run;
+        $("dlBtn").onclick = () => { const p = cur(); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([getCode()], { type: "text/html" })); a.download = (p ? p.title : "my-game").replace(/[^\w֐-׿ -]/g, "").trim().replace(/\s+/g, "-") + ".html"; a.click(); };
+
+        // ---------- templates ----------
+        $("tpls").innerHTML = TEMPLATES.map((t) => `<button data-t="${t.id}"><span class="e">${t.emoji}</span><b>${esc(he ? t.he : t.name)}</b><span>${esc(t.desc)}</span></button>`).join("");
+        $("tpls").onclick = (e) => { const b = e.target.closest("[data-t]"); if (!b) return; newProject(TEMPLATES.find((t) => t.id === b.dataset.t)); $("tplModal").classList.add("hidden"); };
+        $("newBtn").onclick = () => $("tplModal").classList.remove("hidden");
+        document.querySelectorAll("[data-close]").forEach((b) => b.onclick = () => b.closest(".modal").classList.add("hidden"));
+
+        // ---------- publishing ----------
+        const COVERS = ["🎮", "⭐", "🚀", "🐸", "🍪", "❓", "👾", "🐉", "⚽", "🏎️", "🧩", "🎨", "🐱", "🦄", "💎", "🔥", "🍕", "🏰"];
+        let cover = "🎮";
+        function renderCovers() { $("pEmoji").innerHTML = COVERS.map((e) => `<button type="button" data-e="${e}" class="${e === cover ? "on" : ""}">${e}</button>`).join(""); }
+        $("pEmoji").onclick = (e) => { const b = e.target.closest("[data-e]"); if (b) { cover = b.dataset.e; renderCovers(); } };
+        $("pubBtn").onclick = async () => {
+            await ready;
+            if (!state.user || !state.profile) { location.href = "/login?next=/studio"; return; }
+            const p = cur(); cover = p.emoji || "🎮"; renderCovers();
+            $("pTitle").value = p.title; $("pDesc").value = p.desc || ""; $("pErr").textContent = "";
+            $("pubModal").classList.remove("hidden");
+            loadMine();
+        };
+        async function loadMine() {
+            try {
+                const snap = await getDocs(query(collection(db, "creations"), where("uid", "==", state.user.uid)));
+                const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                if (!rows.length) return;
+                $("mineWrap").classList.remove("hidden");
+                const lab = { pending: tr("⏳ Waiting for Noam", "⏳ מחכה לנועם"), approved: tr("✅ In the arcade", "✅ בארקייד"), rejected: tr("❌ Not approved", "❌ לא אושר") };
+                $("mine").innerHTML = rows.map((r) => `<div><span>${esc(r.emoji)}</span><span data-noi18n>${esc(r.title)}</span><em>${r.status === "approved" ? `<a href="/made?g=${esc(r.id)}" style="color:var(--accent-2)">${lab.approved}</a>` : lab[r.status] || ""}</em></div>`).join("");
+            } catch (e) {}
+        }
+        $("pSend").onclick = async () => {
+            const p = cur(), title = $("pTitle").value.trim(), desc = $("pDesc").value.trim(), code = getCode();
+            const err = (m) => ($("pErr").textContent = m);
+            if (isBanned()) return err(tr("Your account is suspended.", "החשבון שלך מושעה."));
+            if (title.length < 3) return err(tr("Give your game a name (at least 3 letters).", "תנו שם למשחק (לפחות 3 אותיות)."));
+            for (const t of [title, desc]) { const bad = t && textProblem(t); if (bad && bad !== "Write a bit more first.") return err(tr("Please keep the name and description friendly, without links or phone numbers.", "השם והתיאור צריכים להיות נחמדים, בלי קישורים או מספרי טלפון.")); }
+            if (code.length > MAX) return err(tr("Your game is too big to publish.", "המשחק גדול מדי לפרסום."));
+            const tpl = TEMPLATES.find((t) => t.id === p.from);
+            if (tpl && tpl.code.trim() === code.trim()) return err(tr("Change the game a bit first, so it's yours!", "קודם שנו קצת את המשחק, כדי שיהיה שלכם!"));
+            $("pSend").disabled = true;
+            try {
+                // the same project updates its existing entry (and goes back to review)
+                const base = { uid: state.user.uid, author: state.profile.name, avatar: state.profile.avatar || "", title, desc, emoji: cover, code, status: "pending", updatedAt: serverTimestamp() };
+                let id = p.pubId;
+                if (id) await setDoc(doc(db, "creations", id), base, { merge: true });
+                else { id = doc(collection(db, "creations")).id; await setDoc(doc(db, "creations", id), { ...base, plays: 0, likes: 0, createdAt: serverTimestamp() }); }
+                p.pubId = id; p.title = title; p.desc = desc; p.emoji = cover; save(); renderProjects();
+                import("/social.js").then((m) => m.bumpStat("creations")).catch(() => {});
+                $("pubModal").classList.add("hidden");
+                toast(tr("🚀 Sent! Noam will check your game soon, then it appears in Made by Players.", "🚀 נשלח! נועם יבדוק את המשחק בקרוב, ואז הוא יופיע ב׳נוצר על ידי שחקנים׳."), 6000);
+            } catch (e) { console.warn(e); err(tr("Couldn't send it. Try again.", "לא הצלחנו לשלוח. נסו שוב.")); }
+            $("pSend").disabled = false;
+        };
+
+        // ---------- start ----------
+        const remix = new URLSearchParams(location.search).get("remix");
+        if (remix) {
+            try {
+                const { getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+                const s = await getDoc(doc(db, "creations", remix));
+                if (s.exists() && s.data().status === "approved") { const d = s.data(); newProject({ id: "remix", emoji: d.emoji, name: d.title, he: d.title, code: d.code }, d.code, tr(`${d.title} (remix)`, `${d.title} (רמיקס)`)); toast(tr("🔀 Remixing! This is your own copy to change.", "🔀 רמיקס! זה עותק שלכם לשנות.")); }
+            } catch (e) {}
+            history.replaceState(null, "", "/studio");
+        }
+        if (!cur()) { if (S.projects.length) open(S.projects[0]); else { newProject(TEMPLATES[0]); $("tplModal").classList.remove("hidden"); } }
+        else open(cur());
+        window.__studio = { getCode, setCode, run };
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

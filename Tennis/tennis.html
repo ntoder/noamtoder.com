@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A quick game of tennis against the computer, seen from above. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Tennis · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Tennis</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 - 0</b><small>Games</small></div><div class="stat"><b id="pts">0 - 0</b><small>Points</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Tennis</h2>
+                <p id="startText"><span class="seg" id="diff"><button data-d="easy">Easy</button><button data-d="normal">Normal</button><button data-d="hard">Hard</button></span>Move with the arrow keys / WASD, or hold your finger where you want to run.<br>You swing by yourself when the ball comes close.<br>Hold ⬅ or ➡ as you hit to aim. First to 3 games wins!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Match Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Hitting the ball before it bounces (a volley) makes it go faster.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "tennisBest", G = 900;
+        const CL = 70, CR = W - 70, CT = 60, CB = H - 60, NET = H / 2, REACH = 44;
+        const AI = { easy: { sp: 210, err: 0.22, pace: 0.9 }, normal: { sp: 270, err: 0.12, pace: 1 }, hard: { sp: 340, err: 0.05, pace: 1.12 } };
+        const CALL = ["0", "15", "30", "40"];
+        let diff = "normal", me, cpu, ball, pts, games, server, state = "ready", t = 0, phase, timer, msg = "", msgT = 0, fx = Kit.particles(), target = null, won, lost, rally;
+        try { diff = localStorage.getItem("tennisDiff") || "normal"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function reset() { pts = [0, 0]; games = [0, 0]; server = 0; won = 0; lost = 0; setupPoint(); stats(); }
+        function setupPoint() {
+            me = { x: W / 2 + 40, y: CB + 10, swing: 0 }; cpu = { x: W / 2 - 40, y: CT - 10, swing: 0 };
+            const s = server === 0 ? me : cpu;
+            ball = { x: s.x + 14, y: s.y + (server === 0 ? -10 : 10), z: 40, vx: 0, vy: 0, vz: 0, side: server === 0 ? 0 : 1, bounces: 0, last: -1, live: false, target: null };
+            phase = "serve"; timer = 0; rally = 0; target = null;
+        }
+        function stats() {
+            const call = (a, b) => (a >= 3 && b >= 3 ? (a === b ? "40" : a > b ? "AD" : "40") : CALL[Math.min(a, 3)]);
+            Kit.stat("score", `${games[0]} - ${games[1]}`);
+            $("pts").textContent = `${call(pts[0], pts[1])} - ${call(pts[1], pts[0])}`;
+        }
+        function hit(who, power) {
+            // pick where the ball lands on the other side
+            const pl = who === 0 ? me : cpu, L = AI[diff];
+            let tx, ty;
+            if (who === 0) {
+                const off = (ball.x - pl.x) / REACH;                                   // where it hit your racket aims it
+                const kx = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0);
+                tx = W / 2 + (kx || -off) * (CR - CL) * 0.38 + Kit.rand(-30, 30);
+                ty = Kit.rand(CT + 40, NET - 70);
+            } else {
+                tx = Math.random() < 0.5 ? Kit.rand(CL + 20, W / 2 - 40) : Kit.rand(W / 2 + 40, CR - 20);
+                if (Math.abs(tx - me.x) < 80) tx = me.x < W / 2 ? Kit.rand(W / 2 + 60, CR - 20) : Kit.rand(CL + 20, W / 2 - 60);
+                ty = Kit.rand(NET + 70, CB - 40);
+                if (Math.random() < L.err) { if (Math.random() < 0.5) tx += Kit.pick([-1, 1]) * 140; else ty = CB + 60; }
+            }
+            const d = Math.hypot(tx - ball.x, ty - ball.y), sp = (360 + Math.min(rally, 12) * 14) * power * (who === 1 ? L.pace : 1), T = d / sp;
+            ball.vx = (tx - ball.x) / T; ball.vy = (ty - ball.y) / T; ball.vz = G * T / 2 - ball.z / T;
+            ball.bounces = 0; ball.last = who; ball.live = true; ball.target = { x: tx, y: ty };
+            pl.swing = 0.25; rally++; beep(who === 0 ? 520 : 400, 0.05, "square", 0.05);
+        }
+        function inCourt(x, y, side) { return x >= CL - 4 && x <= CR + 4 && (side === 1 ? y >= CT - 4 && y <= NET : y >= NET && y <= CB + 4); }
+        function pointTo(who, why) {
+            pts[who]++; who === 0 ? won++ : lost++;
+            msg = why; msgT = 1.4; phase = "over"; timer = 0;
+            if (who === 0) tune([659, 880], 0.06, "triangle", 0.05); else beep(180, 0.25, "sawtooth", 0.04, -60);
+            const [a, b] = pts;
+            if ((a >= 4 || b >= 4) && Math.abs(a - b) >= 2) {
+                const g = a > b ? 0 : 1; games[g]++; pts = [0, 0]; server = 1 - server;
+                msg = g === 0 ? "Game, you!" : "Game, computer"; if (g === 0) tune([523, 659, 784, 1047], 0.08, "square", 0.05);
+            }
+            stats();
+        }
+        function update(dt) {
+            timer += dt; if (msgT > 0) msgT -= dt;
+            if (me.swing > 0) me.swing -= dt; if (cpu.swing > 0) cpu.swing -= dt;
+            // you
+            const kx = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0), ky = (Kit.keys.has("down") ? 1 : 0) - (Kit.keys.has("up") ? 1 : 0);
+            if (kx || ky) { target = null; me.x += kx * 300 * dt; me.y += ky * 300 * dt; }
+            else if (target) { const dx = target.x - me.x, dy = target.y - me.y, d = Math.hypot(dx, dy), st = Math.min(d, 320 * dt); if (d > 1) { me.x += dx / d * st; me.y += dy / d * st; } }
+            me.x = Math.max(20, Math.min(W - 20, me.x)); me.y = Math.max(NET + 40, Math.min(H - 14, me.y));
+            // computer runs toward where the ball will be
+            const L = AI[diff];
+            let gx = W / 2, gy = CT - 10;
+            if (ball.live && ball.vy < 0) { const tt = Math.max(0, (cpu.y + 10 - ball.y) / ball.vy); gx = ball.x + ball.vx * tt; gy = Math.min(NET - 60, Math.max(CT - 30, ball.target && ball.bounces === 0 ? ball.target.y - 60 : cpu.y)); }
+            const dx = gx - cpu.x, dy = gy - cpu.y, d = Math.hypot(dx, dy), st = Math.min(d, L.sp * dt);
+            if (d > 1) { cpu.x += dx / d * st; cpu.y += dy / d * st; }
+            if (phase === "serve") {
+                const s = server === 0 ? me : cpu; ball.x = s.x + 14; ball.y = s.y + (server === 0 ? -10 : 10); ball.z = 40 + Math.abs(Math.sin(t * 4)) * 30;
+                if (server === 1 && timer > 1.1) { phase = "rally"; hit(1, 0.95); }
+                if (server === 0 && timer > 3) { phase = "rally"; hit(0, 0.95); }
+                return;
+            }
+            if (phase === "over") { if (timer > 1.5) { if (games[0] >= 3 || games[1] >= 3) return end(); setupPoint(); } return; }
+            // ball flight
+            ball.vz -= G * dt; ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.z += ball.vz * dt;
+            if (ball.z <= 0) {
+                ball.z = 0;
+                const side = ball.y < NET ? 1 : 0;
+                if (ball.bounces === 0) {
+                    if (!inCourt(ball.x, ball.y, side) || side === ball.last) return pointTo(ball.last === 0 ? 1 : 0, "Out!");
+                } else return pointTo(side === 0 ? 1 : 0, side === 0 ? "Too slow!" : "Winner!");
+                ball.bounces++; ball.vz = Math.abs(ball.vz) * 0.68; ball.vx *= 0.9; ball.vy *= 0.9;
+                fx.burst(ball.x, ball.y, "#ffffff", 5, 1.5); beep(220, 0.03, "triangle", 0.03);
+            }
+            if (ball.y < -40 || ball.y > H + 40 || ball.x < -40 || ball.x > W + 40) { const side = ball.y < NET ? 1 : 0; return pointTo(ball.bounces ? 1 - side : ball.last === 0 ? 1 : 0, ball.bounces ? "Winner!" : "Out!"); }
+            // automatic swings when the ball comes close
+            for (const [who, p] of [[0, me], [1, cpu]]) {
+                if (ball.last === who || ball.z > 90) continue;
+                if ((who === 0 && ball.y < NET) || (who === 1 && ball.y > NET)) continue;
+                if (Math.hypot(ball.x - p.x, ball.y - p.y) < REACH) hit(who, who === 0 && ball.bounces === 0 ? 1.15 : 1);
+            }
+        }
+        function end() {
+            state = "dead"; const win = games[0] > games[1];
+            const sc = won * 20 + (win ? 300 + { easy: 0, normal: 100, hard: 300 }[diff] : 0);
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `${win ? "🏆 You win the match" : "😢 The computer wins the match"} ${games[0]} - ${games[1]}<br>${sc} points · best ${best}`;
+            if (win) tune([523, 659, 784, 1047, 1319], 0.1, "triangle", 0.06); Kit.show("over");
+        }
+        function player(p, col, top) {
+            ctx.fillStyle = "#00000044"; ctx.beginPath(); ctx.ellipse(p.x, p.y + 8, 16, 7, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = col; Kit.rr(ctx, p.x - 12, p.y - 24, 24, 28, 9); ctx.fill();
+            ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(p.x, p.y - 30, 9, 0, 7); ctx.fill();
+            const a = (top ? Math.PI : 0) + (p.swing > 0 ? (0.25 - p.swing) * 10 - 1.2 : -0.5);
+            ctx.save(); ctx.translate(p.x + 12, p.y - 14); ctx.rotate(a);
+            ctx.strokeStyle = "#c8ccdf"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, 0); ctx.stroke();
+            ctx.strokeStyle = "#eef0ff"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(28, 0, 11, 8, 0, 0, 7); ctx.stroke();
+            ctx.restore();
+        }
+        function draw() {
+            ctx.fillStyle = "#c96a3a"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#2a8ad6"; ctx.fillRect(CL - 20, CT - 30, CR - CL + 40, CB - CT + 60);
+            ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+            ctx.strokeRect(CL, CT, CR - CL, CB - CT);
+            ctx.beginPath(); ctx.moveTo(CL, NET - 150); ctx.lineTo(CR, NET - 150); ctx.moveTo(CL, NET + 150); ctx.lineTo(CR, NET + 150); ctx.moveTo(W / 2, NET - 150); ctx.lineTo(W / 2, NET + 150); ctx.stroke();
+            ctx.fillStyle = "#eef0ff"; ctx.fillRect(CL - 16, NET - 3, CR - CL + 32, 6); ctx.fillStyle = "#0b0d1a55"; ctx.fillRect(CL - 16, NET + 3, CR - CL + 32, 4);
+            player(cpu, "#ff4d8d", true);
+            // ball shadow then ball (higher = bigger and further from its shadow)
+            ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.ellipse(ball.x, ball.y, 6, 3, 0, 0, 7); ctx.fill();
+            const r = 6 + ball.z * 0.03;
+            ctx.fillStyle = "#e6ff4d"; ctx.beginPath(); ctx.arc(ball.x, ball.y - ball.z * 0.6, r, 0, 7); ctx.fill();
+            player(me, Kit.skin("tennis", "#2ee6c9"), false);
+            fx.draw(ctx);
+            if (phase === "serve" && server === 0) Kit.text(ctx, "Click or press Space to serve", W / 2, H - 20, 14, "#ffffff");
+            if (msgT > 0) Kit.text(ctx, msg, W / 2, NET - 40, 24, "#ffffff", "center", "'Press Start 2P', monospace", 400);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        function serveNow() { if (state === "play" && phase === "serve" && server === 0) { phase = "rally"; hit(0, 0.95); } }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (phase === "serve" && server === 0) return serveNow(); target = { x: p.x, y: p.y }; });
+        cv.addEventListener("pointermove", (e) => { if (e.buttons || e.pointerType === "touch") { const p = Kit.point(cv, e); target = { x: p.x, y: p.y }; } });
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", Space: "serve", Enter: "serve" }, (k) => {
+            if (k !== "serve") return; if (state !== "play") { if (state === "ready" || !$("over").classList.contains("hidden")) start(); return; } serveNow();
+        });
+        document.querySelectorAll("#diff button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.d === diff);
+            b.onclick = () => { diff = b.dataset.d; try { localStorage.setItem("tennisDiff", diff); } catch (e) {} document.querySelectorAll("#diff button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        pts = [0, 0]; games = [0, 0]; server = 0; setupPoint(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Tennis</h2><p>A quick game of tennis against the computer, seen from above. Run around your side of the court and your player swings by itself when the ball comes close. Hold left or right as you hit to aim your shot, and try to make the computer run. The ball must land inside the lines on the other side, and it can only bounce once. Real tennis scoring is used, and the first to win three games takes the match.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrow keys / WASD</td><td>Run</td></tr><tr><td>Hold ⬅ or ➡ while hitting</td><td>Aim your shot</td></tr><tr><td>Space / click</td><td>Serve</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Stay near the middle of the baseline so you can reach both sides.</li><li>Aim away from the computer to make it run.</li><li>Volleys before the bounce are faster, but harder to control.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Tennis</h3><p>In Tennis, your player swings automatically when the ball comes close, so your job is to be in the right place and to aim. The best home position is the middle of your baseline. From there you can reach shots to either side. After every shot, move back toward the middle while the ball is on the other side of the net.</p><p>To aim, hold left or right as you hit the ball. The most effective plan is to make the computer run: hit one shot to one side, then the next to the other. Hitting the ball before it bounces, a volley, sends it back much faster, but it's harder to control, so use it when the computer is out of position. The ball can only bounce once on your side, so don't let it get behind you.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Return the ball over the net by getting into position early.</li><li><b>Getting good:</b> Aim your shots away from the computer to make it run.</li><li><b>Expert:</b> Mix deep shots and volleys, and win the match without losing a game.</li></ul><h3>Did you know?</h3><p>Modern lawn tennis was developed in England in the 1870s, and the first Wimbledon Championships were held in 1877. Tennis scoring, with its 15, 30 and 40, is so old that nobody knows for sure where it came from. One popular theory links it to the quarters of a clock face.</p><h3>Questions players ask</h3><h4>How do I hit the ball?</h4><p>Just get close to it. Your player swings by itself. Hold left or right to aim.</p><h4>How is a match won?</h4><p>Real tennis scoring is used, and the first to win three games wins the match.</p><h4>What is a volley?</h4><p>Hitting the ball before it bounces. It's faster but harder to control.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/HeaderHero/headerhero">Header Hero</a><a href="/Checkers/checkers">Checkers</a><a href="/SeaBattle/seabattle">Sea Battle</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

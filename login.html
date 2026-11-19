@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="robots" content="noindex, follow">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log In · Noam's Game Hub</title>
     <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -90,7 +92,7 @@
 
             <form id="form" novalidate>
                 <label id="nameField" class="hidden">Display name
-                    <input id="name" type="text" maxlength="30" autocomplete="nickname" placeholder="Player123">
+                    <input id="name" type="text" maxlength="20" autocomplete="nickname" placeholder="Player123">
                 </label>
                 <label>Email
                     <input id="email" type="email" autocomplete="email" required placeholder="you@example.com">
@@ -116,6 +118,7 @@
     <script type="module">
         import { auth, db } from "/firebase-config.js";
         import "/hub.js";
+        import { nameProblem } from "/progress.js";
         import {
             signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile,
             GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail
@@ -192,6 +195,7 @@
             const password = $("password").value;
             const name = $("name").value.trim();
             if (!email || !password) return show("Enter your email and password.");
+            if (mode === "signup" && name && nameProblem(name)) return show(nameProblem(name));
             busy(true);
             try {
                 let cred;

@@ -1,66 +1,203 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Noametry is the original game of the hub. Free to play in your browser on Noam's Game Hub.">
-    <title>Noametry Dash</title>
-    <link rel="stylesheet" href="noametry.css">
-    <link rel="shortcut icon" href="noametry.png" type="image/x-icon">
+    <meta name="description" content="Noametry is the original game of the hub. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Noametry · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="game-container">
-        <div class="header">
-            <h1>Noametry Dash</h1>
-            <div class="stats">
-                <div class="stat">
-                    <span class="label">Level:</span>
-                    <span class="value" id="level">1</span>
-                </div>
-                <div class="stat">
-                    <span class="label">Score:</span>
-                    <span class="value" id="score">0</span>
-                </div>
-                <div class="stat">
-                    <span class="label">Best:</span>
-                    <span class="value" id="best">0</span>
-                </div>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Noa<span>metry</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Points</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="900" height="420"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Noametry</h2>
+                <p id="startText">Space, ⬆, click or tap to jump. Hold to keep jumping.<br>Dodge the spikes, land on the blocks, and hit the yellow pads for a super jump.<br>Every 15 points is a new level, and the track gets faster!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Crashed!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
             </div>
-        </div>
-
-        <div class="game-board">
-            <div class="player" id="player"></div>
-            <div class="ground" id="ground"></div>
-        </div>
-
-        <div class="game-over-screen" id="gameOverScreen">
-            <div class="game-over-content">
-                <h2>Game Over!</h2>
-                <p>Score: <span id="finalScore">0</span></p>
-                <button id="restartBtn">Play Again</button>
-            </div>
-        </div>
-
-        <div class="controls">
-            <p>Click or press SPACE to jump</p>
+            
         </div>
     </div>
+    
+    <p class="hint">Press Space right after you crash to retry instantly.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, T = 34, GROUND = H - 80, BEST = "noametryBest", PER = 15;
+        const THEMES = [["#2a1b6b", "#7c5cff"], ["#0f3d4a", "#2ee6c9"], ["#4a1240", "#ff4d8d"], ["#3d2a08", "#ffc94d"], ["#0e2a52", "#4da3ff"], ["#123d1c", "#2ee6a0"]];
+        Kit.stat("best", Kit.best(BEST));
+        let p, obs, dist, nextX, score, level, speed, state = "ready", t = 0, attempts = 0, banner = 0, fx = Kit.particles(), holding = false, beat = 0;
 
-    <script src="noametry.js"></script>
+        function reset() {
+            p = { x: 170, y: GROUND - T, vy: 0, ang: 0, onGround: true, dead: false };
+            obs = []; dist = 0; nextX = W + 200; score = 0; level = 1; speed = 340; banner = 1.6;
+            attempts++; Kit.stat("score", 0); Kit.stat("level", 1);
+        }
+        // ---- track pieces (x in tiles, relative). s = spike, b = block (w,h,y-from-ground), d = jump pad
+        const CHUNKS = [
+            { min: 1, len: 4, items: [["s", 0]] },
+            { min: 1, len: 5, items: [["s", 0], ["s", 1]] },
+            { min: 1, len: 4, items: [["b", 0, 1, 1]] },
+            { min: 1, len: 8, items: [["b", 0, 1, 1], ["b", 3, 1, 2]] },
+            { min: 2, len: 6, items: [["s", 0], ["s", 1], ["s", 2]] },
+            { min: 2, len: 9, items: [["b", 0, 5, 1], ["s", 2, 0, 1]] },
+            { min: 2, len: 10, items: [["d", 0], ["b", 4, 2, 3]] },
+            { min: 3, len: 9, items: [["s", 0], ["s", 1], ["b", 2, 2, 1, 1], ["s", 2], ["s", 3], ["s", 4], ["s", 5]] },
+            { min: 3, len: 10, items: [["b", 0, 1, 1], ["b", 2, 1, 2], ["b", 4, 1, 3], ["s", 5], ["s", 6]] },
+            { min: 4, len: 7, items: [["s", 0], ["b", 3, 1, 1], ["s", 4]] },
+            { min: 4, len: 12, items: [["d", 0], ["s", 2], ["s", 3], ["s", 4], ["s", 5], ["s", 6], ["s", 7]] }
+        ];
+        function addChunk() {
+            const pool = CHUNKS.filter((c) => c.min <= level);
+            const c = Kit.pick(pool), base = nextX;
+            for (const it of c.items) {
+                const [k, x] = it, wx = base + x * T;
+                if (k === "s") obs.push({ k, x: wx, w: T, h: T, y: GROUND - T - (it[3] || 0) * T, counted: false });
+                else if (k === "b") { const w = it[2] * T, h = it[3] * T, lift = (it[4] || 0) * T; obs.push({ k, x: wx, w, h, y: GROUND - h - lift, counted: false }); }
+                else obs.push({ k, x: wx, w: T, h: 8, y: GROUND - 8, counted: true, used: false });
+            }
+            nextX = base + c.len * T + Kit.rand(3, 6) * T * (speed / 340);
+        }
+        function jump(power = -800) { p.vy = power; p.onGround = false; beep(power < -900 ? 900 : 520, 0.06, "triangle", 0.04, 200); }
+        function die() {
+            if (p.dead) return;
+            p.dead = true; state = "dead"; beep(120, 0.4, "sawtooth", 0.07, -60);
+            fx.burst(p.x + T / 2, p.y + T / 2, Kit.skin("noametry", "#2ee6c9"), 30, 5);
+            fx.burst(p.x + T / 2, p.y + T / 2, "#ffffff", 12, 3);
+            const best = Kit.setBest(BEST, score);
+            Kit.save(score);
+            setTimeout(() => { $("overText").innerHTML = `${score} points · level ${level}<br>Best ${best} · attempt ${attempts}`; Kit.show("over"); }, 650);
+        }
+        function step(dt) {
+            const prevBottom = p.y + T;
+            dist += speed * dt;
+            p.vy += 2600 * dt; p.y += p.vy * dt;
+            let ground = GROUND;
+            const px = p.x + dist;
+            for (const o of obs) {
+                const ox = o.x, inX = px + T - 4 > ox && px + 4 < ox + o.w;
+                if (o.k === "b" && inX) {
+                    if (prevBottom <= o.y + 6 && p.y + T >= o.y) ground = Math.min(ground, o.y);
+                    else if (p.y + T > o.y + 6 && p.y < o.y + o.h) return die();
+                } else if (o.k === "s" && px + T - 8 > ox + 9 && px + 8 < ox + T - 9 && p.y + T > o.y + 12 && p.y < o.y + T) return die();
+                else if (o.k === "d" && inX && p.y + T >= GROUND - 10 && !o.used) { o.used = true; p.y = GROUND - T; jump(-1150); fx.burst(px - dist + T / 2, GROUND, "#ffc94d", 14, 3); }
+                if (!o.counted && ox + o.w < px) {
+                    o.counted = true; score++; Kit.stat("score", score);
+                    if (score % PER === 0) levelUp();
+                }
+            }
+            if (p.y + T >= ground && p.vy >= 0) {
+                p.y = ground - T; p.vy = 0;
+                if (!p.onGround) { p.onGround = true; fx.burst(p.x + 4, p.y + T, "#ffffff66", 5, 1.5); }
+            } else if (p.y + T < ground - 1) p.onGround = false;
+            if (p.onGround && holding) jump();
+        }
+        function levelUp() {
+            level++; speed = Math.min(500, 340 + (level - 1) * 26); banner = 1.6;
+            Kit.stat("level", level); tune([523, 659, 784, 1047], 0.08, "square", 0.05);
+        }
+        const game = Kit.loop((dt) => {
+            t += dt; beat = (beat + dt * 2.2) % 1;
+            if (state === "play") {
+                for (let i = 0; i < 2; i++) { if (state !== "play") break; step(dt / 2); }
+                while (nextX < dist + W + 300) addChunk();
+                obs = obs.filter((o) => o.x + o.w > dist - 100);
+                if (!p.onGround) p.ang += dt * 9.5;
+                else p.ang = Math.round(p.ang / (Math.PI / 2)) * (Math.PI / 2);
+                if (Math.random() < 0.6) fx.burst(p.x, p.y + T - 4, Kit.skin("noametry", "#2ee6c9") + "88", 1, 0.8);
+            }
+            if (banner > 0) banner -= dt;
+            fx.update(dt); draw();
+        });
+
+        function draw() {
+            const [dark, neon] = THEMES[(level - 1) % THEMES.length];
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, dark); g.addColorStop(1, "#0b0d1a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            // parallax squares
+            ctx.strokeStyle = neon + "22"; ctx.lineWidth = 2;
+            for (let i = 0; i < 14; i++) { const s = 40 + (i % 4) * 22, x = ((i * 157 - dist * 0.2) % (W + 200) + W + 200) % (W + 200) - 100, y = 40 + (i * 73) % (GROUND - 140); ctx.strokeRect(x, y, s, s); }
+            // ground
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.strokeStyle = neon + "33"; ctx.lineWidth = 1;
+            const go = dist % T; for (let x = -go; x < W; x += T) { ctx.beginPath(); ctx.moveTo(x, GROUND); ctx.lineTo(x, H); ctx.stroke(); }
+            ctx.fillStyle = neon; ctx.shadowColor = neon; ctx.shadowBlur = 12 + beat * 8; ctx.fillRect(0, GROUND, W, 3); ctx.shadowBlur = 0;
+            // obstacles
+            for (const o of obs) {
+                const x = o.x - dist;
+                if (x > W + 50) continue;
+                if (o.k === "s") {
+                    ctx.fillStyle = "#0b0d1a"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(x + 2, o.y + T); ctx.lineTo(x + T / 2, o.y + 2); ctx.lineTo(x + T - 2, o.y + T); ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = neon + "66"; ctx.beginPath(); ctx.moveTo(x + 10, o.y + T - 2); ctx.lineTo(x + T / 2, o.y + 14); ctx.lineTo(x + T - 10, o.y + T - 2); ctx.fill();
+                } else if (o.k === "b") {
+                    ctx.fillStyle = "#0b0d1aee"; ctx.fillRect(x, o.y, o.w, o.h);
+                    ctx.strokeStyle = neon; ctx.lineWidth = 2; ctx.strokeRect(x + 1, o.y + 1, o.w - 2, o.h - 2);
+                    ctx.strokeStyle = neon + "44"; for (let yy = o.y + T; yy < o.y + o.h; yy += T) { ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + o.w, yy); ctx.stroke(); }
+                    for (let xx = x + T; xx < x + o.w; xx += T) { ctx.beginPath(); ctx.moveTo(xx, o.y); ctx.lineTo(xx, o.y + o.h); ctx.stroke(); }
+                } else {
+                    ctx.fillStyle = o.used ? "#ffc94d66" : "#ffc94d"; ctx.shadowColor = "#ffc94d"; ctx.shadowBlur = 14;
+                    ctx.beginPath(); ctx.ellipse(x + T / 2, GROUND - 3, T / 2, 6, 0, Math.PI, 0); ctx.fill(); ctx.shadowBlur = 0;
+                }
+            }
+            // player cube
+            if (!p.dead) {
+                const col = Kit.skin("noametry", "#2ee6c9");
+                ctx.save(); ctx.translate(p.x + T / 2, p.y + T / 2); ctx.rotate(p.ang);
+                ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.fillRect(-T / 2, -T / 2, T, T); ctx.shadowBlur = 0;
+                ctx.fillStyle = "#0b0d1a"; ctx.fillRect(-T / 2 + 6, -T / 2 + 6, T - 12, T - 12);
+                ctx.fillStyle = col; ctx.fillRect(-6, -6, 12, 12);
+                ctx.restore();
+            }
+            fx.draw(ctx);
+            // HUD: level progress bar
+            const prog = (score % PER) / PER;
+            ctx.fillStyle = "#ffffff22"; Kit.rr(ctx, W / 2 - 160, 16, 320, 10, 5); ctx.fill();
+            ctx.fillStyle = neon; Kit.rr(ctx, W / 2 - 160, 16, Math.max(10, 320 * prog), 10, 5); ctx.fill();
+            Kit.text(ctx, `${Math.round(prog * 100)}%`, W / 2 + 190, 21, 13, "#ffffffcc");
+            if (state === "play" && dist < 420) Kit.text(ctx, `Attempt ${attempts}`, W / 2 + 60 - dist, 120, 30, "#ffffffcc", "center", "'Press Start 2P', monospace", 400);
+            if (banner > 0 && state === "play" && level > 1) { ctx.globalAlpha = Math.min(1, banner); Kit.text(ctx, `LEVEL ${level}`, W / 2, 110, 28, neon, "center", "'Press Start 2P', monospace", 400); ctx.globalAlpha = 1; }
+        }
+        function start() { reset(); state = "play"; holding = false; Kit.hide("start"); Kit.hide("over"); tune([392, 523, 659], 0.07, "triangle"); }
+        function press() {
+            if (state === "ready") return start();
+            if (state === "dead") { if (!$("over").classList.contains("hidden")) start(); return; }
+            holding = true; if (p.onGround) jump();
+        }
+        Kit.onKeys({ Space: "jump", ArrowUp: "jump", KeyW: "jump", Enter: "jump" }, press, () => { holding = false; });
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); press(); });
+        addEventListener("pointerup", () => { holding = false; });
+        $("startBtn").onclick = (e) => { e.stopPropagation(); start(); };
+        $("againBtn").onclick = start;
+        reset(); attempts = 0; game.start();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -73,11 +210,19 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
         <section><h2>About Noametry</h2><p>Noametry is the original game of the hub. Your square slides along a never-ending track full of spikes and blocks, and one well-timed jump is the difference between a new record and starting over. The track speeds up as your score climbs, so every run feels a little more intense than the last.</p></section>
-        <section><h3>How to play</h3><table><tr><td>Space / click / tap</td><td>Jump</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Jump a moment before you reach a spike, not when you are on top of it.</li><li>Watch the shape coming next instead of your own square.</li><li>Short practice runs help you learn the rhythm of each level.</li></ul></section>
+        <section><h3>How to play</h3><table><tr><td>Space / ⬆ / click / tap</td><td>Jump (hold to keep jumping)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Jump a moment before you reach a spike, not when you are on top of it.</li><li>Watch the shape coming next instead of your own square.</li><li>Short practice runs help you learn the rhythm of each level.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Noametry</h3><p>Noametry is a rhythm game in disguise. The track is fixed, so the same spike is always in the same place, and every jump you need happens at the same moment on every run. Instead of reacting to what you see, try to learn the run like a song. After a few attempts you'll notice the patterns: a single spike, then a double, then a block you can land on and run across.</p><p>The most common mistake is jumping too late. Your square needs a little time to rise, so press jump just before the spike, when it's about one square-width away. On long gaps between blocks, hold the jump button down instead of tapping, so your square bounces again the moment it lands. When the track speeds up, keep the same timing in your head but start each jump a fraction earlier.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Focus on surviving the first 20 seconds. Play short runs and notice where you crash most often.</li><li><b>Getting good:</b> Learn to chain jumps across blocks by holding the button, and stop looking at your own square. Watch the next obstacle instead.</li><li><b>Expert:</b> Go for long runs without a single wasted jump. Extra jumps put you in the air at the wrong time when the next spike arrives.</li></ul><h3>Did you know?</h3><p>Noametry is the first game I built for this site, and the whole hub grew out of it. It's inspired by one-button rhythm platformers like Geometry Dash, where every level is designed to be learned by heart and beaten in one perfect run.</p><h3>Questions players ask</h3><h4>Why do I sometimes die on top of a block?</h4><p>You hit the side of the block instead of landing on it. Jump slightly earlier so your square clears the corner.</p><h4>Does it work on a phone?</h4><p>Yes. Tap anywhere on the game to jump, and keep your finger down to keep jumping.</p><h4>How do I restart quickly?</h4><p>Press Space right after you crash to retry instantly. It's the fastest way to practise a hard section.</p><h4>How is my score counted?</h4><p>Your score goes up the longer you survive. Log in and your best run is saved to your profile and the leaderboard.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Breakout/breakout">Brick Smash</a><a href="/DinoGame/dinogame">Dino Run</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
@@ -87,7 +232,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

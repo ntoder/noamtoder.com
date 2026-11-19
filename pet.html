@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Hub Pet · Noam's Game Hub</title>
+    <meta name="description" content="Hatch your own Hub pet. It grows every time you play a game, evolves into Sporty, Brainy, Zappy or Artsy depending on what you play, and wears hats you unlock. Free.">
+    <link rel="canonical" href="https://noamtoder.com/pet">
+    <meta property="og:title" content="Hatch your own Hub pet">
+    <meta property="og:description" content="It grows every time you play a game on Noam's Game Hub.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; width: 100%; }
+        .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+        .home { background: radial-gradient(ellipse at 50% 85%, #2a2160 0%, #171b36 60%); border: 1px solid var(--line); border-radius: 24px; position: relative; overflow: hidden; }
+        #pc { width: 100%; height: auto; display: block; cursor: pointer; touch-action: manipulation; }
+        .acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 16px 16px; justify-content: center; }
+        .acts button, .acts a { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 10px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; text-decoration: none; }
+        .acts button:hover, .acts a:hover { border-color: var(--accent); }
+        .acts .main { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .acts button:disabled { opacity: .5; cursor: default; }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px; margin-bottom: 16px; }
+        .name { display: flex; gap: 10px; align-items: center; }
+        .name h2 { font-size: 30px; font-weight: 800; }
+        .name button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
+        .sub { color: var(--accent-2); font-weight: 800; margin: 2px 0 14px; }
+        .bar { margin: 10px 0; }
+        .bar label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+        .bar .t { height: 12px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+        .bar .f { height: 100%; border-radius: 999px; transition: width .5s; }
+        .hats { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+        .hats button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 8px 6px; cursor: pointer; font: 700 12px Inter, Rubik, sans-serif; display: grid; gap: 4px; justify-items: center; }
+        .hats button.on { border-color: var(--accent-2); background: #2ee6c922; }
+        .hats button:disabled { opacity: .45; cursor: default; }
+        .hats canvas { width: 64px; height: 64px; }
+        .hats small { color: var(--muted); font-weight: 600; font-size: 10px; line-height: 1.2; text-align: center; }
+        .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+        .kinds div { background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 8px 4px; font-size: 12px; color: var(--muted); }
+        .kinds b { display: block; color: var(--text); font-size: 13px; }
+        .kinds canvas { width: 72px; height: 72px; }
+        .how p, .how li { color: #cfd3f5; line-height: 1.6; font-size: 15px; }
+        .how ul { padding-inline-start: 20px; display: grid; gap: 4px; margin-top: 6px; }
+        h3 { font-size: 18px; margin-bottom: 10px; }
+        .bubble { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #fff; color: #0b0d1a; border-radius: 14px; padding: 8px 14px; font: 700 14px Inter, Rubik, sans-serif; max-width: 80%; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
+        .bubble.show { opacity: 1; }
+        @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } .kinds { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>My <span>Hub Pet</span></h1>
+        <a class="back" href="/profile">Profile →</a>
+    </div>
+    <main>
+        <div class="wrap">
+            <div>
+                <div class="home">
+                    <div class="bubble" id="bubble"></div>
+                    <canvas id="pc" width="560" height="440" aria-label="Your pet"></canvas>
+                    <div class="acts">
+                        <button id="patBtn">🤚 Pat</button>
+                        <button id="treatBtn">🍪 Treat</button>
+                        <a class="main" id="playBtn" href="/">🎮 Play a game</a>
+                        <button id="shareBtn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="card">
+                    <div class="name"><h2 id="pname" data-noi18n>Bloop</h2><button id="renameBtn" title="Rename" aria-label="Rename">✏️</button></div>
+                    <div class="sub" id="psub">Egg</div>
+                    <div class="bar"><label><span>⭐ <span id="xpLbl">Growing</span></span><span id="xpNum" data-noi18n></span></label><div class="t"><div class="f" id="xpBar" style="background:linear-gradient(90deg,#7c5cff,#2ee6c9)"></div></div></div>
+                    <div class="bar"><label><span>🍪 Food</span><span id="foodNum" data-noi18n></span></label><div class="t"><div class="f" id="foodBar" style="background:#ffc94d"></div></div></div>
+                    <div class="bar"><label><span>❤️ Love</span><span id="loveNum" data-noi18n></span></label><div class="t"><div class="f" id="loveBar" style="background:#ff4d8d"></div></div></div>
+                </div>
+                <div class="card">
+                    <h3>🎩 Accessories</h3>
+                    <div class="hats" id="hats"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:6px">
+            <h3>✨ What will it become?</h3>
+            <p style="color:var(--muted);font-size:14px;margin-bottom:12px" id="kindNote">When your pet becomes a Teen, it evolves depending on the games you've played most.</p>
+            <div class="kinds" id="kinds"></div>
+        </div>
+
+        <div class="card how">
+            <h3>🐾 How it works</h3>
+            <ul>
+                <li><b>Every game you finish feeds your pet</b> and gives it 10 XP. Your first game hatches the egg.</li>
+                <li>It grows from Baby to Kid, Teen, Grown-up and finally Legend.</li>
+                <li>As a Teen it evolves: play sports for <b>Sporty</b>, puzzles and brain games for <b>Brainy</b>, arcade games for <b>Zappy</b>, or word and creative games for <b>Artsy</b>.</li>
+                <li>Pat it and give it a treat (once an hour) to keep it happy. It gets a bit hungry while you're away, but it never gets sick or goes away.</li>
+                <li>Unlock accessories by earning achievements or by growing your pet.</li>
+                <li>Log in and your pet is saved to your account, so it follows you to other devices.</li>
+            </ul>
+        </div>
+    </main>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam · <a href="/" style="color:inherit">Games</a> · <a href="/about" style="color:inherit">About</a> · </footer>
+
+    <script type="module">
+        import { ready, state, GAMES, LANG, toast, getMyGames } from "/hub.js";
+        import * as P from "/pet.js";
+        import { achievementsFor } from "/progress.js";
+        import { NAMES } from "/i18n.js";
+        const he = LANG === "he", T = (e, h) => (he ? h : e);
+        const $ = (id) => document.getElementById(id);
+        const cv = $("pc"), ctx = cv.getContext("2d");
+        // sharper canvas on high-DPI screens
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        cv.width = 560 * dpr; cv.height = 440 * dpr; ctx.scale(dpr, dpr);
+        const hearts = [], crumbs = [];
+        let fx = {}, t0 = performance.now(), bubbleT = 0;
+
+        function say(text, ms = 2600) { const b = $("bubble"); b.textContent = text; b.classList.add("show"); clearTimeout(bubbleT); bubbleT = setTimeout(() => b.classList.remove("show"), ms); }
+        function frame(now) {
+            const t = (now - t0) / 1000;
+            ctx.clearRect(0, 0, 560, 440);
+            // floor
+            ctx.fillStyle = "#ffffff08"; ctx.beginPath(); ctx.ellipse(280, 392, 250, 40, 0, 0, 7); ctx.fill();
+            P.draw(ctx, 280, 250, 1.9, t, P.getPet(), fx);
+            for (let i = hearts.length - 1; i >= 0; i--) { const h = hearts[i]; h.y -= 1.2; h.a -= 0.012; if (h.a <= 0) { hearts.splice(i, 1); continue; } ctx.globalAlpha = h.a; ctx.font = `${h.s}px serif`; ctx.fillText(h.e, h.x, h.y); ctx.globalAlpha = 1; }
+            for (let i = crumbs.length - 1; i >= 0; i--) { const c = crumbs[i]; c.vy += 0.4; c.x += c.vx; c.y += c.vy; if (c.y > 400) { crumbs.splice(i, 1); continue; } ctx.fillStyle = "#c8873a"; ctx.fillRect(c.x, c.y, 5, 5); }
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
+        function render() {
+            const p = P.getPet(), st = P.stageOf(p), nx = P.nextStage(p), kind = P.kindOf(p), k = P.KINDS[kind];
+            $("pname").textContent = p.name;
+            $("psub").textContent = st.id === "egg" ? T("🥚 Egg · play any game to hatch it", "🥚 ביצה · שחקו משחק כלשהו כדי שתבקע") : `${he ? st.he : st.en}${["teen", "adult", "legend"].includes(st.id) ? " · " + (he ? k.he : k.en) : ""}`;
+            $("psub").style.color = st.id === "egg" ? "var(--muted)" : k.color;
+            const from = st.xp, to = nx ? nx.xp : st.xp;
+            $("xpBar").style.width = nx ? Math.min(100, ((p.xp - from) / (to - from)) * 100) + "%" : "100%";
+            $("xpLbl").textContent = nx ? T(`Next: ${nx.en}`, `הבא: ${nx.he}`) : T("Fully grown!", "גדל לגמרי!");
+            $("xpNum").textContent = nx ? `${p.xp} / ${to} XP` : `${p.xp} XP`;
+            $("foodBar").style.width = p.food + "%"; $("foodNum").textContent = p.food + "%";
+            $("loveBar").style.width = p.love + "%"; $("loveNum").textContent = p.love + "%";
+            const left = 3600000 - (Date.now() - (p.treatAt || 0));
+            $("treatBtn").disabled = left > 0;
+            $("treatBtn").textContent = left > 0 ? T(`🍪 Treat in ${Math.ceil(left / 60000)} min`, `🍪 חטיף בעוד ${Math.ceil(left / 60000)} דק׳`) : T("🍪 Treat", "🍪 חטיף");
+            renderHats();
+        }
+        let ach = new Set();
+        function renderHats() {
+            const p = P.getPet();
+            $("hats").innerHTML = P.HATS.map((h) => {
+                const ok = h.xp <= p.xp || (h.need && ach.has(h.need)) || h.id === "none";
+                return `<button data-h="${h.id}" class="${p.hat === h.id ? "on" : ""}" ${ok ? "" : "disabled"}><canvas width="128" height="128" data-hc="${h.id}"></canvas>${he ? h.he : h.en}${ok ? "" : `<small>${T(`${h.xp} XP or an achievement`, `${h.xp} XP או הישג`)}</small>`}</button>`;
+            }).join("");
+            const demo = { ...p, xp: Math.max(p.xp, 1), food: 90, love: 90 };
+            $("hats").querySelectorAll("[data-hc]").forEach((c) => { const x = c.getContext("2d"); P.draw(x, 64, 74, 0.75, 1, { ...demo, hat: c.dataset.hc }, {}); });
+        }
+        function renderKinds() {
+            const p = P.getPet(), mine = P.kindOf(p), grown = !["egg", "baby", "kid"].includes(P.stageOf(p).id);
+            $("kinds").innerHTML = ["sporty", "brainy", "zappy", "artsy"].map((k) => `<div style="${grown && mine === k ? "border-color:" + P.KINDS[k].color : ""}"><canvas width="144" height="144" data-k="${k}"></canvas><b>${he ? P.KINDS[k].he : P.KINDS[k].en}</b>${{ sporty: T("Sports games", "משחקי ספורט"), brainy: T("Puzzles & brain games", "פאזלים וחשיבה"), zappy: T("Arcade games", "משחקי ארקייד"), artsy: T("Word & creative", "מילים ויצירה") }[k]}</div>`).join("");
+            $("kinds").querySelectorAll("[data-k]").forEach((c) => { const x = c.getContext("2d"); P.draw(x, 72, 80, 0.8, 1, { xp: 600, kind: c.dataset.k, food: 90, love: 90, hat: "none" }, {}); });
+            if (grown) $("kindNote").textContent = T(`Your pet evolved into a ${P.KINDS[mine].en}, because of the games you play most.`, `חיית המחמד שלכם התפתחה ל${P.KINDS[mine].he}, בגלל המשחקים שאתם משחקים הכי הרבה.`);
+        }
+
+        cv.addEventListener("pointerdown", (e) => {
+            const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * 560 / r.width, y = (e.clientY - r.top) * 440 / r.height;
+            if (P.stageOf().id === "egg") { say(T("Play a game to hatch me! 🥚", "שחקו משחק כדי שאבקע! 🥚")); return; }
+            P.pat(); fx.pat = true; fx.jump = -12; setTimeout(() => { fx.pat = false; fx.jump = 0; }, 350);
+            for (let i = 0; i < 3; i++) hearts.push({ x: x - 10 + Math.random() * 30, y, a: 1, e: "❤️", s: 18 + Math.random() * 12 });
+            render();
+        });
+        $("patBtn").onclick = () => cv.dispatchEvent(new PointerEvent("pointerdown", { clientX: cv.getBoundingClientRect().left + cv.getBoundingClientRect().width / 2, clientY: cv.getBoundingClientRect().top + cv.getBoundingClientRect().height * 0.45 }));
+        $("treatBtn").onclick = () => {
+            if (P.stageOf().id === "egg") { say(T("Eggs don't eat yet! Play a game to hatch me.", "ביצים עוד לא אוכלות! שחקו משחק כדי שאבקע.")); return; }
+            if (P.treat()) { for (let i = 0; i < 14; i++) crumbs.push({ x: 280, y: 230, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 6 }); say(T("Yum! Thank you! 😋", "יאמי! תודה! 😋")); }
+            render();
+        };
+        $("renameBtn").onclick = () => {
+            const h = $("pname"); h.contentEditable = "true"; h.focus();
+            document.getSelection().selectAllChildren(h);
+            const done = () => { h.contentEditable = "false"; P.rename(h.textContent); render(); };
+            h.onblur = done; h.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); h.blur(); } };
+        };
+        $("hats").addEventListener("click", (e) => { const b = e.target.closest("[data-h]"); if (!b || b.disabled) return; P.wear(b.dataset.h); render(); say(T("Do I look good? ✨", "אני נראה טוב? ✨")); });
+        $("shareBtn").onclick = async () => {
+            const blob = await P.petCard();
+            const file = new File([blob], "my-hub-pet.png", { type: "image/png" });
+            const text = T(`Meet ${P.getPet().name}, my Hub pet! Hatch your own:`, `תכירו את ${P.getPet().name}, חיית המחמד שלי! בקעו אחת משלכם:`);
+            if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], text, url: "https://noamtoder.com/pet" }); return; } catch (x) { return; } }
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "my-hub-pet.png"; a.click();
+            toast(T("🖼️ Picture saved. Send it to a friend!", "🖼️ התמונה נשמרה. שלחו לחבר!"));
+        };
+        // suggest a game that fits the pet's kind
+        function suggest() {
+            const kind = P.kindOf(), tags = kind === "blob" ? ["arcade", "puzzle", "sports"] : P.KINDS[kind].tags;
+            const list = Object.entries(GAMES).filter(([id, g]) => g.tags.some((t) => tags.includes(t)));
+            const [id, g] = list[Math.floor(Math.random() * list.length)];
+            $("playBtn").href = g.path; $("playBtn").textContent = T(`🎮 Play ${g.name}`, `🎮 שחקו ${NAMES[g.name] || g.name}`);
+        }
+        render(); renderKinds(); suggest();
+        const st = P.stageOf().id, md = P.mood();
+        setTimeout(() => say(st === "egg" ? T("Play any game to hatch me! 🥚", "שחקו משחק כלשהו כדי שאבקע! 🥚") : md === "sad" ? T("I missed you! I'm hungry… 🥺", "התגעגעתי! אני רעב… 🥺") : T(`Hi! Let's play ${$("playBtn").textContent.replace(/^🎮 (Play |שחקו )/, "")}! 🎮`, `היי! בואו נשחק ${$("playBtn").textContent.replace(/^🎮 (Play |שחקו )/, "")}! 🎮`), 3500), 600);
+        await ready;
+        if (state.user) {
+            try { const g = await getMyGames(state.user.uid); ach = new Set(achievementsFor(g, state.profile).filter((a) => a.done).map((a) => a.id)); } catch (e) {}
+            render(); renderKinds();
+        }
+        setInterval(render, 30000);
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

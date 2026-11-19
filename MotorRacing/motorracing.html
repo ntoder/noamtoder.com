@@ -1,45 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Ride a motorbike down a busy road. Free to play in your browser on Noam's Game Hub.">
-    <title>Motorcycle Racing Game</title>
-    <link rel="stylesheet" href="motorracing.css">
+    <meta name="description" content="Race a motorbike along a winding road at sunset. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Motor Racing · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>Motorcycle Racing</h1>
-        <div class="info">
-            <div class="score-board">
-                <p>Score: <span id="score">0</span></p>
-                <p>Speed: <span id="speed">0</span> km/h</p>
-                <p>High Score: <span id="highScore">0</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Motor <span>Racing</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="time">40</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="900" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Motor Racing</h2>
+                <p id="startText">⬆ or Space to speed up, ⬅ ➡ to steer, ⬇ to brake.<br>Weave through the traffic and reach each checkpoint before the clock hits zero.<br>Driving on the grass slows you down!</p>
+                <button class="btn" id="startBtn">▶ Race</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time Up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Race again</button>
+            </div></div>
+            
             </div>
-            <button id="startBtn" class="start-btn">Start Game</button>
-        </div>
-        <canvas id="gameCanvas" width="400" height="600"></canvas>
-        <div class="controls">
-            <p>Arrow Keys to Steer</p>
-            <p>Space to Accelerate</p>
-            <p id="gameStatus"></p>
+            
         </div>
     </div>
-    <script src="motorracing.js"></script>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="down">⬇</button><button data-k="gas">⬆</button><button data-k="right">➡</button></div>
+    <p class="hint">Curves push you to the outside, so steer into them. Each checkpoint gives you a little less extra time.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "raceBest";
+        Kit.stat("best", Kit.best(BEST));
+        const SEG = 200, ROAD = 2000, LANES = 3, CAM_H = 1000, DEPTH = 1 / Math.tan((100 / 2) * Math.PI / 180), DRAW = 160, MAX = SEG / (1 / 60) * 1.1;
+        const CHECK = 700;
+        let segs = [], cars = [], pos, speed, px, score, time, state = "ready", t = 0, nextCheck, ext, crashT, msg = "", msgT = 0, lap, engine = 0, skyOff = 0;
+
+        function ease(a, b, p) { return a + (b - a) * ((-Math.cos(p * Math.PI) / 2) + 0.5); }
+        function lastY() { return segs.length ? segs[segs.length - 1].p2.y : 0; }
+        function add(curve, y) {
+            const n = segs.length;
+            segs.push({ i: n, p1: { x: 0, y: lastY(), z: n * SEG }, p2: { x: 0, y, z: (n + 1) * SEG }, curve, cars: [], dark: Math.floor(n / 3) % 2, sprites: [] });
+        }
+        function road(enter, hold, leave, curve, hill) {
+            const y0 = lastY(), y1 = y0 + hill * SEG, total = enter + hold + leave;
+            for (let n = 0; n < enter; n++) add(ease(0, curve, n / enter), ease(y0, y1, n / total));
+            for (let n = 0; n < hold; n++) add(curve, ease(y0, y1, (enter + n) / total));
+            for (let n = 0; n < leave; n++) add(ease(curve, 0, n / leave), ease(y0, y1, (enter + hold + n) / total));
+        }
+        function build() {
+            segs = [];
+            road(30, 30, 30, 0, 0);
+            const plan = [[50, 50, 50, 3, 20], [40, 60, 40, -4, -30], [30, 40, 30, 0, 40], [50, 50, 50, -2, 0], [40, 40, 40, 5, -40], [60, 60, 60, 0, 60],
+                [30, 30, 30, -5, 0], [40, 80, 40, 2, -60], [30, 30, 30, 0, 0], [50, 50, 50, -3, 30], [40, 40, 40, 4, -20], [50, 50, 50, 0, -10]];
+            for (const p of plan) road(...p);
+            road(40, 40, 40, 0, -lastY() / SEG);          // come back to ground level so the loop is smooth
+            // roadside things
+            segs.forEach((s, i) => {
+                if (i % 12 === 0) s.sprites.push({ off: -1.5 - Math.random(), k: Kit.pick(["tree", "tree", "pole"]) });
+                if (i % 16 === 6) s.sprites.push({ off: 1.4 + Math.random(), k: Kit.pick(["tree", "bush", "pole"]) });
+            });
+        }
+        const LEN = () => segs.length * SEG;
+        function segAt(z) { return segs[Math.floor(z / SEG) % segs.length]; }
+        function spawnCars(n) {
+            cars = [];
+            for (let i = 0; i < n; i++) {
+                const z = 2000 + Math.random() * (LEN() - 4000);
+                cars.push({ off: Kit.pick([-0.66, 0, 0.66]) + Kit.rand(-0.1, 0.1), z, speed: MAX * Kit.rand(0.25, 0.55), col: Kit.pick(["#ff4d8d", "#4da3ff", "#ffc94d", "#a15cff", "#eef0ff", "#2ee6a0"]), truck: Math.random() < 0.2 });
+            }
+        }
+        function reset() {
+            build(); pos = 0; speed = 0; px = 0; score = 0; time = 40; nextCheck = CHECK; ext = 25; crashT = 0; lap = 1; msg = "GO!"; msgT = 1.2;
+            spawnCars(26); Kit.stat("score", 0); Kit.stat("time", 40);
+        }
+        function project(p, cx, cy, cz, loopZ) {
+            const z = p.z + loopZ - cz; const sc = DEPTH / z;
+            return { x: Math.round(W / 2 + sc * (p.x - cx) * W / 2), y: Math.round(H / 2 - sc * (p.y - cy) * H / 2), w: Math.round(sc * ROAD * W / 2), sc };
+        }
+        function update(dt) {
+            const seg = segAt(pos + 400), pct = speed / MAX;
+            const gas = Kit.keys.has("up") || Kit.keys.has("gas"), brake = Kit.keys.has("down");
+            const steer = (Kit.keys.has("left") ? -1 : 0) + (Kit.keys.has("right") ? 1 : 0);
+            px += steer * dt * 2.2 * Math.max(0.25, pct);
+            px -= dt * 2.2 * pct * seg.curve * 0.32;                // the curve pushes you outwards
+            if (gas) speed += MAX / 5 * dt; else if (brake) speed -= MAX * dt; else speed -= MAX / 5 * dt;
+            if (Math.abs(px) > 1 && speed > MAX / 4) { speed -= MAX * 0.9 * dt; if (Math.random() < 0.3) beep(90, 0.04, "sawtooth", 0.02); }
+            px = Math.max(-2.2, Math.min(2.2, px));
+            speed = Math.max(0, Math.min(MAX, speed));
+            for (const s of seg.sprites) if (Math.abs(px - s.off) < 0.35 && speed > MAX / 5) { speed = MAX / 6; crash(); }
+            pos = (pos + speed * dt) % LEN();
+            // traffic
+            const playerZ = pos + CAM_H * DEPTH * 1.0 + 200;
+            for (const c of cars) {
+                c.z = (c.z + c.speed * dt) % LEN();
+                const d = ((c.z - playerZ) % LEN() + LEN()) % LEN();
+                if (d < 260 && speed > c.speed && Math.abs(px - c.off) < (c.truck ? 0.5 : 0.42)) { speed = c.speed * 0.5; c.z = (playerZ + 300) % LEN(); crash(); }
+                if (!c.passed && d > LEN() - 300) { c.passed = true; score += 25; }
+                if (d > 400 && d < LEN() - 400) c.passed = false;
+            }
+            score += speed * dt / 320; Kit.stat("score", Math.floor(score));
+            nextCheck -= speed * dt / SEG;
+            if (nextCheck <= 0) {
+                nextCheck = CHECK; time += ext; msg = `CHECKPOINT +${ext}s`; msgT = 1.6; ext = Math.max(10, ext - 3); lap++;
+                tune([784, 988, 1175], 0.08, "square", 0.05);
+                if (cars.length < 60) for (let i = 0; i < 4; i++) cars.push({ off: Kit.pick([-0.66, 0, 0.66]), z: (pos + 6000 + Math.random() * 20000) % LEN(), speed: MAX * Kit.rand(0.25, 0.6), col: Kit.pick(["#ff4d8d", "#4da3ff", "#ffc94d"]), truck: Math.random() < 0.25 });
+            }
+            time -= dt; Kit.stat("time", Math.max(0, Math.ceil(time)));
+            if (time <= 0) end();
+            if (crashT > 0) crashT -= dt;
+            skyOff += seg.curve * pct * dt * 30;
+            // engine hum
+            engine -= dt; if (engine <= 0 && speed > 10) { engine = 0.09; beep(60 + pct * 140, 0.08, "sawtooth", 0.012); }
+        }
+        function crash() { if (crashT > 0) return; crashT = 0.8; beep(120, 0.3, "square", 0.07, -60); }
+        function end() {
+            state = "dead"; time = 0;
+            const s = Math.floor(score), best = Kit.setBest(BEST, s); Kit.save(s);
+            $("overText").innerHTML = `${s.toLocaleString()} points · ${lap - 1} checkpoints<br>Best ${best.toLocaleString()}`;
+            Kit.show("over");
+        }
+        function poly(c, x1, y1, w1, x2, y2, w2) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x1 - w1, y1); ctx.lineTo(x2 - w2, y2); ctx.lineTo(x2 + w2, y2); ctx.lineTo(x1 + w1, y1); ctx.fill(); }
+        function draw() {
+            // sky + mountains
+            const g = ctx.createLinearGradient(0, 0, 0, H / 2); g.addColorStop(0, "#1b1640"); g.addColorStop(1, "#ff8a5c");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(W / 2 - skyOff * 0.3, H / 2 - 60, 46, 0, 7); ctx.fill();
+            ctx.fillStyle = "#3a2a7a";
+            for (let i = -1; i < 6; i++) { const x = ((i * 220 - skyOff) % 1100 + 1100) % 1100 - 200; ctx.beginPath(); ctx.moveTo(x, H / 2 + 10); ctx.lineTo(x + 110, H / 2 - 70 - (i % 3) * 20); ctx.lineTo(x + 240, H / 2 + 10); ctx.fill(); }
+            const base = segAt(pos), bpct = (pos % SEG) / SEG, playerY = ease(base.p1.y, base.p2.y, bpct);
+            let x = 0, dx = -base.curve * bpct, maxy = H;
+            const camY = playerY + CAM_H, list = [];
+            for (let n = 0; n < DRAW; n++) {
+                const s = segs[(base.i + n) % segs.length], loop = s.i < base.i ? LEN() : 0;
+                const a = project(s.p1, px * ROAD - x, camY, pos, loop), b = project(s.p2, px * ROAD - x - dx, camY, pos, loop);
+                x += dx; dx += s.curve;
+                s.clip = maxy; s.a = a; s.b = b;
+                list.push(s);
+                if (s.p1.z + loop - pos <= DEPTH * 10 || b.y >= maxy || b.y >= a.y) continue;
+                const fog = Math.min(1, n / DRAW);
+                ctx.fillStyle = s.dark ? "#1f7a4a" : "#238c55"; ctx.fillRect(0, b.y, W, a.y - b.y);
+                poly(s.dark ? "#eef0ff" : "#ff4d8d", a.x, a.y, a.w * 1.15, b.x, b.y, b.w * 1.15);
+                poly(s.dark ? "#3a3f5c" : "#40465f", a.x, a.y, a.w, b.x, b.y, b.w);
+                if (s.dark) for (let l = 1; l < LANES; l++) { const lx1 = a.x - a.w + (2 * a.w * l) / LANES, lx2 = b.x - b.w + (2 * b.w * l) / LANES; poly("#eef0ffcc", lx1, a.y, a.w / 60, lx2, b.y, b.w / 60); }
+                if (fog > 0.4) { ctx.fillStyle = `rgba(255,138,92,${(fog - 0.4) * 0.5})`; ctx.fillRect(0, b.y, W, a.y - b.y); }
+                maxy = b.y;
+            }
+            // sprites back to front
+            const playerZ = pos + CAM_H * DEPTH + 200;
+            for (let n = list.length - 1; n > 0; n--) {
+                const s = list[n]; if (!s.a || s.a.sc <= 0) continue;
+                for (const sp of s.sprites) sprite(sp.k, s.a.x + s.a.w * sp.off, s.a.y, s.a.sc, s.clip);
+                for (const c of cars) if (Math.floor(c.z / SEG) === s.i) {
+                    const p = (c.z % SEG) / SEG, sx = s.a.x + (s.b.x - s.a.x) * p + (s.a.w + (s.b.w - s.a.w) * p) * c.off, sy = s.a.y + (s.b.y - s.a.y) * p, sc = s.a.sc + (s.b.sc - s.a.sc) * p;
+                    car(c, sx, sy, sc, s.clip);
+                }
+            }
+            bike();
+            // HUD
+            const kmh = Math.round(speed / MAX * 260);
+            ctx.fillStyle = "#0b0d1aaa"; Kit.rr(ctx, 16, H - 70, 170, 54, 12); ctx.fill();
+            Kit.text(ctx, kmh, 70, H - 43, 30, "#ffffff", "center", "'Press Start 2P', monospace", 400); Kit.text(ctx, "km/h", 150, H - 38, 14, "#9aa0c8");
+            ctx.fillStyle = "#ffffff22"; Kit.rr(ctx, W - 200, 18, 180, 10, 5); ctx.fill();
+            ctx.fillStyle = "#2ee6c9"; Kit.rr(ctx, W - 200, 18, 180 * (1 - nextCheck / CHECK), 10, 5); ctx.fill();
+            Kit.text(ctx, "next checkpoint", W - 110, 40, 11, "#ffffffcc");
+            if (time < 10 && state === "play" && Math.floor(t * 4) % 2) Kit.text(ctx, Math.ceil(time), W / 2, 60, 40, "#ff4d8d", "center", "'Press Start 2P', monospace", 400);
+            if (msgT > 0) { ctx.globalAlpha = Math.min(1, msgT); Kit.text(ctx, msg, W / 2, H / 3, 26, "#ffc94d", "center", "'Press Start 2P', monospace", 400); ctx.globalAlpha = 1; }
+            if (crashT > 0.5) { ctx.fillStyle = `rgba(255,77,141,${(crashT - 0.5)})`; ctx.fillRect(0, 0, W, H); }
+        }
+        function sprite(k, x, y, sc, clip) {
+            const s = sc * W / 2 * 3.2; if (s < 0.01 || y - s * 380 > clip) return;
+            ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, clip); ctx.clip();
+            if (k === "tree") { ctx.fillStyle = "#5a3a20"; ctx.fillRect(x - s * 20, y - s * 120, s * 40, s * 120); ctx.fillStyle = "#1b5e3a"; ctx.beginPath(); ctx.moveTo(x - s * 110, y - s * 100); ctx.lineTo(x, y - s * 380); ctx.lineTo(x + s * 110, y - s * 100); ctx.fill(); }
+            else if (k === "bush") { ctx.fillStyle = "#2a8a4a"; ctx.beginPath(); ctx.ellipse(x, y - s * 40, s * 90, s * 50, 0, 0, 7); ctx.fill(); }
+            else { ctx.fillStyle = "#9aa0c8"; ctx.fillRect(x - s * 8, y - s * 300, s * 16, s * 300); ctx.fillStyle = "#ffc94d"; ctx.fillRect(x - s * 30, y - s * 310, s * 60, s * 20); }
+            ctx.restore();
+        }
+        function car(c, x, y, sc, clip) {
+            const s = sc * W / 2 * 3.2, w = (c.truck ? 260 : 220) * s, h = (c.truck ? 260 : 130) * s; if (w < 1) return;
+            ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, clip); ctx.clip();
+            ctx.fillStyle = "#00000055"; ctx.fillRect(x - w / 2, y - h * 0.1, w, h * 0.15);
+            ctx.fillStyle = c.truck ? "#c8ccdf" : c.col; Kit.rr(ctx, x - w / 2, y - h, w, h * 0.9, Math.max(1, 14 * s)); ctx.fill();
+            if (!c.truck) { ctx.fillStyle = "#0b0d1acc"; Kit.rr(ctx, x - w * 0.36, y - h * 0.95, w * 0.72, h * 0.32, Math.max(1, 8 * s)); ctx.fill(); }
+            else { ctx.fillStyle = c.col; ctx.fillRect(x - w / 2, y - h * 0.25, w, h * 0.12); }
+            ctx.fillStyle = "#ff2a2a"; ctx.fillRect(x - w * 0.45, y - h * 0.42, w * 0.14, h * 0.1); ctx.fillRect(x + w * 0.31, y - h * 0.42, w * 0.14, h * 0.1);
+            ctx.fillStyle = "#111"; ctx.fillRect(x - w * 0.45, y - h * 0.12, w * 0.16, h * 0.14); ctx.fillRect(x + w * 0.29, y - h * 0.12, w * 0.16, h * 0.14);
+            ctx.restore();
+        }
+        function bike() {
+            const steer = (Kit.keys.has("left") ? -1 : 0) + (Kit.keys.has("right") ? 1 : 0), bob = speed > 0 ? Math.sin(t * 40) * 1.2 : 0;
+            const x = W / 2, y = H - 30 + bob, col = Kit.skin("motorracing", "#7c5cff");
+            ctx.save(); ctx.translate(x, y); ctx.rotate(steer * 0.18 + (crashT > 0 ? Math.sin(t * 50) * 0.15 : 0));
+            ctx.fillStyle = "#00000066"; ctx.beginPath(); ctx.ellipse(0, 6, 46, 10, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#111"; Kit.rr(ctx, -11, -36, 22, 44, 8); ctx.fill();
+            ctx.fillStyle = col; Kit.rr(ctx, -26, -70, 52, 44, 14); ctx.fill();
+            ctx.fillStyle = "#ff2a2a"; ctx.fillRect(-16, -38, 32, 6);
+            ctx.fillStyle = "#2b3160"; Kit.rr(ctx, -20, -112, 40, 46, 14); ctx.fill();
+            ctx.fillStyle = "#eef0ff"; ctx.beginPath(); ctx.arc(0, -122, 18, 0, 7); ctx.fill();
+            ctx.fillStyle = col; ctx.fillRect(-18, -128, 36, 8);
+            ctx.fillStyle = "#9aa0c8"; ctx.fillRect(-40, -96, 80, 6);
+            ctx.restore();
+        }
+        const game = Kit.loop((dt) => {
+            t += dt; if (msgT > 0) msgT -= dt;
+            if (state === "play") update(dt);
+            draw();
+        });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([392, 392, 784], 0.25, "square", 0.05); }
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", Space: "gas", ArrowDown: "down", KeyS: "down", Enter: "enter" }, (a) => {
+            if ((a === "enter" || a === "gas") && state !== "play" && (state === "ready" || !$("over").classList.contains("hidden"))) start();
+        });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); msgT = 0; game.start();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -52,12 +246,20 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
-        <section><h2>About Motor Racing</h2><p>Ride a motorbike down a busy road. Speed up, weave between cars and see how far you can get before you crash. The faster you go, the more points you earn, but there's less time to react.</p></section>
-        <section><h3>How to play</h3><table><tr><td>Arrow keys</td><td>Steer</td></tr><tr><td>Space</td><td>Accelerate</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Speed up on empty stretches and slow down in traffic.</li><li>Stay near the middle of the road so you can dodge either way.</li><li>Watch the cars two lanes ahead, not just the next one.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/Soccer/soccer">Soccer</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Memory/memory">Memory Match</a><a href="/">All games →</a></div></section>
+        <section><h2>About Motor Racing</h2><p>Race a motorbike along a winding road at sunset. Speed through curves and over hills, weave between cars and trucks, and reach each checkpoint before the clock runs out. The faster you ride, the more points you earn, but crashing or riding on the grass slows you right down.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ / Space</td><td>Speed up</td></tr><tr><td>⬅ ➡</td><td>Steer</td></tr><tr><td>⬇</td><td>Brake</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Curves push you outwards, so steer into every bend.</li><li>Stay on the road. The grass slows you down a lot.</li><li>Each checkpoint gives a little less extra time, so keep your speed up.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Motor Racing</h3><p>Motor Racing is a race against the clock, so speed is everything, but crashing costs you far more time than slowing down a little. The road pushes you outward on every bend, so start steering into a curve as soon as you see it coming, not when you're already in it. Stay on the tarmac: the grass slows you down a lot and wastes the time you just gained.</p><p>Traffic is the other danger. Cars and trucks move slower than you, so you always come up behind them. Pick the side you'll pass on early, and avoid weaving between two vehicles side by side. Hills hide what's coming, so ease off slightly as you crest one. Each checkpoint gives you a little less extra time than the last, so a clean, steady run beats a fast but messy one.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Keep the bike on the road and reach the first few checkpoints.</li><li><b>Getting good:</b> Steer into bends early and pass traffic without braking.</li><li><b>Expert:</b> Hold top speed for whole sections by planning your line through curves and around traffic.</li></ul><h3>Did you know?</h3><p>Racing games with a road that curves toward the horizon, like this one, became popular in the 1980s. Sega's Hang-On (1985) let players lean a real motorbike-shaped cabinet to steer, and Out Run (1986) became one of the most famous driving games of its time.</p><h3>Questions players ask</h3><h4>How do I brake?</h4><p>Press Down. Most of the time it's better to steer than to brake.</p><h4>Why does my time run out?</h4><p>You need to reach each checkpoint before the timer ends. Each checkpoint adds more time.</p><h4>Does riding on the grass matter?</h4><p>Yes. It slows you down a lot, so stay on the road.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Soccer/soccer">Soccer</a><a href="/FourInARow/fourinarow">Four in a Row</a><a href="/MoleMash/molemash">Mole Mash</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
@@ -66,7 +268,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

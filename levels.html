@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Levels · Noametry levels made by players · Noam's Game Hub</title>
+    <meta name="description" content="Play Noametry levels built by other players, like your favourites, and make your own with the free Level Maker.">
+    <link rel="canonical" href="https://noamtoder.com/levels">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; width: 100%; }
+        .hero { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
+        .hero h2 { font-size: clamp(26px, 5vw, 38px); font-weight: 800; }
+        .hero p { color: var(--muted); }
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .tabs button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 999px; padding: 8px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; }
+        .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+        .lv { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; color: var(--text); text-decoration: none; display: flex; flex-direction: column; transition: transform .15s, border-color .15s; }
+        .lv:hover { transform: translateY(-3px); border-color: var(--accent); }
+        .lv canvas { width: 100%; height: auto; display: block; background: #0b0d1a; }
+        .lv .b { padding: 12px 14px; display: grid; gap: 4px; }
+        .lv b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lv span { color: var(--muted); font-size: 13px; }
+        .lv .st { display: flex; gap: 10px; font-size: 13px; color: var(--muted); font-weight: 700; }
+        .lv .del { margin-top: 6px; background: none; border: 1px solid #ff4d8d66; color: #ff8db4; border-radius: 8px; padding: 4px 8px; font: 700 12px Inter, sans-serif; cursor: pointer; justify-self: start; }
+        a.btn { text-decoration: none; }
+        .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+        .feat { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; background: linear-gradient(120deg, #7c5cff33, #2ee6c922); border: 1px solid var(--accent); border-radius: 20px; padding: 16px; margin-bottom: 22px; align-items: center; }
+        .feat canvas { width: 100%; border-radius: 12px; display: block; }
+        .feat small { color: var(--accent-2); font-weight: 800; letter-spacing: 1px; }
+        .feat h3 { font-size: 26px; margin: 4px 0; }
+        .feat p { color: var(--muted); margin-bottom: 12px; }
+        @media (max-width: 700px) { .feat { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Player <span>Levels</span></h1>
+        <a class="back" href="/maker">✏️ Make one →</a>
+    </div>
+    <main>
+        <div class="hero">
+            <div><h2>🛠️ Levels made by players</h2><p>Noametry levels built with the Level Maker. Beat them, like your favourites, then make your own.</p></div>
+            <a class="btn" href="/maker">✏️ Make a level</a>
+        </div>
+        <div class="feat hidden" id="feat"></div>
+        <div class="tabs" id="tabs">
+            <button data-s="new" class="on">🆕 Newest</button>
+            <button data-s="plays">🔥 Most played</button>
+            <button data-s="likes">❤️ Most liked</button>
+            <button data-s="mine">👤 My levels</button>
+        </div>
+        <div class="grid" id="grid"><p class="empty">Loading levels…</p></div>
+    </main>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam · <a href="/" style="color:inherit">Games</a> · <a href="/maker" style="color:inherit">Level Maker</a> · </footer>
+    <script type="module">
+        import { ready, state, LANG, toast } from "/hub.js";
+        import { db } from "/firebase-config.js";
+        import { collection, query, orderBy, where, limit, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        const he = LANG === "he", tr = (e, h) => (he ? h : e), $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const THEMES = [["#2a1b6b", "#7c5cff"], ["#0f3d4a", "#2ee6c9"], ["#4a1240", "#ff4d8d"], ["#3d2a08", "#ffc94d"], ["#0e2a52", "#4da3ff"], ["#123d1c", "#2ee6a0"]];
+        // a small picture of the first part of a level
+        function preview(c, code) {
+            const [, , th, len, cells] = String(code).split("~"), [dark, neon] = THEMES[(+th || 0) % 6];
+            const x = c.getContext("2d"), W = c.width, H = c.height, T = 12, G = H - 18;
+            const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, dark); g.addColorStop(1, "#0b0d1a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+            x.fillStyle = neon; x.fillRect(0, G, W, 2);
+            for (let i = 0; i + 4 <= (cells || "").length; i += 4) {
+                const cx = parseInt(cells.slice(i, i + 2), 36) * T - 40, cy = G - (+cells[i + 2] + 1) * T, t = cells[i + 3];
+                if (cx > W) continue;
+                if (t === "s") { x.fillStyle = "#fff"; x.beginPath(); x.moveTo(cx, cy + T); x.lineTo(cx + T / 2, cy); x.lineTo(cx + T, cy + T); x.fill(); }
+                else if (t === "b") { x.strokeStyle = neon; x.lineWidth = 1.5; x.strokeRect(cx + 0.5, cy + 0.5, T - 1, T - 1); }
+                else { x.fillStyle = "#ffc94d"; x.fillRect(cx, cy + T - 3, T, 3); }
+            }
+            x.fillStyle = neon; x.fillRect(24, G - T, T, T);
+        }
+        function card(l) {
+            const own = state.user && l.uid === state.user.uid, admin = state.profile && state.profile.role === "admin";
+            return `<a class="lv" href="/maker?l=${encodeURIComponent(l.id)}"><canvas width="520" height="150" data-code="${esc(l.code)}"></canvas>
+                <div class="b"><b data-noi18n>${esc(l.title)}</b><span data-noi18n>${esc(l.avatar || "")} ${esc(l.author)}</span>
+                <div class="st"><span>▶ ${l.plays || 0}</span><span>🏁 ${l.clears || 0}</span><span>❤️ ${l.likes || 0}</span></div>
+                ${own || admin ? `<button class="del" data-del="${esc(l.id)}">${tr("Delete", "מחיקה")}</button>` : ""}</div></a>`;
+        }
+        let sort = "new";
+        async function load() {
+            $("grid").innerHTML = `<p class="empty">${tr("Loading levels…", "טוען שלבים…")}</p>`;
+            await ready;
+            try {
+                const col = collection(db, "levels");
+                let q;
+                if (sort === "mine") {
+                    if (!state.user) { $("grid").innerHTML = `<p class="empty"><a href="/login?next=/levels" style="color:var(--accent-2)">${tr("Log in", "התחברו")}</a> ${tr("to see the levels you made.", "כדי לראות את השלבים שלכם.")}</p>`; return; }
+                    q = query(col, where("uid", "==", state.user.uid), limit(60));
+                } else q = query(col, orderBy(sort === "new" ? "createdAt" : sort, "desc"), limit(60));
+                const rows = (await getDocs(q)).docs.map((d) => ({ id: d.id, ...d.data() }));
+                if (sort === "mine") rows.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+                $("grid").innerHTML = rows.length ? rows.map(card).join("") : `<p class="empty">${sort === "mine" ? tr("You haven't published a level yet.", "עוד לא פרסמתם שלב.") : tr("No levels yet. Be the first to make one!", "עדיין אין שלבים. היו הראשונים!")} <a href="/maker" style="color:var(--accent-2)">${tr("Make a level →", "צרו שלב ←")}</a></p>`;
+                $("grid").querySelectorAll("canvas[data-code]").forEach((c) => preview(c, c.dataset.code));
+                if (sort === "new" && rows.length && !$("feat").dataset.done) featured(rows);
+            } catch (e) { console.warn(e); $("grid").innerHTML = `<p class="empty">${tr("Levels are unavailable right now.", "השלבים לא זמינים כרגע.")}</p>`; }
+        }
+        // level of the day: the same for everyone today, picked from levels other players have beaten
+        function featured(rows) {
+            const good = rows.filter((r) => (r.clears || 0) > 0); const pool = good.length ? good : rows;
+            const d = new Date(), n = d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate();
+            const l = pool[n % pool.length];
+            $("feat").dataset.done = 1;
+            $("feat").innerHTML = `<canvas width="700" height="180" data-code="${esc(l.code)}"></canvas><div><small>${tr("⭐ LEVEL OF THE DAY", "⭐ שלב היום")}</small><h3 data-noi18n>${esc(l.title)}</h3><p data-noi18n>${tr("by", "מאת")} ${esc(l.author)} · ▶ ${l.plays || 0} · ❤️ ${l.likes || 0}</p><a class="btn" href="/maker?l=${encodeURIComponent(l.id)}">▶ ${tr("Play it", "שחקו")}</a></div>`;
+            preview($("feat").querySelector("canvas"), l.code);
+            $("feat").classList.remove("hidden");
+        }
+        $("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-s]"); if (!b) return; sort = b.dataset.s; document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b)); load(); });
+        $("grid").addEventListener("click", async (e) => {
+            const b = e.target.closest("[data-del]"); if (!b) return;
+            e.preventDefault();
+            if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = tr("Sure?", "בטוח?"); setTimeout(() => { delete b.dataset.armed; b.textContent = tr("Delete", "מחיקה"); }, 2500); return; }
+            try { await deleteDoc(doc(db, "levels", b.dataset.del)); b.closest(".lv").remove(); toast(tr("Level deleted", "השלב נמחק")); } catch (x) { toast(tr("Couldn't delete it.", "לא הצלחנו למחוק.")); }
+        });
+        load();
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

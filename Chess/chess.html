@@ -1,41 +1,331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A full game of chess for two players on the same screen. Free to play in your browser on Noam's Game Hub.">
-    <title>Chess Game</title>
-    <link rel="stylesheet" href="chess.css">
-    <link rel="shortcut icon" href="/favicon.png" type="image/x-icon">
+    <meta name="description" content="Play a full game of chess against the computer on easy, medium or hard, or against a friend on the same screen. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Chess · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>Chess</h1>
-        <div class="info-panel">
-            <div class="turn-info">
-                <p>Current Turn: <span id="currentTurn">White</span></p>
-                <p>Status: <span id="gameStatus">Game In Progress</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Chess</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Chess</h2>
+                <p id="startText"><span class="seg" id="mode"><button data-m="ai1">🤖 Easy</button><button data-m="ai2">🤖 Medium</button><button data-m="ai3">🤖 Hard</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span><span class="seg" id="side"><button data-s="w">Play White</button><button data-s="b">Play Black</button><button data-s="r">Random</button></span>Click a piece to see its moves, then click where to go.</p>
+                <button class="btn" id="startBtn">▶ Start game</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ New game</button>
+            </div></div>
+            <div class="overlay hidden" id="promo"><div><h2>Promote to</h2><div class="seg" style="font-size:30px"><button data-p="q" style="font-size:28px">♛</button><button data-p="r" style="font-size:28px">♜</button><button data-p="b" style="font-size:28px">♝</button><button data-p="n" style="font-size:28px">♞</button></div></div></div>
             </div>
-            <div class="controls">
-                <button id="resetBtn" onclick="resetGame()">New Game</button>
-                <button id="undoBtn" onclick="undoMove()">Undo Last Move</button>
-            </div>
-        </div>
-        <div class="board-container">
-            <div id="chessboard" class="chessboard"></div>
-        </div>
-        <div class="move-history">
-            <h3>Move History</h3>
-            <div id="moveHistory" class="moves-list"></div>
+            <div class="side" style="width:230px"><div class="panel"><small>Status</small><b id="status" style="font-size:15px">White to move</b></div><div class="panel"><small>Captured</small><div id="capW" style="font-size:20px;min-height:24px"></div><div id="capB" style="font-size:20px;min-height:24px"></div></div><div class="panel"><small>Moves</small><div id="moves" style="max-height:190px;overflow:auto;text-align:left;font:600 13px/1.7 ui-monospace,monospace"></div></div><div class="panel" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn ghost" id="undoBtn" style="padding:8px 12px">↶ Undo</button><button class="btn ghost" id="flipBtn" style="padding:8px 12px">⇅ Flip</button><button class="btn ghost" id="newBtn" style="padding:8px 12px">＋ New</button></div></div>
         </div>
     </div>
+    
+    <p class="hint">Castling, en passant and promotion are all included. Undo takes back your last move.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), S = cv.width / 8;
+        const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+        const VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+        // piece-square tables (white's view, a8 = index 0)
+        const PST = {
+            p: [0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30, 20, 10, 10, 5, 5, 10, 25, 25, 10, 5, 5, 0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5, 5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+            n: [-50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15, 10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15, 15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50],
+            b: [-20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 10, 10, 5, 0, -10, -10, 5, 5, 10, 10, 5, 5, -10, -10, 0, 10, 10, 10, 10, 0, -10, -10, 10, 10, 10, 10, 10, 10, -10, -10, 5, 0, 0, 0, 0, 5, -10, -20, -10, -10, -10, -10, -10, -10, -20],
+            r: [0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 5, 5, 0, 0, 0],
+            q: [-20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 5, 5, 5, 0, -10, -5, 0, 5, 5, 5, 5, 0, -5, 0, 0, 5, 5, 5, 5, 0, -5, -10, 5, 5, 5, 5, 5, 0, -10, -10, 0, 5, 0, 0, 0, 0, -10, -20, -10, -10, -5, -5, -10, -10, -20],
+            k: [-30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -20, -30, -30, -40, -40, -30, -30, -20, -10, -20, -20, -20, -20, -20, -20, -10, 20, 20, 0, 0, 0, 0, 20, 20, 20, 30, 10, 0, 0, 10, 30, 20]
+        };
+        const isW = (p) => p && p === p.toUpperCase();
+        const colorOf = (p) => (p ? (isW(p) ? "w" : "b") : null);
+        const rc = (i) => [i >> 3, i & 7];
+        const NAMES = "abcdefgh";
+        const sqName = (i) => NAMES[i & 7] + (8 - (i >> 3));
 
-    <script src="chess.js"></script>
+        function initial() {
+            const back = "rnbqkbnr".split("");
+            const b = Array(64).fill("");
+            for (let c = 0; c < 8; c++) { b[c] = back[c]; b[8 + c] = "p"; b[48 + c] = "P"; b[56 + c] = back[c].toUpperCase(); }
+            return { b, turn: "w", castle: { K: true, Q: true, k: true, q: true }, ep: -1, half: 0, full: 1 };
+        }
+        function attacked(b, sq, by) {
+            const [r, c] = rc(sq), up = by === "w" ? 1 : -1;
+            const at = (rr, cc) => (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 ? b[rr * 8 + cc] : null);
+            const mine = (p, t) => p && colorOf(p) === by && p.toLowerCase() === t;
+            if (mine(at(r + up, c - 1), "p") || mine(at(r + up, c + 1), "p")) return true;
+            for (const [dr, dc] of [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]]) if (mine(at(r + dr, c + dc), "n")) return true;
+            for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if ((dr || dc) && mine(at(r + dr, c + dc), "k")) return true;
+            for (const [dr, dc, ts] of [[1, 0, "rq"], [-1, 0, "rq"], [0, 1, "rq"], [0, -1, "rq"], [1, 1, "bq"], [1, -1, "bq"], [-1, 1, "bq"], [-1, -1, "bq"]]) {
+                let rr = r + dr, cc = c + dc;
+                while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+                    const p = b[rr * 8 + cc];
+                    if (p) { if (colorOf(p) === by && ts.includes(p.toLowerCase())) return true; break; }
+                    rr += dr; cc += dc;
+                }
+            }
+            return false;
+        }
+        function pseudo(st) {
+            const { b, turn } = st, moves = [], fwd = turn === "w" ? -1 : 1;
+            const add = (from, to, extra = {}) => moves.push({ from, to, piece: b[from], cap: b[to], ...extra });
+            for (let i = 0; i < 64; i++) {
+                const p = b[i]; if (!p || colorOf(p) !== turn) continue;
+                const [r, c] = rc(i), t = p.toLowerCase();
+                if (t === "p") {
+                    const r1 = r + fwd, last = turn === "w" ? 0 : 7, startR = turn === "w" ? 6 : 1;
+                    const push = (to, extra) => { if ((to >> 3) === last) for (const pr of "qrbn") add(i, to, { ...extra, promo: pr }); else add(i, to, extra); };
+                    if (r1 >= 0 && r1 < 8 && !b[r1 * 8 + c]) { push(r1 * 8 + c); if (r === startR && !b[(r + 2 * fwd) * 8 + c]) add(i, (r + 2 * fwd) * 8 + c, { double: true }); }
+                    for (const dc of [-1, 1]) {
+                        const cc = c + dc; if (cc < 0 || cc > 7 || r1 < 0 || r1 > 7) continue;
+                        const to = r1 * 8 + cc;
+                        if (b[to] && colorOf(b[to]) !== turn) push(to);
+                        else if (to === st.ep) add(i, to, { epCap: r * 8 + cc, cap: b[r * 8 + cc] });
+                    }
+                } else if (t === "n" || t === "k") {
+                    const ds = t === "n" ? [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+                    for (const [dr, dc] of ds) { const rr = r + dr, cc = c + dc; if (rr < 0 || rr > 7 || cc < 0 || cc > 7) continue; const to = rr * 8 + cc; if (!b[to] || colorOf(b[to]) !== turn) add(i, to); }
+                    if (t === "k") {
+                        const opp = turn === "w" ? "b" : "w", home = turn === "w" ? 60 : 4, K = turn === "w" ? "K" : "k", Q = turn === "w" ? "Q" : "q";
+                        if (i === home && !attacked(b, home, opp)) {
+                            if (st.castle[K] && !b[home + 1] && !b[home + 2] && !attacked(b, home + 1, opp) && !attacked(b, home + 2, opp)) add(i, home + 2, { castle: "K" });
+                            if (st.castle[Q] && !b[home - 1] && !b[home - 2] && !b[home - 3] && !attacked(b, home - 1, opp) && !attacked(b, home - 2, opp)) add(i, home - 2, { castle: "Q" });
+                        }
+                    }
+                } else {
+                    const ds = t === "r" ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : t === "b" ? [[1, 1], [1, -1], [-1, 1], [-1, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+                    for (const [dr, dc] of ds) {
+                        let rr = r + dr, cc = c + dc;
+                        while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) { const to = rr * 8 + cc; if (b[to]) { if (colorOf(b[to]) !== turn) add(i, to); break; } add(i, to); rr += dr; cc += dc; }
+                    }
+                }
+            }
+            return moves;
+        }
+        function make(st, m) {
+            const b = st.b.slice(), castle = { ...st.castle };
+            b[m.to] = m.promo ? (st.turn === "w" ? m.promo.toUpperCase() : m.promo) : b[m.from]; b[m.from] = "";
+            if (m.epCap !== undefined) b[m.epCap] = "";
+            if (m.castle) { const home = m.from; if (m.castle === "K") { b[home + 1] = b[home + 3]; b[home + 3] = ""; } else { b[home - 1] = b[home - 4]; b[home - 4] = ""; } }
+            const t = m.piece.toLowerCase();
+            if (t === "k") { if (st.turn === "w") castle.K = castle.Q = false; else castle.k = castle.q = false; }
+            for (const [sq, k] of [[63, "K"], [56, "Q"], [7, "k"], [0, "q"]]) if (m.from === sq || m.to === sq) castle[k] = false;
+            return { b, turn: st.turn === "w" ? "b" : "w", castle, ep: m.double ? (m.from + m.to) / 2 : -1, half: t === "p" || m.cap ? 0 : st.half + 1, full: st.full + (st.turn === "b" ? 1 : 0) };
+        }
+        function kingSq(b, color) { const k = color === "w" ? "K" : "k"; return b.indexOf(k); }
+        function inCheck(st, color = st.turn) { return attacked(st.b, kingSq(st.b, color), color === "w" ? "b" : "w"); }
+        function legal(st) { return pseudo(st).filter((m) => { const n = make(st, m); return !attacked(n.b, kingSq(n.b, st.turn), n.turn); }); }
+
+        // ---- computer player (alpha-beta search)
+        function evaluate(st) {
+            let s = 0;
+            for (let i = 0; i < 64; i++) { const p = st.b[i]; if (!p) continue; const t = p.toLowerCase();
+                if (isW(p)) s += VAL[t] + PST[t][i]; else s -= VAL[t] + PST[t][(7 - (i >> 3)) * 8 + (i & 7)]; }
+            return st.turn === "w" ? s : -s;
+        }
+        function order(ms) { return ms.sort((a, b) => (b.cap ? VAL[b.cap.toLowerCase()] * 10 - VAL[b.piece.toLowerCase()] : 0) + (b.promo ? 800 : 0) - ((a.cap ? VAL[a.cap.toLowerCase()] * 10 - VAL[a.piece.toLowerCase()] : 0) + (a.promo ? 800 : 0))); }
+        let nodes = 0;
+        function quiesce(st, a, b, depth) {
+            const stand = evaluate(st); nodes++;
+            if (stand >= b) return b; if (a < stand) a = stand;
+            if (depth <= 0) return a;
+            for (const m of order(legal(st).filter((m) => m.cap))) { const sc = -quiesce(make(st, m), -b, -a, depth - 1); if (sc >= b) return b; if (sc > a) a = sc; }
+            return a;
+        }
+        function search(st, depth, a, b, ply) {
+            if (depth === 0) return quiesce(st, a, b, 3);
+            const ms = legal(st); nodes++;
+            if (!ms.length) return inCheck(st) ? -100000 + ply : 0;
+            for (const m of order(ms)) { const sc = -search(make(st, m), depth - 1, -b, -a, ply + 1); if (sc >= b) return b; if (sc > a) a = sc; }
+            return a;
+        }
+        function bestMove(st, level) {
+            const ms = order(legal(st).sort(() => Math.random() - 0.5)); nodes = 0;
+            if (level === 1) {                                  // easy: shallow and a bit random
+                const scored = ms.map((m) => ({ m, s: -quiesce(make(st, m), -1e9, 1e9, 1) + Kit.rand(-90, 90) }));
+                scored.sort((x, y) => y.s - x.s); return scored[0].m;
+            }
+            const depth = level === 2 ? 2 : 4;
+            let best = ms[0], a = -1e9;
+            for (const m of ms) { const sc = -search(make(st, m), depth - 1, -1e9, -a, 1); if (sc > a) { a = sc; best = m; } }
+            return best;
+        }
+
+        // ---- game state + UI
+        let st, history, moveList, sel = -1, targets = [], last = null, mode = "ai2", human = "w", flipped = false, over = false, thinking = false, pendingPromo = null;
+        try { mode = localStorage.getItem("chessMode") || "ai2"; } catch (e) {}
+        const net = Kit.net, online = () => mode === "online";
+        let prevMode = mode === "online" ? "ai2" : mode;
+        const mkey = (m) => m.from + "-" + m.to + (m.promo || "");
+        function san(stBefore, m, all) {
+            if (m.castle) return m.castle === "K" ? "O-O" : "O-O-O";
+            const t = m.piece.toLowerCase(); let s = "";
+            if (t !== "p") {
+                s = t.toUpperCase();
+                const same = all.filter((o) => o.to === m.to && o.from !== m.from && o.piece === m.piece);
+                if (same.length) s += same.some((o) => (o.from & 7) === (m.from & 7)) ? sqName(m.from)[1] : sqName(m.from)[0];
+            } else if (m.cap) s = sqName(m.from)[0];
+            if (m.cap) s += "x"; s += sqName(m.to); if (m.promo) s += "=" + m.promo.toUpperCase();
+            const n = make(stBefore, m); if (inCheck(n)) s += legal(n).length ? "+" : "#";
+            return s;
+        }
+        function newGame() {
+            st = initial(); history = []; moveList = []; sel = -1; targets = []; last = null; over = false; thinking = false; pendingPromo = null;
+            human = mode === "2p" ? "w" : human; flipped = mode !== "2p" && human === "b";
+            Kit.hide("over"); Kit.hide("promo"); render(); status();
+            if (mode !== "2p" && !online() && st.turn !== human) aiTurn();
+        }
+        function play(m) {
+            const all = legal(st);
+            moveList.push(san(st, m, all)); history.push({ st, last });
+            st = make(st, m); last = m; sel = -1; targets = [];
+            if (m.cap) beep(300, 0.08, "square", 0.05, -100); else beep(520, 0.05, "triangle", 0.04);
+            render(); status(); checkEnd();
+            if (!over && mode !== "2p" && !online() && st.turn !== human) aiTurn();
+        }
+        function myPlay(m) { play(m); if (online()) net.send(mkey(m)); }
+        function aiTurn() {
+            thinking = true; status();
+            setTimeout(() => { const m = bestMove(st, +mode.slice(2)); thinking = false; if (m && !over) play(m); }, 250);
+        }
+        function insufficient(b) {
+            const ps = b.filter(Boolean).map((p) => p.toLowerCase()).filter((p) => p !== "k");
+            return ps.length === 0 || (ps.length === 1 && (ps[0] === "n" || ps[0] === "b"));
+        }
+        function checkEnd() {
+            const ms = legal(st);
+            let res = null;
+            if (!ms.length) res = inCheck(st) ? (st.turn === "w" ? "Black" : "White") + " wins by checkmate!" : "Stalemate: it's a draw.";
+            else if (st.half >= 100) res = "Draw by the 50-move rule.";
+            else if (insufficient(st.b)) res = "Draw: not enough pieces to checkmate.";
+            if (res && online()) {
+                over = true;
+                const win = res.startsWith("White") ? "w" : res.startsWith("Black") ? "b" : "draw";
+                net.over(win);
+                if (win === human) Kit.tune([523, 659, 784, 1047], 0.12, "triangle");
+                $("status").textContent = (win === "draw" ? "" : win === human ? "🏆 You win! " : "Your friend wins. ") + res;
+                return;
+            }
+            if (res) {
+                over = true;
+                const youWon = mode !== "2p" && res.startsWith(human === "w" ? "White" : "Black");
+                $("overText").textContent = mode === "2p" ? res : youWon ? "🏆 You beat the computer! " + res : res.includes("Draw") || res.includes("Stalemate") ? res : "The computer wins this time. " + res;
+                setTimeout(() => Kit.show("over"), 500);
+                if (youWon) Kit.tune([523, 659, 784, 1047], 0.12, "triangle");
+            }
+        }
+        function status() {
+            const who = st.turn === "w" ? "White" : "Black";
+            let s = over ? "Game over" : online() ? (st.turn === human ? "Your move" : "Friend's move…") : thinking ? "🤔 Computer is thinking…" : mode === "2p" ? `${who} to move` : st.turn === human ? "Your move" : "Computer's move";
+            if (!over && inCheck(st)) s += " · Check!";
+            $("status").textContent = s;
+            const rows = [];
+            for (let i = 0; i < moveList.length; i += 2) rows.push(`<div><span>${i / 2 + 1}.</span> ${moveList[i]} ${moveList[i + 1] || ""}</div>`);
+            $("moves").innerHTML = rows.join("") || '<div style="color:#9aa0c8">No moves yet</div>';
+            $("moves").scrollTop = 1e6;
+            const caps = { w: [], b: [] }, start = initial().b.join("");
+            for (const p of "pnbrqPNBRQ") { const missing = (start.split(p).length - 1) - st.b.filter((x) => x === p).length; for (let k = 0; k < missing; k++) caps[isW(p) ? "b" : "w"].push(GLYPH[p.toLowerCase()]); }
+            $("capW").textContent = caps.w.join(" "); $("capB").textContent = caps.b.join(" ");
+        }
+        const toScreen = (i) => { const [r, c] = rc(i); return flipped ? [7 - c, 7 - r] : [c, r]; };
+        function render() {
+            const chk = inCheck(st) ? kingSq(st.b, st.turn) : -1;
+            for (let i = 0; i < 64; i++) {
+                const [x, y] = toScreen(i), light = ((i >> 3) + (i & 7)) % 2 === 0;
+                ctx.fillStyle = light ? "#e8e4ff" : "#7c6fc4"; ctx.fillRect(x * S, y * S, S, S);
+                if (last && (i === last.from || i === last.to)) { ctx.fillStyle = "rgba(255,201,77,.45)"; ctx.fillRect(x * S, y * S, S, S); }
+                if (i === sel) { ctx.fillStyle = "rgba(46,230,201,.55)"; ctx.fillRect(x * S, y * S, S, S); }
+                if (i === chk) { const g = ctx.createRadialGradient(x * S + S / 2, y * S + S / 2, 4, x * S + S / 2, y * S + S / 2, S * 0.7); g.addColorStop(0, "rgba(255,40,80,.9)"); g.addColorStop(1, "rgba(255,40,80,0)"); ctx.fillStyle = g; ctx.fillRect(x * S, y * S, S, S); }
+                const p = st.b[i];
+                if (p) {
+                    ctx.font = `${S * 0.78}px "Segoe UI Symbol","Noto Sans Symbols 2","DejaVu Sans",serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.lineWidth = 3; ctx.strokeStyle = isW(p) ? "#2b3160" : "#eef0ff"; ctx.fillStyle = isW(p) ? "#ffffff" : "#1a1d33";
+                    ctx.strokeText(GLYPH[p.toLowerCase()], x * S + S / 2, y * S + S * 0.54); ctx.fillText(GLYPH[p.toLowerCase()], x * S + S / 2, y * S + S * 0.54);
+                }
+                // coordinates
+                ctx.font = "600 11px Inter, sans-serif"; ctx.fillStyle = light ? "#7c6fc4" : "#e8e4ff"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+                if (x === 0) ctx.fillText(8 - (i >> 3), 3, y * S + 3);
+                if (y === 7) { ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(NAMES[i & 7], x * S + S - 3, S * 8 - 2); }
+            }
+            for (const m of targets) {
+                const [x, y] = toScreen(m.to);
+                ctx.fillStyle = "rgba(11,13,26,.35)"; ctx.beginPath();
+                if (m.cap) { ctx.lineWidth = 5; ctx.strokeStyle = "rgba(11,13,26,.35)"; ctx.arc(x * S + S / 2, y * S + S / 2, S * 0.44, 0, 7); ctx.stroke(); }
+                else { ctx.arc(x * S + S / 2, y * S + S / 2, S * 0.15, 0, 7); ctx.fill(); }
+            }
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (over || thinking || pendingPromo) return;
+            if (online() ? !net.myTurn() : mode !== "2p" && st.turn !== human) return;
+            const pt = Kit.point(cv, e); let x = Math.floor(pt.x / S), y = Math.floor(pt.y / S);
+            if (flipped) { x = 7 - x; y = 7 - y; }
+            const i = y * 8 + x, p = st.b[i];
+            const hits = targets.filter((m) => m.to === i);
+            if (hits.length) {
+                if (hits[0].promo) { pendingPromo = hits; Kit.show("promo"); return; }
+                return myPlay(hits[0]);
+            }
+            if (p && colorOf(p) === st.turn) { sel = i; targets = legal(st).filter((m) => m.from === i); beep(700, 0.03, "triangle", 0.03); }
+            else { sel = -1; targets = []; }
+            render();
+        });
+        document.querySelectorAll("#promo button").forEach((b) => b.onclick = () => {
+            const m = pendingPromo.find((x) => x.promo === b.dataset.p); pendingPromo = null; Kit.hide("promo"); myPlay(m);
+        });
+        $("undoBtn").onclick = () => {
+            if (thinking || !history.length || online()) return;
+            const steps = mode === "2p" ? 1 : (st.turn === human ? 2 : 1);
+            for (let k = 0; k < steps && history.length; k++) { const h = history.pop(); st = h.st; last = h.last; moveList.pop(); }
+            over = false; sel = -1; targets = []; Kit.hide("over"); render(); status();
+        };
+        $("flipBtn").onclick = () => { flipped = !flipped; render(); };
+        $("newBtn").onclick = () => { if (online()) net.leave(); Kit.show("start"); };
+        document.querySelectorAll("#mode button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.m === mode);
+            b.onclick = () => { if (b.dataset.m === "online") return net.open(); mode = b.dataset.m; prevMode = mode; try { localStorage.setItem("chessMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        document.querySelectorAll("#side button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.s === human);
+            b.onclick = () => { human = b.dataset.s === "r" ? (Math.random() < 0.5 ? "w" : "b") : b.dataset.s; document.querySelectorAll("#side button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        $("startBtn").onclick = () => { if (mode === "online") mode = prevMode; Kit.hide("start"); newGame(); };
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: ["w", "b"], names: { w: "⚪ White", b: "⚫ Black" },
+            start(side) { mode = "online"; hl(); Kit.hide("start"); Kit.hide("over"); Kit.hide("promo"); human = side; newGame(); flipped = side === "b"; render(); status(); },
+            apply(str) {
+                const m = legal(st).find((x) => mkey(x) === str);
+                if (!m) return console.warn("[chess] bad online move", str);
+                play(m);
+            },
+            leave() { if (online()) { mode = prevMode; hl(); Kit.show("start"); } } });
+        $("againBtn").onclick = () => { Kit.hide("over"); Kit.show("start"); };
+        st = initial(); history = []; moveList = []; render(); status();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -48,12 +338,20 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
-        <section><h2>About Chess</h2><p>A full game of chess for two players on the same screen. Click a piece to see every move it can make, then click a square to move it. Castling, en passant and pawn promotion are all included, and you can undo a move if someone slips.</p></section>
-        <section><h3>How to play</h3><table><tr><td>Click</td><td>Select a piece, then click where to move</td></tr><tr><td>Undo</td><td>Take back the last move</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Control the centre of the board early.</li><li>Move each piece once before moving one piece twice.</li><li>Castle early to keep your king safe.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/MotorRacing/motorracing">Motor Racing</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+        <section><h2>About Chess</h2><p>Play a full game of chess against the computer on easy, medium or hard, or against a friend on the same screen. Click a piece to see every move it can make, then click a square to move it. Castling, en passant and pawn promotion are all included, the move list records the game, and you can undo a move if you slip.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click</td><td>Select a piece, then click where to move</td></tr><tr><td>Undo</td><td>Take back your last move</td></tr><tr><td>Flip</td><td>Turn the board around</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Control the centre of the board early.</li><li>Move each piece once before moving one piece twice.</li><li>Castle early to keep your king safe.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Chess</h3><p>A good chess game starts with three goals: control the centre, develop your pieces, and get your king safe. Moving the pawns in front of your king and queen two squares forward gives your pieces room and claims the middle of the board. Next, bring out your knights and bishops before moving any piece twice. Then castle, which tucks your king into a corner behind a wall of pawns and brings a rook toward the centre.</p><p>In the middle of the game, before every move, ask two questions: what is my opponent threatening, and is any of my pieces unprotected? Most games between beginners are decided by a piece left hanging, not by a clever plan. Count how many of your pieces attack a square compared with your opponent's before you trade. The Easy computer makes mistakes you can punish. Hard looks several moves ahead, so careful, safe moves matter more than tricks.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Learn how each piece moves and play against Easy. Castle in every game.</li><li><b>Getting good:</b> Check every move for hanging pieces, and beat Medium by trading pieces only when it helps you.</li><li><b>Expert:</b> Against Hard, play solid openings, keep your king safe, and look for forks and pins, where one move attacks two things at once.</li></ul><h3>Did you know?</h3><p>Chess developed in India around the 6th century, from a game called chaturanga, and spread through Persia to Europe. In 1997, IBM's Deep Blue computer became the first machine to beat a reigning world champion, Garry Kasparov, in a match. Today, free chess programs are far stronger than any human player.</p><h3>Questions players ask</h3><h4>Does it include castling and en passant?</h4><p>Yes. Castling, en passant and pawn promotion are all included.</p><h4>Can I play with a friend?</h4><p>Yes, on the same screen, or online with a room code using the 🌐 Online button.</p><h4>Can I take back a move?</h4><p>Yes, use Undo when playing the computer. It's switched off in online games.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/chess-for-beginners">Chess for beginners: 10 rules that win your first games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MotorRacing/motorracing">Motor Racing</a><a href="/PaddleBattle/paddlebattle">Paddle Battle</a><a href="/MineFinder/minefinder">Mine Finder</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
@@ -62,7 +360,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A tense football penalty shootout against the computer. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Penalty Shootout · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Penalty <span>Shootout</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 - 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Penalty Shootout</h2>
+                <p id="startText"><span class="seg" id="diff"><button data-d="easy">Easy</button><button data-d="normal">Normal</button><button data-d="hard">Hard</button></span>Take turns: you shoot, then you're the goalkeeper.<br>Shooting: move the target and click to kick. Corners are hardest to save!<br>Saving: click where you think the ball is going to dive.</p>
+                <button class="btn" id="startBtn">▶ Kick off</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Shootout Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            <div class="side" style="width:190px"><div class="panel"><small>You</small><div id="logMe" style="font-size:18px;letter-spacing:2px">○ ○ ○ ○ ○</div></div><div class="panel"><small>Computer</small><div id="logCpu" style="font-size:18px;letter-spacing:2px">○ ○ ○ ○ ○</div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">5 penalties each. If it's a draw, it goes to sudden death!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "penaltyBest";
+        const GX = 200, GW = 460, GY = 110, GH = 200, SPOT = { x: W / 2, y: H - 60 }, REACH = 62;
+        const LV = { easy: { guess: 0.25, reach: 1, tell: 0.5 }, normal: { guess: 0.4, reach: 1.05, tell: 0.3 }, hard: { guess: 0.55, reach: 1.15, tell: 0.12 } };
+        let diff = "normal", phase, round, mine, theirs, log, aim, ball, keeper, timer, msg, msgT, state = "ready", t = 0, fx = Kit.particles(), shots, saves, sudden;
+        try { diff = localStorage.getItem("penDiff") || "normal"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function reset() { round = 0; mine = 0; theirs = 0; log = { me: [], cpu: [] }; shots = 0; saves = 0; sudden = false; nextTurn(); stats(); }
+        function stats() { Kit.stat("score", `${mine} - ${theirs}`); }
+        function keeperHome() { keeper = { x: GX + GW / 2, y: GY + GH - 70, tx: GX + GW / 2, ty: GY + GH - 70, dive: 0 }; }
+        function nextTurn() {
+            keeperHome(); ball = { x: SPOT.x, y: SPOT.y, s: 1, fly: 0, from: null, to: null, done: false };
+            const myTurn = log.me.length === log.cpu.length;
+            phase = myTurn ? "aim" : "runup"; timer = 0; aim = { x: GX + GW / 2, y: GY + GH / 2 };
+            msg = myTurn ? "Your kick: click where to shoot" : "Your save: click where to dive!"; msgT = 2;
+            if (!myTurn) {
+                const corner = Math.random() < 0.7;
+                ball.target = { x: corner ? Kit.pick([GX + 40, GX + GW - 40]) + Kit.rand(-20, 20) : GX + GW / 2 + Kit.rand(-120, 120), y: Kit.rand(GY + 25, GY + GH - 25) };
+                ball.miss = Math.random() < 0.12; if (ball.miss) ball.target.x += Kit.pick([-1, 1]) * 260;
+            }
+        }
+        function kick(target) {
+            ball.from = { x: SPOT.x, y: SPOT.y }; ball.to = target; ball.fly = 0.001; phase = "fly"; beep(180, 0.08, "square", 0.06);
+        }
+        function shoot(px, py) {
+            // the aim wobbles a little; the further from the middle, the more it wobbles
+            const wob = 10 + Math.abs(px - (GX + GW / 2)) * 0.05;
+            const target = { x: px + Kit.rand(-wob, wob), y: py + Kit.rand(-wob, wob) };
+            kick(target); shots++;
+            // computer keeper guesses
+            const L = LV[diff], good = Math.random() < L.guess;
+            keeper.tx = good ? target.x : GX + Kit.rand(40, GW - 40); keeper.ty = good ? target.y : Kit.rand(GY + 40, GY + GH - 20);
+            keeper.speed = 900; keeper.delay = 0.12;
+        }
+        function result(goal, whoShot) {
+            phase = "result"; timer = 0;
+            if (whoShot === "me") { log.me.push(goal); if (goal) { mine++; msg = "GOAL!"; tune([523, 659, 784, 1047], 0.07, "square", 0.05); fx.burst(ball.x, ball.y, "#ffc94d", 30, 5); } else { msg = Kit.pick(["Saved!", "Missed!"]); beep(160, 0.3, "sawtooth", 0.05, -60); } }
+            else { log.cpu.push(goal); if (goal) { theirs++; msg = "They scored"; beep(160, 0.3, "sawtooth", 0.05, -60); } else { if (!ball.missWide) saves++; msg = ball.missWide ? "Missed!" : "GREAT SAVE!"; tune([784, 988, 1175], 0.07, "square", 0.05); fx.burst(keeper.x, keeper.y, "#2ee6c9", 26, 5); } }
+            stats(); renderLog();
+        }
+        function decided() {
+            const a = log.me.length, b = log.cpu.length;
+            if (!sudden) {
+                const leftMe = 5 - a, leftCpu = 5 - b;
+                if (mine > theirs + leftCpu || theirs > mine + leftMe) return true;
+                if (a === 5 && b === 5) { if (mine !== theirs) return true; sudden = true; msg = "Sudden death!"; }
+                return false;
+            }
+            return a === b && mine !== theirs;
+        }
+        function end() {
+            state = "dead"; const win = mine > theirs;
+            const sc = (mine + saves) * 100 + (win ? 300 + { easy: 0, normal: 100, hard: 300 }[diff] : 0);
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `${win ? "🏆 You win the shootout!" : "😢 The computer wins the shootout"} ${mine} - ${theirs}<br>${sc} points · best ${best}`;
+            if (win) tune([523, 659, 784, 1047, 1319], 0.1, "triangle", 0.06); Kit.show("over");
+        }
+        function update(dt) {
+            timer += dt; if (msgT > 0) msgT -= dt;
+            // keeper movement
+            if (keeper.delay > 0) keeper.delay -= dt;
+            else { const dx = keeper.tx - keeper.x, dy = keeper.ty - keeper.y, d = Math.hypot(dx, dy), st = Math.min(d, (keeper.speed || 800) * dt); if (d > 1) { keeper.x += dx / d * st; keeper.y += dy / d * st; keeper.dive = Math.max(-1, Math.min(1, dx / 120)); } }
+            if (phase === "runup") { if (timer > 1.1) { kick(ball.target); keeper.speed = 780; } }
+            if (phase === "fly") {
+                ball.fly += dt / 0.62; const k = Math.min(1, ball.fly);
+                ball.x = ball.from.x + (ball.to.x - ball.from.x) * k; ball.y = ball.from.y + (ball.to.y - ball.from.y) * k - Math.sin(k * Math.PI) * 40; ball.s = 1 - 0.55 * k;
+                if (k >= 1) {
+                    const inGoal = ball.to.x > GX + 8 && ball.to.x < GX + GW - 8 && ball.to.y > GY + 8 && ball.to.y < GY + GH;
+                    const saved = Math.hypot(keeper.x - ball.to.x, keeper.y + 10 - ball.to.y) < REACH * (log.me.length === log.cpu.length ? LV[diff].reach : 1);
+                    const myShot = log.me.length === log.cpu.length;
+                    ball.missWide = !inGoal;
+                    if (inGoal && saved) { ball.to = { x: ball.to.x + Kit.rand(-120, 120), y: GY + GH + 90 }; }
+                    result(inGoal && !saved, myShot ? "me" : "cpu");
+                }
+            }
+            if (phase === "result" && timer > 1.6) { if (decided()) return end(); nextTurn(); }
+        }
+        function renderLog() {
+            const dot = (v) => (v === true ? "⚽" : v === false ? "✖" : "○");
+            const row = (arr) => { const n = Math.max(5, arr.length); return Array.from({ length: n }, (_, i) => dot(arr[i])).join(" "); };
+            $("logMe").textContent = row(log.me); $("logCpu").textContent = row(log.cpu);
+        }
+        function draw() {
+            // stadium + grass
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#0e1530"); g.addColorStop(0.35, "#1a2550"); g.addColorStop(0.36, "#2fa95d"); g.addColorStop(1, "#1f7a4a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            for (let i = 0; i < 40; i++) { ctx.fillStyle = ["#ff4d8d55", "#4da3ff55", "#ffc94d55", "#ffffff33"][i % 4]; ctx.beginPath(); ctx.arc(20 + i * 22, 40 + (i * 37) % 50, 6, 0, 7); ctx.fill(); }
+            for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? "#2fa95d" : "#35b765"; ctx.beginPath(); ctx.moveTo(W / 2 - 40 - i * 40, GY + GH); ctx.lineTo(W / 2 - 40 - (i + 1) * 40, GY + GH); ctx.lineTo(W / 2 - 40 - (i + 1) * 140, H); ctx.lineTo(W / 2 - 40 - i * 140, H); ctx.fill(); ctx.beginPath(); ctx.moveTo(W / 2 + 40 + i * 40, GY + GH); ctx.lineTo(W / 2 + 40 + (i + 1) * 40, GY + GH); ctx.lineTo(W / 2 + 40 + (i + 1) * 140, H); ctx.lineTo(W / 2 + 40 + i * 140, H); ctx.fill(); }
+            ctx.strokeStyle = "#ffffffcc"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(60, GY + GH); ctx.lineTo(W - 60, GY + GH); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(GX - 60, GY + GH); ctx.lineTo(GX - 160, H - 20); ctx.moveTo(GX + GW + 60, GY + GH); ctx.lineTo(GX + GW + 160, H - 20); ctx.stroke();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(SPOT.x, SPOT.y + 14, 10, 4, 0, 0, 7); ctx.fill();
+            // goal + net
+            ctx.fillStyle = "#ffffff10"; ctx.fillRect(GX, GY, GW, GH);
+            ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 1;
+            for (let x = GX; x <= GX + GW; x += 20) { ctx.beginPath(); ctx.moveTo(x, GY); ctx.lineTo(x, GY + GH); ctx.stroke(); }
+            for (let y = GY; y <= GY + GH; y += 20) { ctx.beginPath(); ctx.moveTo(GX, y); ctx.lineTo(GX + GW, y); ctx.stroke(); }
+            ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(GX, GY + GH); ctx.lineTo(GX, GY); ctx.lineTo(GX + GW, GY); ctx.lineTo(GX + GW, GY + GH); ctx.stroke();
+            // keeper
+            const kx = keeper.x, ky = keeper.y, kc = log.me.length === log.cpu.length ? "#ff4d8d" : Kit.skin("penalty", "#2ee6c9");
+            ctx.save(); ctx.translate(kx, ky); ctx.rotate(keeper.dive * 0.9);
+            ctx.fillStyle = kc; Kit.rr(ctx, -20, -30, 40, 56, 12); ctx.fill();
+            ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(0, -44, 14, 0, 7); ctx.fill();
+            ctx.strokeStyle = kc; ctx.lineWidth = 10; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-18, -22); ctx.lineTo(-44, -50); ctx.moveTo(18, -22); ctx.lineTo(44, -50); ctx.stroke();
+            ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(-46, -53, 9, 0, 7); ctx.arc(46, -53, 9, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#1a1d33"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(-10, 24); ctx.lineTo(-14, 50); ctx.moveTo(10, 24); ctx.lineTo(14, 50); ctx.stroke();
+            ctx.restore();
+            // shooter (computer) run-up
+            if (phase === "runup") { const k = Math.min(1, timer / 1.1), sx = SPOT.x - 80 + k * 60, sy = SPOT.y + 30 - k * 20; ctx.fillStyle = "#ff4d8d"; Kit.rr(ctx, sx - 14, sy - 46, 28, 40, 8); ctx.fill(); ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(sx, sy - 56, 11, 0, 7); ctx.fill();
+                // a small hint of where the kick is going (shorter on harder levels)
+                if (timer > 1.1 - LV[diff].tell) { ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.arc(ball.target.x, ball.target.y, 16, 0, 7); ctx.fill(); } }
+            // aim reticle
+            if (phase === "aim") { const wx = aim.x + Math.sin(t * 3.1) * 8, wy = aim.y + Math.cos(t * 2.3) * 6; ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(wx, wy, 16, 0, 7); ctx.moveTo(wx - 24, wy); ctx.lineTo(wx + 24, wy); ctx.moveTo(wx, wy - 24); ctx.lineTo(wx, wy + 24); ctx.stroke(); }
+            // ball
+            const r = 15 * ball.s;
+            ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.ellipse(ball.x, ball.y + r + 4 * ball.s, r, r * 0.35, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, r, 0, 7); ctx.fill();
+            ctx.fillStyle = "#1a1d33"; ctx.beginPath(); ctx.arc(ball.x, ball.y, r * 0.35, 0, 7); ctx.fill();
+            fx.draw(ctx);
+            if (msgT > 0 || phase === "result") Kit.text(ctx, msg, W / 2, GY - 40, msg.length > 14 ? 20 : 32, msg === "GOAL!" || msg === "GREAT SAVE!" ? "#ffc94d" : "#ffffff", "center", "'Press Start 2P', monospace", 400);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointermove", (e) => { if (phase === "aim") { const p = Kit.point(cv, e); aim = p; } });
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play") return; const p = Kit.point(cv, e);
+            if (phase === "aim") { aim = p; shoot(p.x + Math.sin(t * 3.1) * 8, p.y + Math.cos(t * 2.3) * 6); }
+            else if ((phase === "runup" || phase === "fly") && log.me.length !== log.cpu.length && !keeper.chosen) { keeper.chosen = true; keeper.tx = Math.max(GX + 20, Math.min(GX + GW - 20, p.x)); keeper.ty = Math.max(GY + 30, Math.min(GY + GH - 30, p.y)); keeper.delay = 0; }
+        });
+        document.querySelectorAll("#diff button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.d === diff);
+            b.onclick = () => { diff = b.dataset.d; try { localStorage.setItem("penDiff", diff); } catch (e) {} document.querySelectorAll("#diff button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); renderLog(); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        keeperHome(); ball = { x: SPOT.x, y: SPOT.y, s: 1 }; phase = "idle"; msg = ""; msgT = 0; log = { me: [], cpu: [] }; game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Penalty Shootout</h2><p>A tense football penalty shootout against the computer. First you step up to the spot: move the target over the goal and click to shoot, trying to beat the keeper. Then you swap roles and go in goal, where you have to guess where the computer will shoot and dive to make the save. Each side takes five penalties, and if it's still level it goes to sudden death.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Move the mouse</td><td>Aim your shot</td></tr><tr><td>Click</td><td>Shoot, or dive when you're in goal</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Shots near the corners are hardest for the keeper to reach.</li><li>The target wobbles a little, so don't aim right at the post.</li><li>Watch the shooter closely when you're in goal. On easier levels you get a hint of where the ball is going.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Penalty Shootout</h3><p>When you're shooting in Penalty Shootout, the corners are your friends. The keeper can reach shots near the middle easily but has to dive full stretch for the corners. The target wobbles a little, though, so aiming exactly at the post can send the ball wide. Aim just inside the corner, not at it.</p><p>When you're in goal, watch the shooter closely. On the easier levels you get a small hint about where the shot is going. Don't dive too early. Wait for the hint, then commit. Each side takes five penalties, and if it's level after that, it goes to sudden death, where one miss can decide the match.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Aim inside the corners and score at least three of your five penalties.</li><li><b>Getting good:</b> Learn to read the hint in goal and save at least one penalty per shootout.</li><li><b>Expert:</b> Win on the hardest level, where the keeper is faster and the hints are smaller.</li></ul><h3>Did you know?</h3><p>The penalty kick was added to football's rules in 1891, after it was suggested by William McCrum, an Irish goalkeeper. Penalty shootouts to decide drawn matches came much later. The first FIFA World Cup match to be decided by one was played in 1982.</p><h3>Questions players ask</h3><h4>How many penalties does each side take?</h4><p>Five each. If it's a draw, it goes to sudden death.</p><h4>How do I dive?</h4><p>Move the mouse to where you want to dive and click.</p><h4>Where should I aim?</h4><p>Just inside the corners. Aiming right at the post can make the ball go wide.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/KeepyUppy/keepyuppy">Keepy Uppy</a><a href="/Bowling/bowling">Bowling</a><a href="/FiveASide/fiveaside">5-a-Side Football</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

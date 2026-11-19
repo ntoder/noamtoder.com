@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="robots" content="noindex, follow">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b0d1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/noam/noam.css">
+  <link rel="stylesheet" href="/noam/app.css">
+  <title>Music & sounds · Noam's Game Hub</title>
+  <meta name="description" content="14 music styles that keep composing new tunes, plus rain, waves, fire and more. Made live in your browser: no ads, no talking.">
+  <style> #amb { max-width: 560px; margin: 0 auto; padding: 8px 0; } #amb .amb { height: auto; } label:has(#amb-focus) { display: none !important; } </style>
+</head>
+<body>
+  <main class="page"><h1>🎧 Music & sounds</h1><p class="lead">14 music styles that keep writing new tunes, plus rain, waves, a fireplace and more. Everything is made live in your browser: no internet needed once loaded, no ads, no talking. Mix them however you like.</p><div class="card" id="amb"></div></main>
+  <script src="/noam/noam-core.js"></script>
+  <script src="/noam/glue.js"></script>
+  <script src="/noam/ambient.js"></script>
+  <script src="/noam/noam-ui.js"></script>
+  <script>NoamUI.shell('music'); renderAmbientPanel(document.getElementById('amb')); hooks.init();</script>
+</body>
+</html>

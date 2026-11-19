@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Become the star striker in the box. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Header Hero · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Header <span>Hero</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="goals">0/0</b><small>Goals</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Header Hero</h2>
+                <p id="startText">Your teammate crosses the ball in from the left.<br>Run with ⬅ ➡, jump with Space, and head (or volley!) it into the goal.<br>Hold ⬆ or ⬇ as you hit it to aim high or low. 15 crosses!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Full Time</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button><button data-k="up">⬆</button><button data-k="jump">⤒</button></div>
+    <p class="hint">The white circle shows where the ball will come down. Diving headers and volleys score extra!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, GROUND = H - 60, BEST = "headerBest", CROSSES = 15;
+        const GX = W - 90, GTOP = GROUND - 190, BR = 11;
+        Kit.stat("best", Kit.best(BEST));
+        let pl, ball, keeper, n, goals, score, combo, state = "ready", t = 0, wait = 0, msg = "", msgT = 0, fx = Kit.particles(), floats = [], shake = 0;
+        function reset() { pl = { x: 420, y: GROUND, vx: 0, vy: 0, air: false, nod: 0 }; keeper = { y: GROUND - 60, dive: 0 }; n = 0; goals = 0; score = 0; combo = 0; ball = null; wait = 1; stats(); }
+        function stats() { Kit.stat("score", score); Kit.stat("goals", `${goals}/${n}`); }
+        function cross() {
+            n++; stats();
+            const high = Math.random() < 0.5;
+            ball = { x: 40, y: high ? 140 : 300, vx: Kit.rand(300, 430) + n * 6, vy: high ? Kit.rand(-120, 40) : Kit.rand(-360, -240), live: true, hit: false, how: "", rot: 0, bounces: 0 };
+            beep(300, 0.05, "triangle", 0.04);
+        }
+        function strike(kind, px, py) {
+            // send the ball toward the goal; where it touches you changes the angle
+            const off = (ball.y - py) / 20, aim = Kit.keys.has("up") ? -1 : Kit.keys.has("down") ? 1 : 0;
+            ball.vx = 560 + Math.abs(ball.vx) * 0.25 + (kind === "volley" ? 120 : 0);
+            ball.vy = (off * 160) + aim * 160 + (kind === "volley" ? -340 : -120) + (pl.air ? pl.vy * 0.15 : 0);
+            ball.hit = true; ball.how = kind; pl.nod = 0.2;
+            fx.burst(ball.x, ball.y, "#ffffff", 10, 3); beep(kind === "volley" ? 160 : 220, 0.08, "square", 0.06);
+        }
+        function update(dt) {
+            if (msgT > 0) msgT -= dt; if (shake > 0) shake -= dt; if (pl.nod > 0) pl.nod -= dt;
+            // you
+            const dir = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0);
+            pl.vx += (dir * 300 - pl.vx) * Math.min(1, dt * 12);
+            pl.x = Math.max(120, Math.min(GX - 80, pl.x + pl.vx * dt));
+            if (pl.air) { pl.vy += 1500 * dt; pl.y += pl.vy * dt; if (pl.y >= GROUND) { pl.y = GROUND; pl.air = false; } }
+            // keeper tracks the ball once it's headed, gets sharper every cross
+            const want = ball && ball.hit ? Math.max(GTOP + 30, Math.min(GROUND - 30, ball.y + ball.vy * 0.12)) : GROUND - 70;
+            const ks = ball && ball.hit && ball.ht < 0.12 ? 0 : 110 + n * 9;
+            keeper.y += Math.max(-ks * dt, Math.min(ks * dt, want - keeper.y)); keeper.dive = (want - keeper.y) / 60;
+            if (!ball) { wait -= dt; if (wait <= 0) { if (n >= CROSSES) return end(); cross(); } return; }
+            if (!ball.live) { wait -= dt; if (wait <= 0) ball = null, wait = 0.6; return; }
+            if (ball.hit) ball.ht = (ball.ht || 0) + dt;
+            ball.vy += 640 * dt; ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.rot += ball.vx * dt * 0.02;
+            if (!ball.hit) {
+                const hx = pl.x + 4, hy = pl.y - 70, fxp = pl.x + 18, fyp = pl.y - 14;
+                if (Math.hypot(ball.x - hx, ball.y - hy) < BR + 16) strike(pl.air ? "header" : "header", hx, hy);
+                else if (Math.hypot(ball.x - fxp, ball.y - fyp) < BR + 16) strike("volley", fxp, fyp);
+            }
+            // goal frame
+            if (ball.x > GX - 4 && ball.x < GX + 8 && Math.abs(ball.y - GTOP) < BR + 4) { ball.vy = Math.abs(ball.vy) * 0.6; ball.vx *= -0.4; beep(500, 0.06, "square", 0.05); msg = "Crossbar!"; msgT = 1; }
+            if (ball.hit && ball.x > GX - 30 && ball.x < GX && Math.abs(ball.y - keeper.y) < 36 && ball.vx > 0) { ball.vx = -Math.abs(ball.vx) * 0.4; ball.vy = -200; return miss("Saved!"); }
+            if (ball.x > GX + 6 && ball.y > GTOP + 4 && ball.y < GROUND && ball.live) {
+                if (!ball.hit) return miss("No touch");
+                return goal();
+            }
+            if (ball.y > GROUND - BR) { ball.y = GROUND - BR; ball.vy = -Math.abs(ball.vy) * 0.5; ball.bounces++; if (ball.bounces > 2 && !ball.hit) return miss("Missed it!"); }
+            if (ball.x > W + 30 || ball.x < -40 || (ball.hit && ball.y < -200)) return miss(ball.hit ? "Over the bar!" : "Missed it!");
+        }
+        function goal() {
+            goals++; combo++;
+            const pts = (ball.how === "volley" ? 150 : 100) + (pl.air ? 50 : 0) + (combo > 1 ? (combo - 1) * 25 : 0);
+            score += pts; ball.live = false; wait = 1.2; shake = 0.3;
+            msg = ball.how === "volley" ? "VOLLEY GOAL!" : pl.air ? "DIVING HEADER!" : "GOAL!"; msgT = 1.3;
+            floats.push({ x: GX - 40, y: ball.y - 30, s: "+" + pts, t: 1 });
+            fx.burst(ball.x, ball.y, "#ffc94d", 40, 6); tune([523, 659, 784, 1047], 0.07, "square", 0.05); stats();
+        }
+        function miss(why) { combo = 0; ball.live = false; wait = 1; msg = why; msgT = 1.2; beep(170, 0.2, "sawtooth", 0.04, -60); stats(); }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${goals} goals from ${CROSSES} crosses · ${score} points<br>Best ${best}`;
+            if (goals >= 8) tune([523, 659, 784, 1047, 1319], 0.1, "triangle", 0.06); Kit.show("over");
+        }
+        function person(x, y, col, nod) {
+            ctx.fillStyle = "#00000044"; ctx.beginPath(); ctx.ellipse(x, GROUND + 4, 20, 6, 0, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#1a1d33"; ctx.lineWidth = 9; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x - 6, y - 26); ctx.lineTo(x - 8, y - 2); ctx.moveTo(x + 6, y - 26); ctx.lineTo(x + 14, y - 4); ctx.stroke();
+            ctx.fillStyle = col; Kit.rr(ctx, x - 15, y - 60, 30, 36, 10); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.font = "800 14px Inter, sans-serif"; ctx.textAlign = "center"; ctx.fillText("9", x, y - 37);
+            ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(x + 4 + nod * 20, y - 72, 13, 0, 7); ctx.fill();
+            ctx.fillStyle = "#3a2410"; ctx.beginPath(); ctx.arc(x + 2 + nod * 20, y - 78, 12, Math.PI, 0); ctx.fill();
+        }
+        function draw() {
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-5, 5), Kit.rand(-5, 5));
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#14183a"); g.addColorStop(0.45, "#2a3a7a"); g.addColorStop(0.46, "#2fa95d"); g.addColorStop(1, "#1f7a4a");
+            ctx.fillStyle = g; ctx.fillRect(-10, -10, W + 20, H + 20);
+            for (let i = 0; i < 60; i++) { ctx.fillStyle = ["#ff4d8d66", "#4da3ff66", "#ffc94d66", "#ffffff44"][i % 4]; ctx.beginPath(); ctx.arc(10 + i * 15, 70 + (i * 37) % 120, 6 + Math.sin(t * 6 + i) * (state === "play" && msgT > 0 && msg.includes("GOAL") ? 2 : 0), 0, 7); ctx.fill(); }
+            for (let x = 0; x < W; x += 80) { ctx.fillStyle = "#35b765"; ctx.fillRect(x, GROUND - 160, 40, H); }
+            ctx.fillStyle = "#ffffffcc"; ctx.fillRect(0, GROUND, W, 3);
+            // goal
+            ctx.fillStyle = "#ffffff14"; ctx.fillRect(GX, GTOP, W - GX, GROUND - GTOP);
+            ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 1; for (let y = GTOP; y < GROUND; y += 16) { ctx.beginPath(); ctx.moveTo(GX, y); ctx.lineTo(W, y + 20); ctx.stroke(); } for (let x = GX; x < W; x += 16) { ctx.beginPath(); ctx.moveTo(x, GTOP); ctx.lineTo(x + 10, GROUND); ctx.stroke(); }
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(GX, GROUND); ctx.lineTo(GX, GTOP); ctx.lineTo(W, GTOP); ctx.stroke();
+            // keeper
+            ctx.save(); ctx.translate(GX - 22, keeper.y); ctx.rotate(Math.max(-0.6, Math.min(0.6, keeper.dive)) * 0.6);
+            ctx.fillStyle = "#ffc94d"; Kit.rr(ctx, -14, -34, 28, 60, 9); ctx.fill(); ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(0, -44, 11, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(-12, -24); ctx.lineTo(-22, -52); ctx.moveTo(12, -24); ctx.lineTo(20, -52); ctx.stroke();
+            ctx.restore();
+            // crosser on the left
+            ctx.fillStyle = "#4da3ff"; Kit.rr(ctx, 14, GROUND - 60, 26, 34, 8); ctx.fill(); ctx.fillStyle = "#ffd29d"; ctx.beginPath(); ctx.arc(27, GROUND - 70, 10, 0, 7); ctx.fill();
+            person(pl.x, pl.y, Kit.skin("headerhero", "#4da3ff"), pl.nod > 0 ? 1 : 0);
+            if (ball) {
+                ctx.fillStyle = "#00000044"; ctx.beginPath(); ctx.ellipse(ball.x, GROUND + 3, BR, 4, 0, 0, 7); ctx.fill();
+                ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, BR, 0, 7); ctx.fill(); ctx.fillStyle = "#1a1d33"; ctx.beginPath(); ctx.arc(0, 0, 4, 0, 7); ctx.arc(7, 4, 2.5, 0, 7); ctx.arc(-6, 5, 2.5, 0, 7); ctx.fill(); ctx.restore();
+                if (!ball.hit && ball.live) { const tt = Math.max(0, (pl.x - ball.x) / ball.vx); if (tt > 0 && tt < 1.2) { const ly = ball.y + ball.vy * tt + 320 * tt * tt; if (ly < GROUND) { ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ball.x + ball.vx * tt, ly, 8, 0, 7); ctx.stroke(); } } }
+            }
+            fx.draw(ctx);
+            for (const f of floats) { f.t -= 1 / 60; f.y -= 0.6; ctx.globalAlpha = Math.max(0, f.t); Kit.text(ctx, f.s, f.x, f.y, 22, "#ffc94d"); }
+            floats = floats.filter((f) => f.t > 0); ctx.globalAlpha = 1;
+            if (msgT > 0) Kit.text(ctx, msg, W / 2, 60, msg.length > 10 ? 22 : 34, msg.includes("GOAL") || msg.includes("HEADER") ? "#ffc94d" : "#ffffff", "center", "'Press Start 2P', monospace", 400);
+            ctx.restore();
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        function jump() { if (state === "play" && !pl.air) { pl.air = true; pl.vy = -620; beep(400, 0.05, "triangle", 0.03); } }
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", Space: "jump" }, (k) => {
+            if (k === "jump") { if (state !== "play") { if (state === "ready" || !$("over").classList.contains("hidden")) start(); return; } jump(); }
+        });
+        Kit.touchButtons((k) => { if (k === "jump") jump(); });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+        if (window.__test) window.__test.hh = () => ({ ball, pl, msg, keeper });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Header Hero</h2><p>Become the star striker in the box. Your teammate swings crosses in from the left wing, and you have to get under the ball and head it past the goalkeeper. Jump for a diving header worth bonus points, or meet a low cross with a volley. Hold up or down as you connect to aim high or low. The keeper gets quicker with every cross, and you get fifteen chances to score.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡</td><td>Run</td></tr><tr><td>Space</td><td>Jump</td></tr><tr><td>Hold ⬆ / ⬇</td><td>Aim high or low</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Watch the white circle. It shows where the ball will come down.</li><li>Diving headers and volleys score more than a standing header.</li><li>Aim for the corner the keeper isn't covering.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Header Hero</h3><p>In Header Hero, timing starts with the white circle on the ground. It shows where the cross will come down, so run there as soon as the ball is kicked. Arriving early and then jumping is much easier than sprinting under the ball at the last moment.</p><p>Aim matters as much as contact. Hold up or down as you head the ball to send it high or low, and look at where the keeper is standing before the cross arrives. Diving headers and volleys score bonus points, but they're harder to time. The keeper gets quicker with every cross, so use your early chances to practise and save the risky diving headers for when you know the timing.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Run to the white circle early and score with standing headers.</li><li><b>Getting good:</b> Aim high or low away from the keeper, and try volleys on low crosses.</li><li><b>Expert:</b> Score with diving headers late in the round when the keeper is at its quickest.</li></ul><h3>Did you know?</h3><p>Heading is one of the hardest skills in football to time well. Some of the most famous goals in World Cup history were diving headers from crosses, because the ball arrives at speed and the keeper has very little time to react.</p><h3>Questions players ask</h3><h4>How many chances do I get?</h4><p>Fifteen crosses per round.</p><h4>How do I aim my header?</h4><p>Hold up or down as you connect with the ball.</p><h4>What scores the most?</h4><p>Diving headers and volleys are worth bonus points.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FiveASide/fiveaside">5-a-Side Football</a><a href="/Sudoku/sudoku">Sudoku</a><a href="/CastleDefense/castledefense">Castle Defense</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

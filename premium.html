@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Get Premium · Noam's Game Hub</title>
     <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/game-shell.css">
     <style>
         body { -webkit-user-select: auto; user-select: auto; }
@@ -37,6 +38,16 @@
         .status.wait { background: #ffc94d22; color: var(--gold); }
         a { color: var(--accent-2); }
         .hidden { display: none !important; }
+        .redeem { background: var(--bg-2); border: 1px dashed var(--accent-2); border-radius: 16px; padding: 18px; margin-bottom: 22px; text-align: center; }
+        .redeem h3 { font-size: 17px; margin-bottom: 4px; }
+        .redeem p { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+        .redeem form { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .redeem input { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);
+            font: 800 18px 'Inter', monospace; letter-spacing: 3px; text-transform: uppercase; width: 180px; text-align: center; outline: none; }
+        .redeem input:focus { border-color: var(--accent-2); }
+        .redeem .msg { margin-top: 10px; font-weight: 700; min-height: 20px; }
+        .redeem .msg.err { color: #ff8db4; } .redeem .msg.ok { color: #2ee6a0; }
+        .gift { color: var(--muted); font-size: 14px; margin-top: 12px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -58,8 +69,20 @@
             <ul class="perks">
                 <li>🚫 <b>No ads</b> anywhere on the Game Hub</li>
                 <li>★ <b>Unlock every Premium game</b><div class="games" id="premGames"></div></li>
-                <li>🏆 A gold ★ next to your name</li>
+                <li>🚀 <b>Early access</b>: play brand-new games a week before everyone else</li>
+                <li>🎨 <b>Skins</b>: pick your own colours in Space Shooter, Subway Runner, Dino Run and Brick Smash</li>
+                <li>🖼️ <b>Avatar frames</b>: gold, neon, fire or rainbow around your picture</li>
+                <li>👑 A <b style="color:var(--gold)">gold name ★</b> on the leaderboards and a "Premium since" badge</li>
             </ul>
+            <div class="redeem" id="redeemBox">
+                <h3>🎟️ Have a Premium code?</h3>
+                <p>Type it in to switch on Premium straight away.</p>
+                <form id="redeemForm">
+                    <input id="codeInput" placeholder="ABCD-1234" maxlength="9" autocomplete="off" spellcheck="false" aria-label="Premium code">
+                    <button class="btn" type="submit" id="redeemBtn">Redeem</button>
+                </form>
+                <div class="msg" id="redeemMsg"></div>
+            </div>
             <div class="cta">
                 <div class="status ok hidden" id="isPrem">★ You already have Premium. Thanks for supporting the hub!</div>
                 <div class="status wait hidden" id="isWaiting">⏳ Request sent! Pay Noam ₪10 and he'll switch it on.</div>
@@ -70,10 +93,12 @@
             <div class="how">
                 <h3>How it works</h3>
                 <ol>
-                    <li>Log in (or make a free account) and press <b>Request Premium</b>.</li>
-                    <li>Pay <b>Noam ₪10 in cash</b>.</li>
-                    <li>Noam turns on Premium for your account. Refresh the page and you're in.</li>
+                    <li>Pay <b>Noam ₪10 in cash</b>. You'll get a Premium code like <b>ABCD-1234</b>.</li>
+                    <li>Log in (or make a free account) and type the code in the box above.</li>
+                    <li>That's it: Premium is on, for life.</li>
                 </ol>
+                <p class="gift">🎁 <b>Buying for someone else?</b> A code works as a gift: give it to them and they type it in on their own account. Parents can pay for their kids the same way.</p>
+                <p class="gift">No code yet? Press <b>Request Premium</b> and Noam will switch it on after you pay.</p>
             </div>
         </section>
     </main>
@@ -81,7 +106,7 @@
     <script type="module">
         import { db } from "/firebase-config.js";
         import { doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { GAMES, onAccount, isPremium } from "/hub.js";
+        import { GAMES, onAccount, isPremium, redeemCode } from "/hub.js";
         const $ = (id) => document.getElementById(id);
 
         onAccount(({ user, profile, premiumGames }) => {
@@ -91,6 +116,27 @@
             $("isWaiting").classList.toggle("hidden", !waiting);
             $("requestBtn").classList.toggle("hidden", !user || prem || waiting);
             $("loginBtn").classList.toggle("hidden", !!user);
+            $("redeemBox").classList.toggle("hidden", prem);
+        });
+
+        $("codeInput").addEventListener("input", (e) => {
+            let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+            e.target.value = v.length > 4 ? v.slice(0, 4) + "-" + v.slice(4) : v;
+        });
+        $("redeemForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const m = $("redeemMsg"); m.className = "msg"; m.textContent = "Checking…";
+            const { state } = await import("/hub.js");
+            if (!state.user) { location.href = "/login?next=/premium"; return; }
+            $("redeemBtn").disabled = true;
+            try {
+                await redeemCode($("codeInput").value);
+                m.className = "msg ok"; m.textContent = "🎉 Premium is on! Enjoy the games.";
+                $("isPrem").classList.remove("hidden"); $("requestBtn").classList.add("hidden"); $("isWaiting").classList.add("hidden");
+                setTimeout(() => $("redeemBox").classList.add("hidden"), 2500);
+            } catch (err) {
+                m.className = "msg err"; m.textContent = err.message; $("redeemBtn").disabled = false;
+            }
         });
 
         $("requestBtn").addEventListener("click", async () => {

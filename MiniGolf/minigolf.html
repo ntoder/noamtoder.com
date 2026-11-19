@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Nine fun holes of mini golf. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Mini Golf · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.golfcard div{display:flex;justify-content:space-between;font-size:14px;padding:2px 4px}.golfcard span{color:#9aa0c8}.golfcard .tot{border-top:1px solid #2a3060;margin-top:4px;padding-top:4px}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Mini <span>Golf</span></h1>
+        <div class="stats"><div class="stat"><b id="hole">1/9</b><small>Hole</small></div><div class="stat"><b id="strokes">0</b><small>Strokes</small></div><div class="stat"><b id="par">2</b><small>Par</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Mini Golf</h2>
+                <p id="startText">Drag back from the ball and let go to putt, like a slingshot.<br>Pull further for a harder shot. Avoid the water and sand!<br>9 holes. Fewer strokes means more points.</p>
+                <button class="btn" id="startBtn">▶ Tee off</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Round Complete</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            <div class="side" style="width:120px"><div class="panel"><small>Card</small><div id="card" class="golfcard"></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">A ball that's moving too fast skips over the hole, so a gentle putt is best near the cup.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BR = 8, CUP = 13, M = 30, BEST = "golfBest";
+        // w = wall, s = sand, water = water, mv = moving wall [x, y, w, h, dx, dy, speed]
+        const HOLES = [
+            { par: 2, start: [130, 270], cup: [730, 270], w: [], s: [], water: [], mv: [] },
+            { par: 3, start: [130, 140], cup: [730, 140], w: [[410, 30, 40, 360]], s: [[560, 380, 120, 80]], water: [], mv: [] },
+            { par: 3, start: [120, 270], cup: [740, 270], w: [], s: [], water: [[300, 170, 260, 200]], mv: [] },
+            { par: 3, start: [120, 110], cup: [740, 440], w: [[260, 30, 570, 300]], s: [[120, 380, 90, 90]], water: [], mv: [] },
+            { par: 3, start: [110, 270], cup: [750, 270], w: [[300, 200, 30, 30], [300, 310, 30, 30], [430, 140, 30, 30], [430, 255, 30, 30], [430, 370, 30, 30], [560, 200, 30, 30], [560, 310, 30, 30]], s: [[620, 60, 160, 60], [620, 420, 160, 60]], water: [], mv: [] },
+            { par: 3, start: [110, 270], cup: [750, 270], w: [[230, 30, 30, 190], [230, 320, 30, 190], [600, 30, 30, 190], [600, 320, 30, 190]], s: [], water: [], mv: [[400, 220, 40, 100, 0, 1, 150]] },
+            { par: 4, start: [100, 470], cup: [760, 70], w: [[200, 140, 30, 370], [380, 30, 30, 370], [560, 140, 30, 370]], s: [], water: [], mv: [] },
+            { par: 4, start: [100, 270], cup: [640, 270], w: [], s: [[600, 230, 80, 80]], water: [[220, 30, 300, 180], [220, 330, 300, 180], [710, 30, 120, 480]], mv: [] },
+            { par: 3, start: [110, 270], cup: [760, 270], w: [[330, 30, 30, 200], [330, 310, 30, 200], [560, 30, 30, 200], [560, 310, 30, 200]], s: [], water: [], mv: [[320, 230, 50, 80, 0, 1, 120], [550, 230, 50, 80, 0, -1, 170]] }
+        ];
+        let hole, ball, last, strokes, cards, state = "ready", t = 0, aim = null, sunk = 0, fx = Kit.particles(), msg = "", msgT = 0, movers;
+        Kit.stat("best", Kit.best(BEST));
+        function load(i) {
+            hole = i; const h = HOLES[i];
+            ball = { x: h.start[0], y: h.start[1], vx: 0, vy: 0, s: 1 }; last = { x: ball.x, y: ball.y }; strokes = 0; sunk = 0;
+            movers = h.mv.map(([x, y, w, hh, dx, dy, sp]) => ({ x, y, w, h: hh, ox: x, oy: y, dx, dy, sp, p: 0 }));
+            Kit.stat("hole", `${i + 1}/9`); Kit.stat("strokes", 0); Kit.stat("par", h.par);
+            msg = `Hole ${i + 1} · Par ${h.par}`; msgT = 1.6;
+        }
+        function total() { return cards.reduce((a, c) => a + c, 0); }
+        function points() { return cards.reduce((a, c, i) => a + Math.max(0, HOLES[i].par - c + 3) * 100, 0); }
+        function rects() { return HOLES[hole].w.map(([x, y, w, h]) => ({ x, y, w, h })).concat(movers); }
+        const inside = (x, y, [rx, ry, rw, rh]) => x > rx && x < rx + rw && y > ry && y < ry + rh;
+        function collide(r) {
+            const cx = Math.max(r.x, Math.min(ball.x, r.x + r.w)), cy = Math.max(r.y, Math.min(ball.y, r.y + r.h));
+            const dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
+            if (d >= BR) return;
+            let nx, ny;
+            if (d === 0) { // centre inside: push out the short way
+                const l = ball.x - r.x, rr = r.x + r.w - ball.x, tp = ball.y - r.y, b = r.y + r.h - ball.y, m = Math.min(l, rr, tp, b);
+                nx = m === l ? -1 : m === rr ? 1 : 0; ny = m === tp ? -1 : m === b ? 1 : 0;
+                ball.x += nx * (m + BR); ball.y += ny * (m + BR);
+            } else { nx = dx / d; ny = dy / d; ball.x = cx + nx * BR; ball.y = cy + ny * BR; }
+            const v = ball.vx * nx + ball.vy * ny;
+            if (v < 0) { ball.vx -= 1.8 * v * nx; ball.vy -= 1.8 * v * ny; if (Math.abs(v) > 60) beep(260, 0.03, "square", 0.03); }
+        }
+        function update(dt) {
+            if (msgT > 0) msgT -= dt;
+            for (const m of movers) { m.p += dt * m.sp; const off = Math.sin(m.p / 60) * 110; m.x = m.ox + m.dx * off; m.y = m.oy + m.dy * off; }
+            if (sunk > 0) { sunk += dt; ball.s = Math.max(0, 1 - sunk * 3); if (sunk > 1.2) nextHole(); return; }
+            const h = HOLES[hole];
+            for (let s = 0; s < 4; s++) {
+                const st = dt / 4;
+                ball.x += ball.vx * st; ball.y += ball.vy * st;
+                if (ball.x < M + BR) { ball.x = M + BR; ball.vx = Math.abs(ball.vx) * 0.8; }
+                if (ball.x > W - M - BR) { ball.x = W - M - BR; ball.vx = -Math.abs(ball.vx) * 0.8; }
+                if (ball.y < M + BR) { ball.y = M + BR; ball.vy = Math.abs(ball.vy) * 0.8; }
+                if (ball.y > H - M - BR) { ball.y = H - M - BR; ball.vy = -Math.abs(ball.vy) * 0.8; }
+                for (const r of rects()) collide(r);
+            }
+            const sp = Math.hypot(ball.vx, ball.vy);
+            const sand = h.s.some((r) => inside(ball.x, ball.y, r)), dec = sand ? 900 : 230;
+            if (sp > 0) { const ns = Math.max(0, sp - dec * dt); ball.vx *= ns / sp; ball.vy *= ns / sp; }
+            // cup
+            const dcx = h.cup[0] - ball.x, dcy = h.cup[1] - ball.y, dc = Math.hypot(dcx, dcy);
+            if (dc < CUP) {
+                if (sp < 480) { sunk = 0.001; ball.vx = ball.vy = 0; ball.x = h.cup[0]; ball.y = h.cup[1]; cards.push(strokes); sinkMsg(strokes, h.par); }
+                else { ball.vx += dcx * 4; ball.vy += dcy * 4; beep(500, 0.03, "triangle", 0.03); }
+            } else if (dc < CUP * 3 && sp > 0 && sp < 200) { ball.vx += dcx / dc * 60 * dt; ball.vy += dcy / dc * 60 * dt; }
+            // water
+            if (h.water.some((r) => inside(ball.x, ball.y, r))) {
+                fx.burst(ball.x, ball.y, "#4da3ff", 20, 3); beep(200, 0.25, "sine", 0.05, -100);
+                strokes++; Kit.stat("strokes", strokes); ball.x = last.x; ball.y = last.y; ball.vx = ball.vy = 0; msg = "Splash! +1 stroke"; msgT = 1.2;
+            }
+            if (sp < 4 && !sunk && strokes >= 8) { cards.push(strokes); renderCard(); msg = "Max strokes"; msgT = 1.2; sunk = 0.001; }
+        }
+        function sinkMsg(n, par) {
+            const d = n - par;
+            msg = n === 1 ? "HOLE IN ONE!" : d <= -2 ? "Eagle!" : d === -1 ? "Birdie!" : d === 0 ? "Par" : d === 1 ? "Bogey" : `+${d}`; msgT = 1.6;
+            fx.burst(HOLES[hole].cup[0], HOLES[hole].cup[1], n === 1 ? "#ffc94d" : "#ffffff", n === 1 ? 50 : 20, 4);
+            if (d <= 0) tune([523, 659, 784, 1047], 0.07, "triangle", 0.05); else beep(440, 0.15, "triangle", 0.04);
+            renderCard();
+        }
+        function nextHole() {
+            if (hole + 1 >= HOLES.length) return end();
+            load(hole + 1);
+        }
+        function renderCard() {
+            $("card").innerHTML = HOLES.map((h, i) => { const s = cards[i]; const c = s == null ? "" : s < h.par ? "color:#2ee6a0" : s > h.par ? "color:#ff4d8d" : ""; return `<div><span>${i + 1}</span><b style="${c}">${s ?? "·"}</b></div>`; }).join("") +
+                `<div class="tot"><span>Σ</span><b>${total()}</b></div>`;
+        }
+        function end() {
+            state = "dead"; const pts = points(), par = HOLES.reduce((a, h) => a + h.par, 0), d = total() - par;
+            Kit.save(pts); const best = Kit.setBest(BEST, pts);
+            $("overText").innerHTML = `${total()} strokes (${d > 0 ? "+" + d : d === 0 ? "even par" : d} ) · ${pts} points<br>Best ${best}`;
+            tune([523, 659, 784, 1047, 1319], 0.1, "triangle", 0.05); Kit.show("over");
+        }
+        function draw() {
+            const h = HOLES[hole];
+            ctx.fillStyle = "#3a2a7a"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#2fa95d"; Kit.rr(ctx, M - 6, M - 6, W - 2 * M + 12, H - 2 * M + 12, 18); ctx.fill();
+            for (let x = M; x < W - M; x += 40) { ctx.fillStyle = "#35b765"; ctx.fillRect(x, M, 20, H - 2 * M); }
+            ctx.strokeStyle = "#8a5a30"; ctx.lineWidth = 12; Kit.rr(ctx, M - 6, M - 6, W - 2 * M + 12, H - 2 * M + 12, 18); ctx.stroke();
+            for (const [x, y, w, hh] of h.water) { ctx.fillStyle = "#2a6fdb"; Kit.rr(ctx, x, y, w, hh, 14); ctx.fill(); ctx.strokeStyle = "#8fd3ff66"; ctx.lineWidth = 2; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x + w / 2 + Math.sin(t + k) * 30, y + hh / 2 + k * 14 - 14, 18 + k * 6, 0.2, 2.6); ctx.stroke(); } }
+            for (const [x, y, w, hh] of h.s) { ctx.fillStyle = "#e8c98a"; Kit.rr(ctx, x, y, w, hh, 20); ctx.fill(); }
+            for (const r of rects()) { ctx.fillStyle = "#8a5a30"; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.fillStyle = "#a8743f"; ctx.fillRect(r.x + 3, r.y + 3, r.w - 6, Math.min(6, r.h - 6)); }
+            // cup and flag
+            ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(h.cup[0], h.cup[1], CUP, 0, 7); ctx.fill();
+            ctx.fillStyle = "#eef0ff"; ctx.fillRect(h.cup[0] - 1, h.cup[1] - 50, 3, 50);
+            ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.moveTo(h.cup[0] + 2, h.cup[1] - 50); ctx.lineTo(h.cup[0] + 28 + Math.sin(t * 4) * 3, h.cup[1] - 42); ctx.lineTo(h.cup[0] + 2, h.cup[1] - 34); ctx.fill();
+            // aim
+            const moving = Math.hypot(ball.vx, ball.vy) > 4;
+            if (aim && !moving && !sunk) {
+                const dx = aim.sx - aim.x, dy = aim.sy - aim.y, pw = Math.min(1, Math.hypot(dx, dy) / 180), a = Math.atan2(dy, dx);
+                ctx.strokeStyle = `hsl(${120 - pw * 120} 90% 60%)`; ctx.lineWidth = 4; ctx.setLineDash([8, 8]);
+                ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ball.x + Math.cos(a) * (30 + pw * 150), ball.y + Math.sin(a) * (30 + pw * 150)); ctx.stroke(); ctx.setLineDash([]);
+            }
+            // ball
+            ctx.fillStyle = "#00000044"; ctx.beginPath(); ctx.arc(ball.x + 2, ball.y + 3, BR * ball.s, 0, 7); ctx.fill();
+            ctx.fillStyle = Kit.skin("minigolf", "#ffffff"); ctx.beginPath(); ctx.arc(ball.x, ball.y, BR * ball.s, 0, 7); ctx.fill();
+            if (!moving && !sunk && state === "play") { ctx.strokeStyle = "#ffffff66"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ball.x, ball.y, BR + 6 + Math.sin(t * 5) * 2, 0, 7); ctx.stroke(); }
+            fx.draw(ctx);
+            if (msgT > 0) { ctx.globalAlpha = Math.min(1, msgT * 2); Kit.text(ctx, msg, W / 2, 70, 26, msg === "HOLE IN ONE!" ? "#ffc94d" : "#ffffff", "center", "'Press Start 2P', monospace", 400); ctx.globalAlpha = 1; }
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || sunk || Math.hypot(ball.vx, ball.vy) > 4) return; const p = Kit.point(cv, e); aim = { sx: p.x, sy: p.y, x: p.x, y: p.y }; });
+        cv.addEventListener("pointermove", (e) => { if (aim) { const p = Kit.point(cv, e); aim.x = p.x; aim.y = p.y; } });
+        addEventListener("pointerup", () => {
+            if (!aim) return; const dx = aim.sx - aim.x, dy = aim.sy - aim.y, d = Math.hypot(dx, dy); aim = null;
+            if (d < 8) return;
+            const pw = Math.min(1, d / 180), sp = 60 + pw * 840;
+            last = { x: ball.x, y: ball.y }; ball.vx = dx / d * sp; ball.vy = dy / d * sp;
+            strokes++; Kit.stat("strokes", strokes); beep(300 + pw * 200, 0.05, "triangle", 0.05);
+        });
+        function start() { cards = []; state = "play"; load(0); renderCard(); Kit.hide("start"); Kit.hide("over"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        cards = []; load(0); msgT = 0; game.start();
+        if (window.__test) window.__test.golf = () => ({ ball, hole, cup: HOLES[hole].cup });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Mini Golf</h2><p>Nine fun holes of mini golf. Drag back from the ball and let go to putt, like pulling back a slingshot: the further you pull, the harder you hit. Bank shots off the walls, steer around sand traps that slow the ball down, and avoid the water or you'll get a penalty stroke. Some holes have moving walls you need to time just right. Get each hole in as few strokes as you can.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag back and let go</td><td>Aim and putt</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Use the walls. A bank shot is often the shortest way to the hole.</li><li>A fast ball can skip over the cup, so slow down near the hole.</li><li>Wait for moving walls to open before you putt.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Mini Golf</h3><p>Mini Golf is about power control. Drag back from the ball and let go: the further you pull, the harder the putt. A ball that's moving too fast can skip right over the hole, so near the cup, a gentle putt that rolls in is better than a hard one that bounces out.</p><p>Walls are tools. On many holes the shortest path to the cup is a bank shot off a wall. Imagine the ball bouncing like light off a mirror: it leaves the wall at the same angle it hit it. Some holes have moving walls, so watch them for a moment and putt when the gap is about to open. Par is the number of shots a good player needs, so aim to match it on each hole.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Get the ball in the hole on each of the 9 holes, however many shots it takes.</li><li><b>Getting good:</b> Use bank shots and putt softly near the cup to finish holes in par.</li><li><b>Expert:</b> Finish the course under par by planning one-shot routes off the walls.</li></ul><h3>Did you know?</h3><p>Miniature golf has been around since the late 1800s. One of the earliest known courses was made in 1867 for the Ladies' Putting Club at St Andrews in Scotland, the town known as the home of golf.</p><h3>Questions players ask</h3><h4>How do I putt?</h4><p>Drag back from the ball and let go. Pull further for a harder shot.</p><h4>Why did the ball go over the hole?</h4><p>It was moving too fast. Use a softer putt near the cup.</p><h4>How many holes are there?</h4><p>Nine holes, each a little harder than the last.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Bowling/bowling">Bowling</a><a href="/HeaderHero/headerhero">Header Hero</a><a href="/Sudoku/sudoku">Sudoku</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

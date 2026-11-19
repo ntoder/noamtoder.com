@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A colourful match-three puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Gem Swap · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Gem <span>Swap</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="moves">30</b><small>Moves</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Gem Swap</h2>
+                <p id="startText">Swap two gems next to each other to make a line of 3 or more.<br>Match 4 for a ⚡ striped gem and 5 for a 🌈 star gem!<br>You have 30 moves. Chain reactions score extra.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Out of Moves</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Click a gem then a neighbour, or drag a gem to swap it. Stuck? A hint glows after a few seconds.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), N = 8, S = cv.width / N, BEST = "gemBest", MOVES = 30;
+        const COLS = ["#ff4d6d", "#ffc94d", "#2ee6a0", "#4da3ff", "#a15cff", "#ff9d4d"];
+        Kit.stat("best", Kit.best(BEST));
+        let g, score, moves, combo, sel = null, busy = false, revert = null, swapCell = null, state = "ready", t = 0, idle = 0, hint = null, fx = Kit.particles(), floats = [];
+        const inB = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+        const gem = (c) => ({ c, sp: null, ox: 0, oy: 0, s: 1 });
+        function fill() {
+            g = Array.from({ length: N }, () => Array(N).fill(null));
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+                let c; do { c = Kit.randi(0, 5); } while ((x > 1 && g[y][x - 1].c === c && g[y][x - 2].c === c) || (y > 1 && g[y - 1][x].c === c && g[y - 2][x].c === c));
+                g[y][x] = gem(c); g[y][x].oy = -(N - y + 2) * S;
+            }
+            if (!hasMove()) fill();
+        }
+        function runs() {
+            const out = [];
+            for (let y = 0; y < N; y++) for (let x = 0; x < N;) { const c = g[y][x] && g[y][x].c; let k = x; while (k < N && g[y][k] && g[y][k].c === c && c >= 0) k++; if (k - x >= 3) out.push({ dir: "h", cells: Array.from({ length: k - x }, (_, i) => [x + i, y]) }); x = Math.max(k, x + 1); }
+            for (let x = 0; x < N; x++) for (let y = 0; y < N;) { const c = g[y][x] && g[y][x].c; let k = y; while (k < N && g[k][x] && g[k][x].c === c && c >= 0) k++; if (k - y >= 3) out.push({ dir: "v", cells: Array.from({ length: k - y }, (_, i) => [x, y + i]) }); y = Math.max(k, y + 1); }
+            return out;
+        }
+        function hasMove() {
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) for (const [dx, dy] of [[1, 0], [0, 1]]) {
+                const X = x + dx, Y = y + dy; if (!inB(X, Y)) continue;
+                if (g[y][x].sp === "star" || g[Y][X].sp === "star") return [[x, y], [X, Y]];
+                [g[y][x], g[Y][X]] = [g[Y][X], g[y][x]]; const ok = runs().length > 0; [g[y][x], g[Y][X]] = [g[Y][X], g[y][x]];
+                if (ok) return [[x, y], [X, Y]];
+            }
+            return null;
+        }
+        function settled() { for (const row of g) for (const c of row) if (c && (Math.abs(c.ox) > 0.5 || Math.abs(c.oy) > 0.5)) return false; return true; }
+        function trySwap(a, b) {
+            if (busy || moves <= 0) return;
+            const [ax, ay] = a, [bx, by] = b; if (Math.abs(ax - bx) + Math.abs(ay - by) !== 1) return;
+            const A = g[ay][ax], B = g[by][bx];
+            g[ay][ax] = B; g[by][bx] = A;
+            B.ox = (bx - ax) * S; B.oy = (by - ay) * S; A.ox = (ax - bx) * S; A.oy = (ay - by) * S;
+            sel = null; hint = null; idle = 0; busy = true; combo = 0; swapCell = [bx, by];
+            if (A.sp === "star" || B.sp === "star") {                     // star + any gem: clear that colour
+                const star = A.sp === "star" ? A : B, other = star === A ? B : A, kill = new Set();
+                star.pending = other.c < 0 ? Kit.randi(0, 5) : other.c;
+                for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === star) kill.add(x + "," + y);
+                moves--; Kit.stat("moves", moves); setTimeout(() => clear(kill), 160); return;
+            }
+            if (!runs().length) revert = [a, b]; else { moves--; Kit.stat("moves", moves); }
+            beep(420, 0.05, "triangle", 0.04);
+        }
+        function clear(set) {
+            // expand by specials
+            const q = [...set];
+            while (q.length) {
+                const [x, y] = q.pop().split(",").map(Number), c = g[y][x]; if (!c || c.used) continue; c.used = true;
+                const add = (X, Y) => { const k = X + "," + Y; if (inB(X, Y) && !set.has(k)) { set.add(k); q.push(k); } };
+                if (c.sp === "h") for (let X = 0; X < N; X++) add(X, y);
+                if (c.sp === "v") for (let Y = 0; Y < N; Y++) add(x, Y);
+                if (c.sp === "star") { const col = c.pending ?? mostCommon(); for (let Y = 0; Y < N; Y++) for (let X = 0; X < N; X++) if (g[Y][X] && g[Y][X].c === col) add(X, Y); }
+            }
+            combo++;
+            const pts = set.size * 10 * combo; score += pts; Kit.stat("score", score);
+            let cx = 0, cy = 0;
+            for (const k of set) { const [x, y] = k.split(",").map(Number); cx += x; cy += y; const c = g[y][x]; if (c) fx.burst(x * S + S / 2, y * S + S / 2, c.c >= 0 ? COLS[c.c] : "#fff", 6, 3); g[y][x] = c && c.keep ? c : null; }
+            for (const row of g) for (const c of row) if (c) { delete c.keep; c.used = false; }
+            floats.push({ x: cx / set.size * S + S / 2, y: cy / set.size * S + S / 2, s: "+" + pts, t: 0.9 });
+            beep(500 + combo * 90, 0.09, "square", 0.05); if (combo >= 3) tune([784, 988], 0.05, "triangle", 0.04);
+            gravity();
+        }
+        function mostCommon() { const n = Array(6).fill(0); for (const r of g) for (const c of r) if (c && c.c >= 0) n[c.c]++; return n.indexOf(Math.max(...n)); }
+        function gravity() {
+            for (let x = 0; x < N; x++) {
+                let write = N - 1;
+                for (let y = N - 1; y >= 0; y--) if (g[y][x]) { if (write !== y) { g[write][x] = g[y][x]; g[write][x].oy += (y - write) * S; g[y][x] = null; } write--; }
+                for (let y = write, k = 1; y >= 0; y--, k++) { g[y][x] = gem(Kit.randi(0, 5)); g[y][x].oy = -(write + 1) * S - k * 4; }
+            }
+        }
+        function resolve() {
+            const rs = runs();
+            if (!rs.length) {
+                busy = false; swapCell = null;
+                if (!hasMove()) { floats.push({ x: cv.width / 2, y: cv.height / 2, s: "Shuffle!", t: 1.2 }); fill(); busy = true; }
+                else if (moves <= 0) end();
+                return;
+            }
+            const set = new Set();
+            for (const r of rs) {
+                r.cells.forEach(([x, y]) => set.add(x + "," + y));
+                if (r.cells.length >= 4) {                                  // make a special gem
+                    let at = r.cells.find(([x, y]) => swapCell && x === swapCell[0] && y === swapCell[1]) || r.cells[1];
+                    const c = g[at[1]][at[0]];
+                    if (c && !c.sp) { c.sp = r.cells.length >= 5 ? "star" : r.dir === "h" ? "v" : "h"; if (c.sp === "star") c.c = -1; c.keep = true; set.delete(at.join(",")); set.add(at.join(",")); }
+                }
+            }
+            // keep newly made specials
+            for (const k of [...set]) { const [x, y] = k.split(",").map(Number); if (g[y][x] && g[y][x].keep) set.delete(k); }
+            clear(set);
+            swapCell = null;
+        }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${score.toLocaleString()} points<br>Best ${best.toLocaleString()}`;
+            tune([523, 659, 784, 1047], 0.1, "triangle", 0.05); setTimeout(() => Kit.show("over"), 400);
+        }
+        const game = Kit.loop((dt) => {
+            t += dt;
+            const k = Math.min(1, dt * 14);
+            for (const row of g) for (const c of row) if (c) { c.ox -= c.ox * k; c.oy = c.oy < 0 ? Math.min(0, c.oy + 1400 * dt) : c.oy - c.oy * k; if (Math.abs(c.ox) < 0.5) c.ox = 0; if (Math.abs(c.oy) < 0.5) c.oy = 0; }
+            if (state === "play") {
+                if (busy && settled()) {
+                    if (revert) { const [a, b] = revert; revert = null; const A = g[a[1]][a[0]], B = g[b[1]][b[0]]; g[a[1]][a[0]] = B; g[b[1]][b[0]] = A; B.ox = (b[0] - a[0]) * S; B.oy = (b[1] - a[1]) * S; A.ox = (a[0] - b[0]) * S; A.oy = (a[1] - b[1]) * S; beep(200, 0.08, "triangle", 0.03); setTimeout(() => { busy = false; }, 200); }
+                    else resolve();
+                }
+                if (!busy) { idle += dt; if (idle > 6 && !hint) hint = hasMove(); }
+            }
+            for (const f of floats) { f.t -= dt; f.y -= 40 * dt; } floats = floats.filter((f) => f.t > 0);
+            fx.update(dt); draw();
+        });
+        function drawGem(c, x, y) {
+            const cx = x * S + S / 2 + c.ox, cy = y * S + S / 2 + c.oy, r = S * 0.36;
+            if (cy < -S) return;
+            if (c.sp === "star") {
+                const grd = ctx.createRadialGradient(cx, cy, 2, cx, cy, r); COLS.forEach((col, i) => grd.addColorStop(i / 5, col));
+                ctx.fillStyle = grd; ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = t * 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.5 : r * 1.05; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } ctx.fill(); return;
+            }
+            const col = COLS[c.c];
+            ctx.fillStyle = col; ctx.beginPath();
+            const shape = c.c % 3;
+            if (shape === 0) ctx.arc(cx, cy, r, 0, 7);
+            else if (shape === 1) { ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy); }
+            else Kit.rr(ctx, cx - r * 0.9, cy - r * 0.9, r * 1.8, r * 1.8, r * 0.4);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.ellipse(cx - r * 0.3, cy - r * 0.35, r * 0.32, r * 0.18, -0.6, 0, 7); ctx.fill();
+            if (c.sp === "h" || c.sp === "v") { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.beginPath(); for (let i = -1; i <= 1; i++) { if (c.sp === "h") { ctx.moveTo(cx - r * 0.8, cy + i * 7); ctx.lineTo(cx + r * 0.8, cy + i * 7); } else { ctx.moveTo(cx + i * 7, cy - r * 0.8); ctx.lineTo(cx + i * 7, cy + r * 0.8); } } ctx.stroke(); }
+        }
+        function draw() {
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, 0, cv.width, cv.height);
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { ctx.fillStyle = (x + y) % 2 ? "#181c3a" : "#1e2347"; ctx.fillRect(x * S, y * S, S, S); }
+            if (sel) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; Kit.rr(ctx, sel[0] * S + 3, sel[1] * S + 3, S - 6, S - 6, 10); ctx.stroke(); }
+            if (hint && Math.floor(t * 3) % 2) for (const [x, y] of hint) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; Kit.rr(ctx, x * S + 5, y * S + 5, S - 10, S - 10, 10); ctx.stroke(); }
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x]) drawGem(g[y][x], x, y);
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.min(1, f.t * 2); Kit.text(ctx, f.s, f.x, f.y, 22, "#ffffff"); }
+            ctx.globalAlpha = 1;
+        }
+        let down = null;
+        const cellAt = (e) => { const p = Kit.point(cv, e); return [Math.floor(p.x / S), Math.floor(p.y / S), p]; };
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play" || busy) return; const [x, y, p] = cellAt(e); if (!inB(x, y)) return;
+            if (sel && Math.abs(sel[0] - x) + Math.abs(sel[1] - y) === 1) { trySwap(sel, [x, y]); return; }
+            sel = [x, y]; down = p; beep(700, 0.03, "triangle", 0.02);
+        });
+        cv.addEventListener("pointermove", (e) => {
+            if (!down || !sel || busy) return; const p = Kit.point(cv, e), dx = p.x - down.x, dy = p.y - down.y;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > S * 0.4) { const d = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]; const to = [sel[0] + d[0], sel[1] + d[1]]; down = null; if (inB(...to)) trySwap(sel, to); }
+        });
+        addEventListener("pointerup", () => { down = null; });
+        function start() { score = 0; moves = MOVES; combo = 0; busy = true; state = "play"; fill(); Kit.stat("score", 0); Kit.stat("moves", moves); Kit.hide("start"); Kit.hide("over"); tune([523, 659, 784], 0.08, "triangle"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        fill(); game.start();
+        if (window.__test) window.__test.move = () => hasMove();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Gem Swap</h2><p>A colourful match-three puzzle. Swap two gems that sit next to each other to line up three or more of the same colour, and they burst into sparkles. New gems fall from the top, and if they make new lines you get a chain reaction worth extra points. Match four for a striped gem that clears a whole row, or five for a rainbow star that clears every gem of one colour. You have thirty moves to score as much as you can.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click two gems</td><td>Swap them</td></tr><tr><td>Drag a gem</td><td>Swap it with its neighbour</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Make matches near the bottom. Falling gems often make free chain reactions.</li><li>Save the star gem and swap it with the colour there is most of.</li><li>Always look for a move that makes a line of four or five.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Gem Swap</h3><p>In Gem Swap, every match removes gems and new ones fall in from the top. Matches near the bottom of the board move more gems, which gives more chances for falling gems to line up by themselves in free chain reactions. Matches near the top only shuffle a few gems. So when you have a choice, play low.</p><p>Lines of four or five are worth much more than lines of three, and they create special gems: a line of four makes a gem that clears a whole row or column when you match it, and a line of five makes a star gem. Before swapping, scan for spots where one swap would line up four or five in a row. The star gem is the most powerful: swap it with a gem of the colour there's most of on the board to clear every gem of that colour. If you get stuck, wait a few seconds and a hint will glow.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Find any match of three and get used to how gems fall.</li><li><b>Getting good:</b> Play matches near the bottom and look for lines of four.</li><li><b>Expert:</b> Set up lines of five and save the star gem for the most common colour.</li></ul><h3>Did you know?</h3><p>Gem Swap is a match-three game, a genre made famous by Bejeweled in 2001. Match-three games have since become one of the most-played types of game in the world, especially on phones.</p><h3>Questions players ask</h3><h4>How do I swap gems?</h4><p>Click a gem then one next to it, or drag a gem onto its neighbour.</p><h4>What if there are no moves?</h4><p>If you're stuck, a hint glows after a few seconds.</p><h4>What does the star gem do?</h4><p>Swap it with any gem to clear every gem of that colour.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SkyClimber/skyclimber">Sky Climber</a><a href="/AirHockey/airhockey">Air Hockey</a><a href="/KeepyUppy/keepyuppy">Keepy Uppy</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

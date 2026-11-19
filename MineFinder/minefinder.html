@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A logic puzzle where every number tells you how many hidden mines touch that square. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Mine Finder · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#board{display:grid;gap:2px}.cell{width:var(--cell);height:var(--cell);border:0;border-radius:5px;background:linear-gradient(#2f3670,#252a5a);font:800 calc(var(--cell)*.5) Inter,sans-serif;color:#eef0ff;cursor:pointer;padding:0;display:grid;place-items:center;touch-action:manipulation}.cell:hover{filter:brightness(1.25)}.cell.open{background:#12152b;cursor:default}.cell.boom{background:#ff4d8d}.cell.flag{font-size:calc(var(--cell)*.48)}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Mine <span>Finder</span></h1>
+        <div class="stats"><div class="stat"><b id="mines">10</b><small>Mines</small></div><div class="stat"><b id="time">0</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center"><span class="seg" id="lv"><button data-l="easy">Easy 9×9</button><button data-l="medium">Medium 16×16</button><button data-l="hard">Hard 24×16</button></span>
+            <button class="btn ghost" id="face" style="font-size:22px;padding:6px 14px">🙂</button><button class="btn ghost" id="flagBtn" style="padding:8px 14px">🚩 Flag mode: OFF</button></div>
+            <div class="frame" style="padding:10px"><div id="board"></div>
+            <div class="overlay hidden" id="over"><div><h2 id="overTitle">Cleared!</h2><p id="overText"></p><button class="btn" id="againBtn">↻ New board</button></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Click to open a square. Right-click (or long-press on a phone) to place a flag. Click a number to open everything around it.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const LV = { easy: { w: 9, h: 9, m: 10, base: 200, lim: 120, mul: 2 }, medium: { w: 16, h: 16, m: 40, base: 800, lim: 400, mul: 3 }, hard: { w: 24, h: 16, m: 75, base: 1500, lim: 900, mul: 4 } };
+        const BEST = "mineBest", COLORS = ["", "#4da3ff", "#2ee6a0", "#ff4d8d", "#a15cff", "#ff9d4d", "#2ee6c9", "#eef0ff", "#9aa0c8"];
+        let lv = "easy", cells, w, h, mines, started, over, flags, opened, timeT = 0, timer = null, flagMode = false;
+        try { lv = localStorage.getItem("mineLv") || "easy"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        const board = $("board");
+        function idx(x, y) { return y * w + x; }
+        function around(i) { const x = i % w, y = Math.floor(i / w), out = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx >= 0 && xx < w && yy >= 0 && yy < h) out.push(idx(xx, yy)); } return out; }
+        function reset() {
+            const L = LV[lv]; w = L.w; h = L.h; mines = L.m; started = false; over = false; flags = 0; opened = 0; timeT = 0;
+            clearInterval(timer); Kit.stat("time", 0); Kit.stat("mines", mines);
+            cells = Array.from({ length: w * h }, () => ({ mine: false, n: 0, open: false, flag: false }));
+            board.style.gridTemplateColumns = `repeat(${w}, var(--cell))`;
+            board.style.setProperty("--cell", `min(${lv === "hard" ? 34 : lv === "medium" ? 36 : 46}px, calc((100vw - 40px) / ${w}))`);
+            board.innerHTML = "";
+            cells.forEach((c, i) => { const d = document.createElement("button"); d.className = "cell"; d.dataset.i = i; board.appendChild(d); c.el = d; });
+            $("face").textContent = "🙂";
+        }
+        function plant(safe) {
+            const keep = new Set([safe, ...around(safe)]);
+            let n = 0;
+            while (n < mines) { const i = Kit.randi(0, w * h - 1); if (!keep.has(i) && !cells[i].mine) { cells[i].mine = true; n++; } }
+            cells.forEach((c, i) => { c.n = around(i).filter((j) => cells[j].mine).length; });
+            started = true; timer = setInterval(() => { timeT++; Kit.stat("time", timeT); }, 1000);
+        }
+        function paint(i) {
+            const c = cells[i], d = c.el;
+            d.className = "cell" + (c.open ? " open" : "") + (c.flag ? " flag" : "") + (c.open && c.mine ? " boom" : "");
+            d.textContent = c.flag && !c.open ? "🚩" : c.open ? (c.mine ? "💣" : c.n || "") : "";
+            d.style.color = c.open && !c.mine ? COLORS[c.n] : "";
+        }
+        function open(i) {
+            const c = cells[i]; if (c.open || c.flag) return;
+            if (!started) plant(i);
+            if (c.mine) { c.open = true; paint(i); return lose(i); }
+            const stack = [i];
+            while (stack.length) {
+                const j = stack.pop(), cj = cells[j]; if (cj.open || cj.flag) continue;
+                cj.open = true; opened++; paint(j);
+                if (cj.n === 0) for (const k of around(j)) if (!cells[k].open) stack.push(k);
+            }
+            beep(500 + Math.random() * 200, 0.03, "triangle", 0.03);
+            if (opened === w * h - mines) winGame();
+        }
+        function chord(i) {
+            const c = cells[i]; if (!c.open || !c.n) return;
+            const ns = around(i); if (ns.filter((j) => cells[j].flag).length !== c.n) return;
+            for (const j of ns) if (!cells[j].flag && !cells[j].open) open(j);
+        }
+        function toggleFlag(i) {
+            const c = cells[i]; if (c.open || over) return;
+            c.flag = !c.flag; flags += c.flag ? 1 : -1; Kit.stat("mines", mines - flags); paint(i); beep(c.flag ? 800 : 400, 0.04, "square", 0.03);
+        }
+        function lose(i) {
+            over = true; clearInterval(timer); $("face").textContent = "😵"; beep(120, 0.5, "sawtooth", 0.07, -60);
+            cells.forEach((c, j) => { if (c.mine && !c.flag) { c.open = true; setTimeout(() => paint(j), Math.random() * 600); } else if (c.flag && !c.mine) c.el.textContent = "❌"; });
+            setTimeout(() => { $("overTitle").textContent = "Boom!"; $("overText").innerHTML = `You hit a mine after ${timeT}s.<br>Tip: start in a corner and look for safe 1s.`; Kit.show("over"); }, 1100);
+        }
+        function winGame() {
+            over = true; clearInterval(timer); $("face").textContent = "😎";
+            const L = LV[lv], sc = L.base + Math.max(0, L.lim - timeT) * L.mul;
+            cells.forEach((c, j) => { if (c.mine && !c.flag) { c.flag = true; paint(j); } });
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            tune([523, 659, 784, 1047, 1319], 0.09, "triangle", 0.06);
+            $("overTitle").textContent = "Cleared!"; $("overText").innerHTML = `${lv[0].toUpperCase() + lv.slice(1)} board in ${timeT}s<br>${sc.toLocaleString()} points · best ${best.toLocaleString()}`;
+            setTimeout(() => Kit.show("over"), 500);
+        }
+        // input: click = open, right-click / long-press / flag mode = flag, click a number = open around it
+        let pressT = null, longDone = false;
+        board.addEventListener("contextmenu", (e) => { e.preventDefault(); const i = e.target.dataset.i; if (i !== undefined && !over) toggleFlag(+i); });
+        board.addEventListener("pointerdown", (e) => {
+            const i = e.target.dataset.i; if (i === undefined || over || e.button === 2) return;
+            longDone = false; clearTimeout(pressT);
+            if (e.pointerType !== "mouse") pressT = setTimeout(() => { longDone = true; toggleFlag(+i); if (navigator.vibrate) navigator.vibrate(30); }, 380);
+        });
+        board.addEventListener("pointerup", (e) => {
+            clearTimeout(pressT);
+            const i = e.target.dataset.i; if (i === undefined || over || e.button === 2 || longDone) return;
+            const c = cells[+i];
+            if (flagMode && !c.open) return toggleFlag(+i);
+            if (c.open) chord(+i); else open(+i);
+        });
+        board.addEventListener("pointerleave", () => clearTimeout(pressT));
+        $("flagBtn").onclick = () => { flagMode = !flagMode; $("flagBtn").classList.toggle("active", flagMode); $("flagBtn").textContent = flagMode ? "🚩 Flag mode: ON" : "🚩 Flag mode: OFF"; };
+        $("face").onclick = reset;
+        document.querySelectorAll("#lv button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.l === lv);
+            b.onclick = () => { lv = b.dataset.l; try { localStorage.setItem("mineLv", lv); } catch (e) {} document.querySelectorAll("#lv button").forEach((x) => x.classList.toggle("active", x === b)); reset(); };
+        });
+        $("againBtn").onclick = () => { Kit.hide("over"); reset(); };
+        reset();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Mine Finder</h2><p>A logic puzzle where every number tells you how many hidden mines touch that square. Use the numbers to work out which squares are safe, open them, and put flags on the mines. Your first click is always safe. Clear the whole board as fast as you can: the quicker you finish, the more points you get.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click</td><td>Open a square</td></tr><tr><td>Right-click / long-press</td><td>Place or remove a flag</td></tr><tr><td>Click a number</td><td>Open all its unflagged neighbours</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Start by looking at the 1s near the edges. They are the easiest to solve.</li><li>If a number already has all its mines flagged, every other square around it is safe.</li><li>Use flag mode on a phone so a tap places a flag.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Mine Finder</h3><p>Every number in Mine Finder tells you exactly how many mines touch that square, including diagonally. The puzzle is about combining those clues. The easiest pattern is a 1 in a corner of opened squares with only one closed square beside it: that closed square must be the mine. Flag it, and any other square touching that 1 is safe.</p><p>Two patterns solve most boards. If a number already has as many flags around it as its value, every other closed square around it is safe, so click the number to open them all at once. And if a number has exactly as many closed squares around it as its value, all of them are mines. When you truly can't work anything out, guess in a spot far from the numbers, where your chances are usually best.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play the small board and solve the 1s along the edges first.</li><li><b>Getting good:</b> Use flags carefully and click numbers to open their neighbours quickly.</li><li><b>Expert:</b> Learn patterns like 1-2-1 and 1-2-2-1 along a wall, and finish big boards with as few guesses as possible.</li></ul><h3>Did you know?</h3><p>This game is inspired by Minesweeper, which Microsoft included with Windows from the early 1990s. Many people learned to use a computer mouse, including the right button, by playing it. In 2000, mathematician Richard Kaye showed that solving Minesweeper in general is an extremely hard problem for computers.</p><h3>Questions players ask</h3><h4>How do I place a flag?</h4><p>Right-click, or long-press on a phone. You can also switch on flag mode so a tap places a flag.</p><h4>Can the first click be a mine?</h4><p>No. Your first click is always safe, and so are the squares around it, so it opens up a patch of the board to get you started.</p><h4>What does clicking a number do?</h4><p>If you've flagged all its mines, it opens every other square around it.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/mine-finder-patterns">Mine Finder: the patterns that let you solve without guessing</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MoleMash/molemash">Mole Mash</a><a href="/StackTower/stacktower">Stack Tower</a><a href="/TypingRain/typingrain">Typing Rain</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Fly a small spaceship through a field of floating space rocks. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Space Rocks · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Space <span>Rocks</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">▲▲▲</b><small>Lives</small></div><div class="stat"><b id="wave">1</b><small>Wave</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Space Rocks</h2>
+                <p id="startText">⬅ ➡ to turn, ⬆ to thrust, Space to shoot.<br>Big rocks break into smaller, faster ones.<br>Grab ⚡ for triple shots and 🛡 for a shield. Watch out for the saucer!</p>
+                <button class="btn" id="startBtn">▶ Launch</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⟲</button><button data-k="right">⟳</button><button data-k="up">▲</button><button data-k="fire">●</button></div>
+    <p class="hint">The edges wrap around: fly off one side and you come back on the other. Extra life every 10,000 points.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "rocksBest";
+        Kit.stat("best", Kit.best(BEST));
+        let ship, rocks, shots, ufo, ufoShots, score, lives, wave, state = "ready", t = 0, fx = Kit.particles(), cd = 0, nextLife, waveT = 0, stars, pickups;
+        stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1.6 + 0.3 }));
+        const wrap = (o) => { if (o.x < -30) o.x += W + 60; if (o.x > W + 30) o.x -= W + 60; if (o.y < -30) o.y += H + 60; if (o.y > H + 30) o.y -= H + 60; };
+        function rock(x, y, size) {
+            const r = [0, 14, 28, 46][size], sp = Kit.rand(30, 70) * (4 - size) * 0.7 * (1 + wave * 0.06), a = Kit.rand(0, 6.28);
+            const pts = Array.from({ length: 11 }, (_, i) => ({ a: i / 11 * 6.283, r: r * Kit.rand(0.72, 1.12) }));
+            return { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r, size, pts, rot: 0, vr: Kit.rand(-1.2, 1.2) };
+        }
+        function newShip() { ship = { x: W / 2, y: H / 2, a: -Math.PI / 2, vx: 0, vy: 0, inv: 2.5, dead: 0, power: 0 }; }
+        function startWave() {
+            wave++; Kit.stat("wave", wave); waveT = 2;
+            for (let i = 0; i < 3 + wave; i++) { let x, y; do { x = Kit.rand(0, W); y = Kit.rand(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 170); rocks.push(rock(x, y, 3)); }
+        }
+        function reset() {
+            score = 0; lives = 3; wave = 0; rocks = []; shots = []; ufoShots = []; ufo = null; pickups = []; nextLife = 10000;
+            newShip(); startWave(); Kit.stat("score", 0); Kit.stat("lives", "▲▲▲");
+        }
+        function add(n) {
+            score += n; Kit.stat("score", score);
+            if (score >= nextLife) { nextLife += 10000; lives++; Kit.stat("lives", "▲".repeat(lives)); tune([784, 988, 1319], 0.08, "square", 0.05); }
+        }
+        function fire() {
+            if (cd > 0 || ship.dead) return;
+            cd = ship.power > 0 ? 0.11 : 0.2;
+            const spread = ship.power > 0 ? [-0.18, 0, 0.18] : [0];
+            for (const s of spread) { const a = ship.a + s; shots.push({ x: ship.x + Math.cos(a) * 16, y: ship.y + Math.sin(a) * 16, vx: Math.cos(a) * 620 + ship.vx, vy: Math.sin(a) * 620 + ship.vy, life: 0.85 }); }
+            beep(880, 0.05, "square", 0.025, -500);
+        }
+        function breakRock(r, i) {
+            rocks.splice(i, 1); add([0, 100, 50, 20][r.size]);
+            fx.burst(r.x, r.y, "#c8ccdf", 6 + r.size * 5, 2.5 + r.size * 0.6);
+            beep([0, 300, 180, 100][r.size], 0.15, "sawtooth", 0.05, -40);
+            if (r.size > 1) for (let k = 0; k < 2; k++) rocks.push(rock(r.x, r.y, r.size - 1));
+            if (Math.random() < 0.06) pickups.push({ x: r.x, y: r.y, life: 8, k: Math.random() < 0.5 ? "power" : "shield" });
+        }
+        function hitShip() {
+            if (ship.inv > 0 || ship.dead) return;
+            if (ship.shield) { ship.shield = false; ship.inv = 1; beep(400, 0.2, "triangle", 0.05); return; }
+            ship.dead = 2; lives--; Kit.stat("lives", "▲".repeat(Math.max(0, lives)) || "—");
+            fx.burst(ship.x, ship.y, Kit.skin("spacerocks", "#2ee6c9"), 40, 5); fx.burst(ship.x, ship.y, "#ffc94d", 20, 3); beep(90, 0.7, "sawtooth", 0.08, -40);
+            if (lives <= 0) { state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${score.toLocaleString()} points · wave ${wave}<br>Best ${best.toLocaleString()}`; Kit.show("over"); }, 1200); }
+        }
+        function update(dt) {
+            cd -= dt; if (waveT > 0) waveT -= dt;
+            if (ship.dead) { ship.dead -= dt; if (ship.dead <= 0 && lives > 0) newShip(); }
+            else {
+                const turn = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0);
+                ship.a += turn * 4.6 * dt;
+                ship.thrust = Kit.keys.has("up");
+                if (ship.thrust) { ship.vx += Math.cos(ship.a) * 360 * dt; ship.vy += Math.sin(ship.a) * 360 * dt; if (Math.random() < 0.7) fx.burst(ship.x - Math.cos(ship.a) * 14, ship.y - Math.sin(ship.a) * 14, "#ff9d4d", 1, 1.5); }
+                const sp = Math.hypot(ship.vx, ship.vy); if (sp > 420) { ship.vx *= 420 / sp; ship.vy *= 420 / sp; }
+                ship.vx *= Math.pow(0.55, dt); ship.vy *= Math.pow(0.55, dt);
+                ship.x += ship.vx * dt; ship.y += ship.vy * dt; wrap(ship);
+                if (ship.inv > 0) ship.inv -= dt; if (ship.power > 0) ship.power -= dt;
+                if (Kit.keys.has("fire")) fire();
+            }
+            for (const s of shots) { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; wrap(s); }
+            shots = shots.filter((s) => s.life > 0);
+            for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt; wrap(r); }
+            for (let i = rocks.length - 1; i >= 0; i--) {
+                const r = rocks[i];
+                const s = shots.findIndex((s) => Math.hypot(s.x - r.x, s.y - r.y) < r.r);
+                if (s >= 0) { shots.splice(s, 1); breakRock(r, i); continue; }
+                if (!ship.dead && Math.hypot(ship.x - r.x, ship.y - r.y) < r.r + 10) { hitShip(); if (!ship.inv || ship.dead) breakRock(r, i); }
+            }
+            // flying saucer from wave 2
+            if (!ufo && wave >= 2 && Math.random() < dt * 0.06) { const left = Math.random() < 0.5; ufo = { x: left ? -30 : W + 30, y: Kit.rand(60, H - 60), vx: left ? 110 : -110, t: 0, hp: 1 }; }
+            if (ufo) {
+                ufo.t += dt; ufo.x += ufo.vx * dt; ufo.y += Math.sin(ufo.t * 2) * 60 * dt;
+                if (Math.random() < dt * 0.9 && !ship.dead) { const a = Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + Kit.rand(-0.35, 0.35); ufoShots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, life: 2.2 }); beep(300, 0.05, "square", 0.03); }
+                const s = shots.findIndex((s) => Math.hypot(s.x - ufo.x, s.y - ufo.y) < 20);
+                if (s >= 0) { shots.splice(s, 1); add(500); fx.burst(ufo.x, ufo.y, "#ff4d8d", 30, 4); tune([660, 880, 1100], 0.06, "square", 0.05); pickups.push({ x: ufo.x, y: ufo.y, life: 8, k: "power" }); ufo = null; }
+                else if (ufo.x < -60 || ufo.x > W + 60) ufo = null;
+                else if (!ship.dead && Math.hypot(ufo.x - ship.x, ufo.y - ship.y) < 26) hitShip();
+            }
+            for (const s of ufoShots) { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (!ship.dead && Math.hypot(s.x - ship.x, s.y - ship.y) < 12) { s.life = 0; hitShip(); } }
+            ufoShots = ufoShots.filter((s) => s.life > 0);
+            for (const p of pickups) { p.life -= dt; if (!ship.dead && Math.hypot(p.x - ship.x, p.y - ship.y) < 22) { p.life = 0; if (p.k === "power") ship.power = 10; else ship.shield = true; tune([988, 1319], 0.06, "triangle", 0.05); } }
+            pickups = pickups.filter((p) => p.life > 0);
+            if (!rocks.length && state === "play") { add(wave * 100); startWave(); }
+        }
+        function draw() {
+            ctx.fillStyle = "#070814"; ctx.fillRect(0, 0, W, H);
+            for (const s of stars) { ctx.globalAlpha = 0.4 + Math.sin(t * 2 + s.x) * 0.3; ctx.fillStyle = "#fff"; ctx.fillRect(s.x, s.y, s.s, s.s); }
+            ctx.globalAlpha = 1;
+            ctx.lineWidth = 2; ctx.lineJoin = "round";
+            for (const r of rocks) {
+                ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
+                ctx.fillStyle = "#1e2347"; ctx.strokeStyle = "#c8ccdf";
+                ctx.beginPath(); r.pts.forEach((p, i) => ctx[i ? "lineTo" : "moveTo"](Math.cos(p.a) * p.r, Math.sin(p.a) * p.r)); ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.restore();
+            }
+            ctx.fillStyle = "#ffffff"; for (const s of shots) { ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, 7); ctx.fill(); }
+            ctx.fillStyle = "#ff4d8d"; for (const s of ufoShots) { ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, 7); ctx.fill(); }
+            for (const p of pickups) { const c = p.k === "power" ? "#ffc94d" : "#4da3ff"; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, 11 + Math.sin(t * 6) * 2, 0, 7); ctx.stroke(); Kit.text(ctx, p.k === "power" ? "⚡" : "🛡", p.x, p.y + 1, 13, c); }
+            if (ufo) { ctx.fillStyle = "#a15cff"; ctx.beginPath(); ctx.ellipse(ufo.x, ufo.y, 22, 8, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#2ee6c9aa"; ctx.beginPath(); ctx.ellipse(ufo.x, ufo.y - 6, 10, 8, 0, Math.PI, 0); ctx.fill(); }
+            if (!ship.dead && state !== "ready" && !(ship.inv > 0 && Math.floor(t * 10) % 2)) {
+                const c = Kit.skin("spacerocks", "#2ee6c9");
+                ctx.save(); ctx.translate(ship.x, ship.y); ctx.rotate(ship.a);
+                if (ship.thrust) { ctx.fillStyle = "#ff9d4d"; ctx.beginPath(); ctx.moveTo(-10, -5); ctx.lineTo(-18 - Math.random() * 8, 0); ctx.lineTo(-10, 5); ctx.fill(); }
+                ctx.strokeStyle = c; ctx.fillStyle = "#0b0d1a"; ctx.lineWidth = 2.5; ctx.shadowColor = c; ctx.shadowBlur = 12;
+                ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-12, -11); ctx.lineTo(-7, 0); ctx.lineTo(-12, 11); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+                if (ship.shield) { ctx.strokeStyle = "#4da3ffaa"; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.stroke(); }
+                ctx.restore();
+            }
+            fx.draw(ctx);
+            if (waveT > 0 && state === "play") { ctx.globalAlpha = Math.min(1, waveT); Kit.text(ctx, `WAVE ${wave}`, W / 2, H / 2 - 60, 26, "#ffc94d", "center", "'Press Start 2P', monospace", 400); ctx.globalAlpha = 1; }
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); else if (state === "dead") { for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt; wrap(r); } } fx.update(dt); draw(); });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([392, 523, 659], 0.08, "square", 0.05); }
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", Space: "fire", KeyJ: "fire", Enter: "enter" }, (a) => {
+            if (a === "fire") fire();
+            if ((a === "enter" || a === "fire") && state === "dead" && !$("over").classList.contains("hidden")) start();
+        });
+        Kit.touchButtons((k) => { if (k === "fire") fire(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        rocks = []; shots = []; ufoShots = []; pickups = []; wave = 0; newShip(); for (let i = 0; i < 6; i++) rocks.push(rock(Kit.rand(0, W), Kit.rand(0, H), Kit.randi(1, 3)));
+        game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Space Rocks</h2><p>Fly a small spaceship through a field of floating space rocks. Shoot a big rock and it breaks into smaller, faster pieces, so keep moving and watch every direction. Collect power-ups for triple shots or a shield, and look out for the flying saucer that shoots back. Clear every rock to start the next wave.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡</td><td>Turn</td></tr><tr><td>⬆</td><td>Thrust</td></tr><tr><td>Space</td><td>Shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Stay near the middle so rocks can't surprise you from the edges.</li><li>Small rocks give the most points but move the fastest.</li><li>Use short bursts of thrust. Your ship keeps drifting.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Space Rocks</h3><p>In Space Rocks, your ship drifts. Thrust pushes you forward, but you keep sliding after you let go, so use short bursts and turn to face where you want to go before you thrust. Most crashes happen when players thrust too much and slide into a rock they can't avoid.</p><p>Big rocks are slow but split into smaller, faster pieces when you hit them. If you break every big rock at once, the screen fills with fast pieces coming from every direction. Instead, break one rock at a time and clean up its pieces before starting on the next. The edges of the screen wrap around, so a rock flying off the right side comes back on the left. Stay near the middle and keep turning so you can see and shoot in every direction.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Stay near the middle, turn to aim, and use very little thrust.</li><li><b>Getting good:</b> Break rocks one at a time and clear the small pieces before they surround you.</li><li><b>Expert:</b> Use the wrap-around edges to escape, and aim for an extra life with long, controlled runs.</li></ul><h3>Did you know?</h3><p>Space Rocks is inspired by Asteroids, released by Atari in 1979. It was Atari's best-selling arcade game, and its realistic drifting spaceship was unusual at the time, because most games let you stop instantly.</p><h3>Questions players ask</h3><h4>How do I play on a phone?</h4><p>Use the on-screen buttons to turn, thrust and fire.</p><h4>What happens at the edge of the screen?</h4><p>You wrap around and come back on the other side. So do the rocks.</p><h4>Can I get extra lives?</h4><p>Yes, you get an extra life every 10,000 points. Watch out for the flying saucer that sometimes appears and shoots at you; hit it for 500 points and a power-up.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MathBlitz/mathblitz">Math Blitz</a><a href="/GemSwap/gemswap">Gem Swap</a><a href="/AirHockey/airhockey">Air Hockey</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

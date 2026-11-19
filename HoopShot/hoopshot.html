@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A basketball shooting challenge. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Hoop Shot · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Hoop <span>Shot</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="time">60</b><small>Time</small></div><div class="stat"><b id="streak">0</b><small>Streak</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Hoop Shot</h2>
+                <p id="startText">Drag back from the ball and let go to shoot, like a slingshot.<br>A clean SWISH is 3 points and +2 seconds. 3 in a row doubles your points!<br>After 8 baskets the hoop starts to move.</p>
+                <button class="btn" id="startBtn">▶ Shoot</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's Up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Pull further back for a stronger shot. The dotted line shows where the ball will go.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, FLOOR = H - 40, BR = 16, RIM = 64, BEST = "hoopBest", G = 1300;
+        Kit.stat("best", Kit.best(BEST));
+        let ball, hoop, score, time, streak, state = "ready", t = 0, aim = null, touched, scored, fx = Kit.particles(), floats = [], net = 0, shots, makes;
+        function newHoop() {
+            const lvl = Math.min(1, makes / 15);
+            hoop = { x: Kit.rand(W * 0.55, W - RIM - 70), y: Kit.rand(170, 300 - lvl * 60), vx: makes >= 8 ? Kit.pick([-1, 1]) * (40 + lvl * 90) : 0 };
+        }
+        function newBall() {
+            ball = { x: Kit.rand(90, W * 0.38), y: FLOOR - BR, vx: 0, vy: 0, live: false, rest: 0, rot: 0 };
+            touched = false; scored = false;
+        }
+        function reset() { score = 0; time = 60; streak = 0; shots = 0; makes = 0; newHoop(); newBall(); Kit.stat("score", 0); Kit.stat("time", 60); Kit.stat("streak", 0); }
+        function rimPoints() { return [{ x: hoop.x, y: hoop.y }, { x: hoop.x + RIM, y: hoop.y }]; }
+        function collideCircle(px, py, r, bounce) {
+            const dx = ball.x - px, dy = ball.y - py, d = Math.hypot(dx, dy), min = BR + r;
+            if (d >= min || d === 0) return false;
+            const nx = dx / d, ny = dy / d; ball.x = px + nx * min; ball.y = py + ny * min;
+            const v = ball.vx * nx + ball.vy * ny; if (v < 0) { ball.vx -= (1 + bounce) * v * nx; ball.vy -= (1 + bounce) * v * ny; }
+            return true;
+        }
+        function update(dt) {
+            time -= dt; if (time <= 0) { time = 0; Kit.stat("time", 0); if (!ball.live) return end(); }
+            Kit.stat("time", Math.ceil(time));
+            if (hoop.vx) { hoop.x += hoop.vx * dt; if (hoop.x < W * 0.45 || hoop.x > W - RIM - 60) hoop.vx *= -1; }
+            if (net > 0) net -= dt * 2;
+            if (!ball.live) return;
+            for (let s = 0; s < 4; s++) {
+                const h = dt / 4, prevY = ball.y;
+                ball.vy += G * h; ball.x += ball.vx * h; ball.y += ball.vy * h; ball.rot += ball.vx * h * 0.03;
+                // rim (two points) and backboard
+                for (const p of rimPoints()) if (collideCircle(p.x, p.y, 4, 0.55)) { if (!touched) beep(240, 0.05, "square", 0.04); touched = true; }
+                const bx = hoop.x + RIM + 4;
+                if (ball.x + BR > bx && ball.x - BR < bx + 10 && ball.y > hoop.y - 120 && ball.y < hoop.y + 10) {
+                    if (ball.vx > 0 && ball.x < bx + 5) { ball.x = bx - BR; ball.vx = -Math.abs(ball.vx) * 0.6; touched = true; beep(180, 0.05, "square", 0.04); }
+                }
+                // through the hoop?
+                if (!scored && prevY < hoop.y && ball.y >= hoop.y && ball.x > hoop.x + 4 && ball.x < hoop.x + RIM - 4 && ball.vy > 0) made();
+                if (ball.y > FLOOR - BR) { ball.y = FLOOR - BR; ball.vy = -Math.abs(ball.vy) * 0.55; ball.vx *= 0.8; if (Math.abs(ball.vy) > 80) beep(120, 0.04, "triangle", 0.04); }
+                if (ball.x < BR) { ball.x = BR; ball.vx = Math.abs(ball.vx) * 0.6; }
+            }
+            if (ball.y >= FLOOR - BR - 1 && Math.abs(ball.vy) < 60) ball.rest += dt;
+            if (ball.x > W + 60 || ball.rest > 0.6) {
+                if (!scored) { streak = 0; Kit.stat("streak", 0); }
+                if (time <= 0) return end();
+                newBall(); if (scored) newHoop();
+            }
+        }
+        function made() {
+            scored = true; makes++; streak++; net = 1;
+            const swish = !touched, pts = (swish ? 3 : 2) * (streak >= 3 ? 2 : 1);
+            score += pts; time = Math.min(60, time + (swish ? 2 : 1));
+            Kit.stat("score", score); Kit.stat("streak", streak);
+            floats.push({ x: hoop.x + RIM / 2, y: hoop.y - 30, s: (swish ? "SWISH! +" : "+") + pts + (streak >= 3 ? " 🔥" : ""), t: 1 });
+            fx.burst(hoop.x + RIM / 2, hoop.y + 20, swish ? "#ffc94d" : "#ffffff", 22, 4);
+            tune(swish ? [784, 988, 1319] : [659, 880], 0.07, "triangle", 0.05);
+        }
+        function end() {
+            if (state !== "play") return;
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${score} points · ${makes} baskets from ${shots} shots<br>Best ${best}`;
+            Kit.show("over");
+        }
+        function shoot(dx, dy) {
+            const pw = Math.min(1, Math.hypot(dx, dy) / 220);
+            ball.vx = -dx * 4.6; ball.vy = -dy * 4.6;
+            const sp = Math.hypot(ball.vx, ball.vy), max = 1150; if (sp > max) { ball.vx *= max / sp; ball.vy *= max / sp; }
+            ball.live = true; shots++; beep(300 + pw * 300, 0.06, "triangle", 0.04);
+        }
+        function drawBall(x, y, rot) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+            ctx.fillStyle = Kit.skin("hoopshot", "#ff8a3d"); ctx.beginPath(); ctx.arc(0, 0, BR, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#5a2a0a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, BR, 0, 7); ctx.moveTo(-BR, 0); ctx.lineTo(BR, 0); ctx.moveTo(0, -BR); ctx.lineTo(0, BR); ctx.stroke();
+            ctx.beginPath(); ctx.arc(-BR * 1.3, 0, BR * 0.9, -0.8, 0.8); ctx.stroke(); ctx.beginPath(); ctx.arc(BR * 1.3, 0, BR * 0.9, Math.PI - 0.8, Math.PI + 0.8); ctx.stroke();
+            ctx.restore();
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1b1640"); g.addColorStop(1, "#3a2a7a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffffff10"; for (let i = 0; i < 9; i++) ctx.fillRect(i * 100 + 20, 30, 60, 90);
+            // floor
+            ctx.fillStyle = "#c98a4b"; ctx.fillRect(0, FLOOR, W, H - FLOOR);
+            ctx.fillStyle = "#b07438"; for (let x = 0; x < W; x += 60) ctx.fillRect(x, FLOOR, 2, H - FLOOR);
+            // pole, backboard, rim, net
+            const bx = hoop.x + RIM + 4;
+            ctx.fillStyle = "#9aa0c8"; ctx.fillRect(bx + 20, hoop.y - 60, 8, FLOOR - hoop.y + 60);
+            ctx.fillStyle = "#eef0ff"; ctx.fillRect(bx, hoop.y - 120, 10, 130); ctx.strokeStyle = "#ff4d8d"; ctx.lineWidth = 2; ctx.strokeRect(bx - 1, hoop.y - 60, 6, 40);
+            ctx.strokeStyle = "#ffffffcc"; ctx.lineWidth = 1.5;
+            const sway = Math.sin(t * 20) * 6 * Math.max(0, net);
+            for (let i = 0; i <= 6; i++) { const x0 = hoop.x + i * RIM / 6, x1 = hoop.x + 12 + i * (RIM - 24) / 6 + sway; ctx.beginPath(); ctx.moveTo(x0, hoop.y); ctx.lineTo(x1, hoop.y + 46 + net * 10); ctx.stroke(); }
+            for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(hoop.x + k * 4, hoop.y + k * 14); ctx.lineTo(hoop.x + RIM - k * 4, hoop.y + k * 14); ctx.stroke(); }
+            // aim guide
+            if (aim && !ball.live) {
+                const dx = aim.x - aim.sx, dy = aim.y - aim.sy; let vx = -dx * 4.6, vy = -dy * 4.6; const sp = Math.hypot(vx, vy); if (sp > 1150) { vx *= 1150 / sp; vy *= 1150 / sp; }
+                ctx.fillStyle = "#ffffffaa"; for (let i = 1; i < 14; i++) { const tt = i * 0.05; ctx.beginPath(); ctx.arc(ball.x + vx * tt, ball.y + vy * tt + 0.5 * G * tt * tt, 4 - i * 0.2, 0, 7); ctx.fill(); }
+            }
+            drawBall(ball.x, ball.y, ball.rot);
+            ctx.strokeStyle = "#ff6a2a"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hoop.x, hoop.y); ctx.lineTo(hoop.x + RIM, hoop.y); ctx.stroke(); // rim in front of the ball
+            fx.draw(ctx);
+            for (const f of floats) { f.t -= 1 / 60; f.y -= 0.6; ctx.globalAlpha = Math.max(0, f.t); Kit.text(ctx, f.s, f.x, f.y, 22, "#ffc94d"); }
+            floats = floats.filter((f) => f.t > 0); ctx.globalAlpha = 1;
+            if (state === "play" && !ball.live && shots === 0) Kit.text(ctx, "Drag back from the ball and let go", W / 2, H - 14, 15, "#ffffffcc");
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || ball.live) return; const p = Kit.point(cv, e); aim = { sx: p.x, sy: p.y, x: p.x, y: p.y }; });
+        cv.addEventListener("pointermove", (e) => { if (!aim) return; const p = Kit.point(cv, e); aim.x = p.x; aim.y = p.y; });
+        addEventListener("pointerup", () => { if (aim && state === "play") { const dx = aim.x - aim.sx, dy = aim.y - aim.sy; if (Math.hypot(dx, dy) > 15) shoot(dx, dy); } aim = null; });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([523, 659, 784], 0.07, "triangle"); }
+        Kit.onKeys({ Enter: "go" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Hoop Shot</h2><p>A basketball shooting challenge. Drag back from the ball like a slingshot and let go to shoot it toward the hoop. A shot that touches nothing is a swish, worth three points and extra time on the clock, and three baskets in a row doubles your points. Every basket moves the hoop somewhere new, and after eight baskets it starts sliding back and forth. Score as many points as you can in sixty seconds.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag and let go</td><td>Aim and shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Follow the dotted line to see where your shot will go.</li><li>High, soft arcs fall into the hoop more often than flat shots.</li><li>Don't rush. A missed shot breaks your streak.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Hoop Shot</h3><p>Hoop Shot uses a slingshot control: drag back from the ball and let go. How far you pull decides the power, and the dotted line shows where the shot will go. Use the line to aim, but don't trust it completely all the way to the hoop, because it only shows the start of the arc.</p><p>High, soft arcs go in more often than flat, hard shots. A ball dropping from above has a much bigger opening to fall through than one flying in from the side. A clean shot that touches nothing is a swish, worth more than a shot off the rim or backboard. Take your time between shots: there's no rush, and a missed shot breaks your streak.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Use the dotted line to get the ball near the hoop every time.</li><li><b>Getting good:</b> Aim for high, soft arcs and find the pull length that works from each spot.</li><li><b>Expert:</b> Go for swishes and long streaks without a miss.</li></ul><h3>Did you know?</h3><p>Basketball was invented in 1891 by James Naismith, a teacher in Springfield, Massachusetts, who needed an indoor game for his students during the winter. The first hoops were peach baskets, and someone had to climb up to get the ball out after every basket.</p><h3>Questions players ask</h3><h4>How do I shoot?</h4><p>Drag back from the ball and let go, like pulling back a slingshot.</p><h4>What is a swish?</h4><p>A shot that goes in without touching the rim or backboard. It's worth more points.</p><h4>What does the dotted line show?</h4><p>It shows the direction and power of your shot before you let go.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Penalty/penalty">Penalty Shootout</a><a href="/MiniGolf/minigolf">Mini Golf</a><a href="/HeaderHero/headerhero">Header Hero</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

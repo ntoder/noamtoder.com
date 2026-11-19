@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="robots" content="noindex, follow">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>NoamChat · Noam's Game Hub</title>
+  <meta name="description" content="NoamChat on the web: chat with your NoamBrowser friends from any computer or phone. End-to-end encrypted.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b0d1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/noam/noam.css">
+  <link rel="stylesheet" href="/noam/app.css">
+  <style>
+    body { height: 100vh; height: 100dvh; overflow: hidden; }
+    main.page { display: flex; flex-direction: column; min-height: 0; padding-bottom: 12px; overflow: auto; }
+    #app.chatting { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; max-width: 760px; width: 100%; margin: 0 auto; }
+    #app.chatting > .nc { flex: 1; min-height: 0; }
+    .nc-tabs, #nc-tabb { display: none !important; }      /* the AI helper and "share this tab" are in the app only */
+    .nc-main { flex: 1; min-height: 0; overflow: auto; }
+    .nc-card { background: var(--bg-2); }
+    .nc-msgs { flex: 1; min-height: 0; }
+    .notif { max-width: 760px; width: 100%; margin: 0 auto 10px; display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+    .foot { display: none; }
+    @media (max-width: 640px) { main.page { padding: 8px 6px 6px; } #app.chatting { border-radius: 12px; } }
+  </style>
+</head>
+<body>
+  <main class="page"><div class="notif" id="notif" hidden>🔔 Get a notification when a message arrives? <span class="grow"></span><button class="btn" id="notif-on">Turn on</button><button class="btn ghost" id="notif-no">Not now</button></div><div id="app"></div></main>
+  <script src="/noam/noam-core.js"></script>
+  <script src="/noam/glue.js"></script>
+  <script src="/noam/qrcode.js"></script>
+  <script src="/noam/trystero.js"></script>
+  <script src="/noam/chat-engine.js"></script>
+  <script src="/noam/chat-ui.js"></script>
+  <script src="/noam/noam-ui.js"></script>
+  <script type="module" src="/noam/noam-link.js"></script>
+  <script>
+    NoamUI.shell('chat');
+    const app = document.getElementById('app');
+    let started = false;
+    NoamUI.gate(app, (el) => {
+      el.classList.add('chatting');
+      renderChatPanel(el);
+      if (!started) { started = true; hooks.init(); } else NoamChat.init();
+      // notifications for new messages while this tab is in the background
+      try {
+        const n = document.getElementById('notif');
+        if ('Notification' in window && Notification.permission === 'default' && localStorage.getItem('nc-notif-asked') !== '1') {
+          n.hidden = false;
+          document.getElementById('notif-on').onclick = () => Notification.requestPermission().finally(() => { n.hidden = true; localStorage.setItem('nc-notif-asked', '1'); });
+          document.getElementById('notif-no').onclick = () => { n.hidden = true; localStorage.setItem('nc-notif-asked', '1'); };
+        }
+      } catch {}
+    }, { title: 'Sign in to NoamChat' });
+    NoamCore.on('account:status', (st) => { if (!st.user) app.classList.remove('chatting'); });
+    NoamCore.on('chat:open', (key) => { if (key && key !== 'requests') NoamChatUI.go('conv', key); else NoamChatUI.go('list'); });
+    // unread count in the tab title
+    NoamChat.on('change', () => { const n = Object.values((NoamChat.data || {}).chats || {}).reduce((a, c) => a + (c.unread || 0), 0) + (((NoamChat.data || {}).requests || []).length); document.title = (n ? `(${n}) ` : '') + 'NoamChat · Noam\'s Game Hub'; });
+  </script>
+</body>
+</html>

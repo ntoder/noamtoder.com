@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Run down a three-lane railway as fast as you can. Free to play in your browser on Noam's Game Hub.">
@@ -178,7 +178,7 @@
             ctx.beginPath(); ctx.moveTo(px - 6, y - 26); ctx.lineTo(px - 6 + swing, y - 4);
             ctx.moveTo(px + 6, y - 26); ctx.lineTo(px + 6 - swing, y - 4); ctx.stroke();
             // body + head + cap
-            ctx.fillStyle = "#7c5cff"; ctx.fillRect(px - 14, y - 58, 28, 34);
+            ctx.fillStyle = ((window.GameHub && window.GameHub.skin && window.GameHub.skin("subwaysurfer")) || "#7c5cff"); ctx.fillRect(px - 14, y - 58, 28, 34);
             ctx.fillStyle = "#ffd7b0"; ctx.beginPath(); ctx.arc(px, y - 68, 11, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = "#ff4d8d"; ctx.fillRect(px - 12, y - 80, 24, 7); ctx.fillRect(px, y - 76, 16, 4);
         }
@@ -267,7 +267,14 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
     <div class="gh-info">
         <section><h2>About Subway Runner</h2><p>Run down a three-lane railway as fast as you can. Trains come straight at you, so switch lanes to get out of the way, and jump over the red and white barriers. Grab coins for extra points. The longer you survive, the faster the trains come.</p></section>
         <section><h3>How to play</h3><table><tr><td>Left / right arrows</td><td>Change lane</td></tr><tr><td>Up / Space</td><td>Jump</td></tr><tr><td>Phone</td><td>Swipe left, right or up</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Look at the far end of the track, not at your runner.</li><li>Barriers can be jumped, trains cannot. Change lanes for those.</li><li>A line of coins is often the safest path.</li></ul></section>
+        <section><h3>Tips</h3><ul><li>Look at the far end of the track, not at your runner.</li><li>Barriers can be jumped, trains cannot. Change lanes for those.</li><li>A line of coins is often the safest path.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Subway Runner</h3><p>Subway Runner is all about reading the track early. Trains and barriers come out of the distance, and the further ahead you look, the more time you have to decide. Keep your eyes near the top of the track, not on your runner. Your runner is always in the same place, so you don't need to watch it.</p><p>Remember the two rules: barriers can be jumped and trains can't. When you see a train in your lane, change lanes. When you see a barrier, jump. Lines of coins usually lead through a safe path, so following them is often the easiest way to avoid trouble. As the speed goes up, make decisions earlier and avoid last-moment lane changes, because changing into a lane with a train arriving is the most common way to crash.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Practise switching lanes calmly. Don't swipe twice when you only need to move once.</li><li><b>Getting good:</b> Follow coin lines and start jumping barriers without slowing down to think.</li><li><b>Expert:</b> At high speed, plan two obstacles ahead and stay in the middle lane when you can, so you always have two ways out.</li></ul><h3>Did you know?</h3><p>Endless runners became one of the most popular game types on phones in the 2010s. Temple Run (2011) and Subway Surfers (2012) were downloaded billions of times between them, and their three-lane, swipe-to-dodge idea is the same one this game uses.</p><h3>Questions players ask</h3><h4>How do I play on a phone?</h4><p>Swipe left or right to change lanes and swipe up to jump.</p><h4>Do coins matter?</h4><p>Yes, they add to your score, and a line of coins is often the safest way through.</p><h4>Why does it get harder?</h4><p>The trains speed up the longer you survive, so a long run is worth much more than a short one.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/DinoGame/dinogame">Dino Run</a><a href="/Snake/snake">Snake</a><a href="/Mario/mario">Pixel Jumper</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>

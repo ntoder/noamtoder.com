@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A quick-fire maths challenge. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Math Blitz · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}#answers button{padding:18px;border-radius:14px;border:1px solid #2a3060;background:#1e2347;color:#eef0ff;font:800 26px Inter,sans-serif;cursor:pointer;transition:transform .1s}#answers button:hover{border-color:#7c5cff;transform:translateY(-2px)}#answers button.good{background:#1f7a4a;border-color:#2ee6a0}#answers button.bad{background:#5a1530;border-color:#ff4d8d}#q.pop{animation:pop .25s}@keyframes pop{from{transform:scale(.85);opacity:.3}to{transform:none;opacity:1}}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Math <span>Blitz</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="time">60</b><small>Time</small></div><div class="stat"><b id="streak">0</b><small>Streak</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="frame" style="width:min(560px,100%);padding:26px 22px;text-align:center">
+            <div style="height:10px;background:#2a3060;border-radius:6px;overflow:hidden;margin-bottom:18px"><div id="bar" style="height:100%;width:100%;background:#2ee6c9;transition:width .1s linear"></div></div>
+            <div id="lvl" style="color:#9aa0c8;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.6px">Level 1</div>
+            <div id="q" style="font:800 clamp(36px,9vw,58px) Inter,sans-serif;margin:10px 0 18px">? + ? = ?</div>
+            <div id="answers"><button></button><button></button><button></button><button></button></div>
+            <input id="typed" inputmode="numeric" autocomplete="off" placeholder="…or type the answer" style="margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1px solid #2a3060;background:#12152b;color:#eef0ff;font:700 18px Inter,sans-serif;text-align:center">
+            <div id="fb" style="height:24px;margin-top:10px;font-weight:800"></div>
+            <div class="overlay" id="start"><div>
+                <h2>Math Blitz</h2>
+                <p id="startText"><span class="seg" id="mode"><button data-m="mix">🎲 Mix</button><button data-m="+">＋</button><button data-m="-">−</button><button data-m="×">×</button><button data-m="÷">÷</button></span>Answer as many sums as you can in 60 seconds.<br>Each right answer gives +1 second, and a wrong one costs 3.<br>Get a streak going for up to x5 points!</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div><div class="overlay hidden" id="over"><div>
+                <h2>Time's Up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Press 1–4 to pick an answer, or type it in the box.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const BEST = "mathBest";
+        Kit.stat("best", Kit.best(BEST));
+        let score, time, streak, solved, q, state = "ready", timer = null, lastTick = 0, mode = "mix";
+        try { mode = localStorage.getItem("mathMode") || "mix"; } catch (e) {}
+        function level() { return 1 + Math.floor(solved / 5); }
+        function makeQ() {
+            const L = level(), ops = mode === "mix" ? (L < 2 ? ["+", "-"] : L < 4 ? ["+", "-", "×"] : ["+", "-", "×", "÷"]) : [mode];
+            const op = Kit.pick(ops), big = Math.min(10 + L * 8, 120);
+            let a, b, ans;
+            if (op === "+") { a = Kit.randi(2, big); b = Kit.randi(2, big); ans = a + b; }
+            else if (op === "-") { a = Kit.randi(5, big + 10); b = Kit.randi(1, a); ans = a - b; }
+            else if (op === "×") { a = Kit.randi(2, Math.min(12, 3 + L)); b = Kit.randi(2, Math.min(12, 4 + L)); ans = a * b; }
+            else { b = Kit.randi(2, Math.min(12, 3 + L)); ans = Kit.randi(2, Math.min(12, 3 + L)); a = b * ans; }
+            const opts = new Set([ans]);
+            while (opts.size < 4) { const d = Kit.pick([1, 2, 10, a > 9 ? 9 : 3, b || 1]) * (Math.random() < 0.5 ? -1 : 1); if (ans + d >= 0) opts.add(ans + d); }
+            return { text: `${a} ${op} ${b}`, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
+        }
+        function show() {
+            q = makeQ(); $("q").textContent = q.text + " = ?"; $("typed").value = "";
+            document.querySelectorAll("#answers button").forEach((b, i) => { b.textContent = q.opts[i]; b.className = ""; b.disabled = false; });
+            $("lvl").textContent = `Level ${level()}`; $("q").classList.remove("pop"); void $("q").offsetWidth; $("q").classList.add("pop");
+        }
+        function answer(v) {
+            if (state !== "play") return;
+            const btns = [...document.querySelectorAll("#answers button")];
+            if (v === q.ans) {
+                streak++; solved++; const mult = Math.min(5, 1 + Math.floor(streak / 4)), pts = 10 * level() * mult;
+                score += pts; time = Math.min(60, time + 1);
+                beep(660 + Math.min(streak, 12) * 30, 0.08, "triangle", 0.05);
+                btns.forEach((b) => { if (+b.textContent === v) b.className = "good"; });
+                $("fb").textContent = `+${pts}${mult > 1 ? `  (x${mult} streak!)` : ""}`; $("fb").style.color = "#2ee6a0";
+                setTimeout(show, 160);
+            } else {
+                streak = 0; time = Math.max(0, time - 3); beep(160, 0.2, "sawtooth", 0.05);
+                btns.forEach((b) => { if (+b.textContent === v) { b.className = "bad"; b.disabled = true; } });
+                $("fb").textContent = `${q.text} = ${q.ans}  (−3s)`; $("fb").style.color = "#ff4d8d";
+                setTimeout(show, 600);
+            }
+            stats();
+        }
+        function stats() { Kit.stat("score", score); Kit.stat("time", Math.ceil(time)); Kit.stat("streak", streak); $("bar").style.width = `${time / 60 * 100}%`; }
+        function tick(now) {
+            if (state !== "play") return;
+            const dt = Math.min(0.1, (now - (lastTick || now)) / 1000); lastTick = now;
+            time -= dt; if (time <= 0) { time = 0; stats(); return end(); }
+            $("bar").style.width = `${time / 60 * 100}%`; $("bar").style.background = time < 10 ? "#ff4d8d" : "";
+            Kit.stat("time", Math.ceil(time));
+            requestAnimationFrame(tick);
+        }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${score.toLocaleString()} points · ${solved} solved<br>Best ${best.toLocaleString()}`;
+            tune([784, 659, 523, 659, 784], 0.09, "triangle", 0.05); Kit.show("over");
+        }
+        function start() {
+            score = 0; time = 60; streak = 0; solved = 0; state = "play"; lastTick = 0; $("fb").textContent = "";
+            Kit.hide("start"); Kit.hide("over"); stats(); show(); requestAnimationFrame(tick); if (matchMedia("(hover: hover)").matches) $("typed").focus({ preventScroll: true });
+        }
+        document.querySelectorAll("#answers button").forEach((b) => b.onclick = () => answer(+b.textContent));
+        $("typed").addEventListener("input", () => { const v = $("typed").value.trim(); if (v !== "" && +v === q.ans) answer(q.ans); else if (v.length >= String(q.ans).length + 1) { answer(+v); } });
+        addEventListener("keydown", (e) => {
+            if (state !== "play") { if (e.code === "Enter") start(); return; }
+            if (e.target === $("typed")) { if (e.code === "Enter" && $("typed").value) answer(+$("typed").value); return; }
+            const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[e.code]; if (n !== undefined) answer(q.opts[n]);
+        });
+        document.querySelectorAll("#mode button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.m === mode);
+            b.onclick = () => { mode = b.dataset.m; try { localStorage.setItem("mathMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Math Blitz</h2><p>A quick-fire maths challenge. Answer as many sums as you can in 60 seconds by picking the right answer or typing it in. Every correct answer adds a second to the clock and a wrong one takes three away. Start with adding and taking away, then times tables and division join in as you level up. Practise one kind of sum or try the mix.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap</td><td>Pick an answer</td></tr><tr><td>1 to 4</td><td>Pick an answer with the keyboard</td></tr><tr><td>Type + Enter</td><td>Type the answer</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Speed matters, but a wrong answer costs three seconds.</li><li>Keep a streak going for up to five times the points.</li><li>Use the single-operation modes to practise your times tables.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Math Blitz</h3><p>Math Blitz is a race, but accuracy matters more than you'd think: a wrong answer costs three seconds, while a right answer gives you one. That means one mistake undoes three correct answers. If you're not sure, take a breath and work it out rather than guessing.</p><p>A few mental tricks speed things up a lot. To add 9, add 10 and take away 1. To multiply by 5, multiply by 10 and halve it. For subtraction, count up from the smaller number. Times tables are the biggest help of all, so if multiplication slows you down, use the single-operation mode to practise just that until the answers come automatically. Keep a streak going and your points multiply up to five times.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play addition only and focus on not making mistakes.</li><li><b>Getting good:</b> Mix operations and use shortcuts like adding 10 and taking 1 away.</li><li><b>Expert:</b> Know your times tables by heart and keep a streak going for the whole minute.</li></ul><h3>Did you know?</h3><p>Practising mental arithmetic in short, timed bursts is a well-known way to build number fluency. Many teachers use quick games like this one as a warm-up at the start of a maths lesson.</p><h3>Questions players ask</h3><h4>How long is a round?</h4><p>60 seconds, but every correct answer adds a second.</p><h4>Can I type the answer?</h4><p>Yes. Type it and press Enter, or press 1 to 4 to choose an answer.</p><h4>Can I practise just one operation?</h4><p>Yes, pick addition, subtraction, multiplication or division on its own.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/mental-math-tricks">8 mental math tricks that make you faster at sums</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TypingRain/typingrain">Typing Rain</a><a href="/SkyClimber/skyclimber">Sky Climber</a><a href="/HoopShot/hoopshot">Hoop Shot</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

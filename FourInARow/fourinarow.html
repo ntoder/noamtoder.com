@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Drop your yellow discs into the board and try to line up four in a row: across, down or diagonally. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Four in a Row · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Four in a <span>Row</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Win streak</small></div><div class="stat"><b id="best">0</b><small>Best streak</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Four in a Row</h2>
+                <p id="startText"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="normal">🤖 Normal</button><button data-m="hard">🤖 Hard</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span>Click a column (or use ⬅ ➡ and Space) to drop a disc.<br>Get four in a row before the computer does!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            <div class="side" style="width:200px"><div class="panel"><small>Status</small><b id="status" style="font-size:15px">Your turn</b></div><div class="panel" style="text-align:left;font-size:13px;line-height:1.7;color:#9aa0c8"><small>How to win</small>Line up 4 of your discs in a row: across, down or diagonally.</div><button class="btn ghost" id="menuBtn">⚙ Change mode</button></div>
+        </div>
+    </div>
+    
+    <p class="hint">Every win against the computer adds to your streak. Your best streak goes on the leaderboard.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), C = 7, R = 6, S = cv.width / C, TOP = S, BEST = "fourBest";
+        const DEPTH = { easy: 2, normal: 4, hard: 7 };
+        let grid, turn, mode = "normal", hover = 3, drop = null, over = false, winLine = null, streak = 0, thinking = false, t = 0, fx = Kit.particles();
+        try { mode = localStorage.getItem("fourMode") || "normal"; streak = +localStorage.getItem("fourStreak") || 0; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST)); Kit.stat("score", streak);
+        const YOU = 1, CPU = 2;
+        const net = Kit.net, online = () => mode === "online";
+        let prevMode = mode === "online" ? "normal" : mode;
+        const canAct = () => online() ? net.myTurn() && !drop && !over : !thinking && !over && (mode === "2p" || turn === YOU);
+        function rowFor(g, c) { for (let r = R - 1; r >= 0; r--) if (!g[r][c]) return r; return -1; }
+        function winner(g) {
+            for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+                const p = g[r][c]; if (!p) continue;
+                for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+                    const line = [[r, c]];
+                    for (let k = 1; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr >= R || cc < 0 || cc >= C || g[rr][cc] !== p) break; line.push([rr, cc]); }
+                    if (line.length === 4) return { p, line };
+                }
+            }
+            return null;
+        }
+        // ---- computer (minimax with alpha-beta)
+        function scoreWindow(w, p) {
+            const o = p === CPU ? YOU : CPU, mine = w.filter((x) => x === p).length, theirs = w.filter((x) => x === o).length, empty = 4 - mine - theirs;
+            if (mine === 4) return 1000; if (mine === 3 && empty === 1) return 6; if (mine === 2 && empty === 2) return 2;
+            if (theirs === 3 && empty === 1) return -5; return 0;
+        }
+        function heur(g) {
+            let s = 0;
+            for (let r = 0; r < R; r++) if (g[r][3] === CPU) s += 3; else if (g[r][3] === YOU) s -= 3;
+            for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+                const er = r + dr * 3, ec = c + dc * 3; if (er < 0 || er >= R || ec < 0 || ec >= C) continue;
+                const w = [0, 1, 2, 3].map((k) => g[r + dr * k][c + dc * k]);
+                s += scoreWindow(w, CPU) - scoreWindow(w, YOU);
+            }
+            return s;
+        }
+        const ORDER = [3, 2, 4, 1, 5, 0, 6];
+        function minimax(g, depth, a, b, maxing) {
+            const w = winner(g); if (w) return w.p === CPU ? 100000 + depth : -100000 - depth;
+            const moves = ORDER.filter((c) => !g[0][c]);
+            if (!moves.length) return 0; if (depth === 0) return heur(g);
+            for (const c of moves) {
+                const r = rowFor(g, c); g[r][c] = maxing ? CPU : YOU;
+                const v = minimax(g, depth - 1, a, b, !maxing); g[r][c] = 0;
+                if (maxing) { if (v > a) a = v; } else if (v < b) b = v;
+                if (a >= b) break;
+            }
+            return maxing ? a : b;
+        }
+        function cpuMove() {
+            const moves = ORDER.filter((c) => !grid[0][c]);
+            let best = moves[0], bv = -Infinity;
+            for (const c of moves) {
+                const r = rowFor(grid, c); grid[r][c] = CPU;
+                let v = minimax(grid, DEPTH[mode] - 1, -Infinity, Infinity, false); grid[r][c] = 0;
+                if (mode === "easy") v += Kit.rand(-8, 8);
+                if (v > bv) { bv = v; best = c; }
+            }
+            return best;
+        }
+        // ---- game
+        function reset() {
+            grid = Array.from({ length: R }, () => Array(C).fill(0)); turn = YOU; over = false; winLine = null; drop = null; thinking = false;
+            status();
+        }
+        function status() {
+            $("status").textContent = over ? "" : online() ? (turn === net.mySide ? `Your turn (${turn === YOU ? "🟡" : "🔴"})` : "Friend's turn…") : mode === "2p" ? (turn === YOU ? "🟡 Yellow's turn" : "🔴 Red's turn") : thinking ? "🤔 Computer is thinking…" : turn === YOU ? "Your turn" : "Computer's turn";
+        }
+        function place(c) {
+            if (over || drop || c < 0 || c >= C) return;
+            const r = rowFor(grid, c); if (r < 0) return beep(150, 0.05);
+            drop = { c, r, y: 0, vy: 0, p: turn };
+        }
+        function landed() {
+            const { c, r, p } = drop; grid[r][c] = p; drop = null; beep(300 + r * 40, 0.06, "triangle", 0.05);
+            const w = winner(grid);
+            if (w) { winLine = w.line; return finish(w.p); }
+            if (grid[0].every(Boolean)) return finish(0);
+            turn = turn === YOU ? CPU : YOU; status();
+            if (mode !== "2p" && !online() && turn === CPU) { thinking = true; status(); setTimeout(() => { const m = cpuMove(); thinking = false; place(m); }, 300); }
+        }
+        function finish(p) {
+            over = true;
+            let msg;
+            if (online()) {
+                net.over(p === 0 ? "draw" : p);
+                if (p === net.mySide) { tune([523, 659, 784, 1047], 0.1, "triangle", 0.06); for (const [rr, cc] of winLine) fx.burst(cc * S + S / 2, TOP + rr * S + S / 2, "#ffc94d", 12, 4); }
+                else if (p) beep(160, 0.4, "sawtooth", 0.05, -60);
+                $("status").textContent = p === 0 ? "It's a draw!" : p === net.mySide ? "🏆 You win!" : "Your friend wins";
+                return;
+            }
+            if (mode === "2p") msg = p === YOU ? "🟡 Yellow wins!" : p === CPU ? "🔴 Red wins!" : "It's a draw!";
+            else if (p === YOU) {
+                streak++; msg = `🏆 You win! Win streak: ${streak}`;
+                Kit.save(streak); Kit.setBest(BEST, streak); tune([523, 659, 784, 1047], 0.1, "triangle", 0.06);
+                for (const [rr, cc] of winLine) fx.burst(cc * S + S / 2, TOP + rr * S + S / 2, "#ffc94d", 12, 4);
+            } else if (p === CPU) { msg = `The computer wins. Your streak was ${streak}.`; streak = 0; beep(160, 0.4, "sawtooth", 0.05, -60); }
+            else msg = "It's a draw! Your streak is safe.";
+            try { localStorage.setItem("fourStreak", streak); } catch (e) {}
+            Kit.stat("score", streak);
+            $("overText").textContent = msg; status();
+            setTimeout(() => Kit.show("over"), 900);
+        }
+        function draw() {
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, 0, cv.width, TOP);
+            // hover disc
+            if (canAct()) disc(hover * S + S / 2, TOP / 2, turn, 0.85);
+            if (drop) disc(drop.c * S + S / 2, drop.y, drop.p, 1);
+            for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (grid[r][c]) disc(c * S + S / 2, TOP + r * S + S / 2, grid[r][c], 1);
+            // board with holes
+            ctx.save(); ctx.beginPath(); ctx.rect(0, TOP, cv.width, R * S);
+            for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { ctx.moveTo(c * S + S / 2 + S * 0.38, TOP + r * S + S / 2); ctx.arc(c * S + S / 2, TOP + r * S + S / 2, S * 0.38, 0, 7, true); }
+            const g = ctx.createLinearGradient(0, TOP, 0, cv.height); g.addColorStop(0, "#5a3fd8"); g.addColorStop(1, "#3a2a9a");
+            ctx.fillStyle = g; ctx.fill("evenodd"); ctx.restore();
+            if (winLine && Math.floor(t * 4) % 2) for (const [r, c] of winLine) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(c * S + S / 2, TOP + r * S + S / 2, S * 0.36, 0, 7); ctx.stroke(); }
+            fx.draw(ctx);
+        }
+        function disc(x, y, p, a) {
+            ctx.globalAlpha = a;
+            const col = p === YOU ? Kit.skin("fourinarow", "#ffc94d") : "#ff4d6d";
+            ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, S * 0.37, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#00000033"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y, S * 0.27, 0, 7); ctx.stroke();
+            ctx.fillStyle = "#ffffff44"; ctx.beginPath(); ctx.arc(x - S * 0.12, y - S * 0.12, S * 0.08, 0, 7); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        const game = Kit.loop((dt) => {
+            t += dt;
+            if (drop) { drop.vy += 3200 * dt; drop.y += drop.vy * dt; const ty = TOP + drop.r * S + S / 2; if (drop.y >= ty) { drop.y = ty; landed(); } }
+            fx.update(dt); draw();
+        });
+        cv.addEventListener("pointermove", (e) => { hover = Math.max(0, Math.min(C - 1, Math.floor(Kit.point(cv, e).x / S))); });
+        function drop1(c) { const ok = !over && !drop && c >= 0 && c < C && rowFor(grid, c) >= 0; place(c); if (ok && online()) net.send(c); }
+        cv.addEventListener("pointerdown", (e) => {
+            if (!canAct()) return;
+            hover = Math.floor(Kit.point(cv, e).x / S); drop1(hover);
+        });
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", Space: "drop", Enter: "drop", ArrowDown: "drop", Digit1: "1", Digit2: "2", Digit3: "3", Digit4: "4", Digit5: "5", Digit6: "6", Digit7: "7" }, (a) => {
+            if (!canAct()) return;
+            if (a === "left") hover = Math.max(0, hover - 1); else if (a === "right") hover = Math.min(C - 1, hover + 1);
+            else if (a === "drop") drop1(hover); else { hover = +a - 1; drop1(hover); }
+        });
+        document.querySelectorAll("#mode button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.m === mode);
+            b.onclick = () => { if (b.dataset.m === "online") return net.open(); mode = b.dataset.m; prevMode = mode; try { localStorage.setItem("fourMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        $("startBtn").onclick = () => { if (mode === "online") mode = prevMode; Kit.hide("start"); reset(); };
+        $("againBtn").onclick = () => { Kit.hide("over"); reset(); };
+        $("menuBtn").onclick = () => { if (online()) net.leave(); Kit.show("start"); };
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: [YOU, CPU], names: { 1: "🟡 Yellow", 2: "🔴 Red" },
+            start() { mode = "online"; hl(); Kit.hide("start"); Kit.hide("over"); reset(); },
+            apply(m) {
+                if (drop) { drop.y = TOP + drop.r * S + S / 2; landed(); }
+                place(+m);
+                if (net.replaying && drop) { drop.y = TOP + drop.r * S + S / 2; landed(); }
+            },
+            leave() { if (online()) { mode = prevMode; hl(); reset(); Kit.show("start"); } } });
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Four in a Row</h2><p>Drop your yellow discs into the board and try to line up four in a row: across, down or diagonally. The computer plays red and thinks several moves ahead, so you will need a plan. Pick easy, normal or hard, or play against a friend on the same screen. Each win against the computer adds to your win streak.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click a column</td><td>Drop a disc</td></tr><tr><td>⬅ ➡ then Space</td><td>Choose a column and drop</td></tr><tr><td>1 to 7</td><td>Drop in that column</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The middle column is the most powerful. Try to take it early.</li><li>Look for moves that make two threats at once.</li><li>Always check whether the computer is one disc away from winning.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Four in a Row</h3><p>The middle column is the most valuable in Four in a Row, because more lines of four pass through it than through any other column. Start there if you can, and try to keep pieces in the centre throughout the game. Discs on the edge columns can only be part of a few possible lines.</p><p>The winning idea in this game is the double threat: a move that sets up two different ways to make four. Your opponent can only block one, so you win with the other. Before every move, check two things. First, can the computer win on its next turn? If so, block it. Second, will your move let the computer drop a disc on top of it to win? Sometimes the most dangerous square is the one just above where you're about to play.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Take the middle column and always block when the computer has three in a row.</li><li><b>Getting good:</b> Look for moves that make two threats at once, and avoid giving the computer a square to win on.</li><li><b>Expert:</b> Plan threats on different rows so that the computer is forced to play under your winning square.</li></ul><h3>Did you know?</h3><p>Four in a Row is based on Connect Four, sold by Milton Bradley from 1974. In 1988, two researchers separately proved with computers that the first player can always win with perfect play, as long as they start in the middle column.</p><h3>Questions players ask</h3><h4>Can I play against a friend?</h4><p>Yes, choose 2 Players to share one screen, or 🌐 Online to play a friend on another device with a room code.</p><h4>Can I use the keyboard?</h4><p>Yes. Press 1 to 7 to drop in that column, or move with the arrows and press Space.</p><h4>What is a streak?</h4><p>Every win in a row against the computer adds to your streak. Your best streak goes on the leaderboard.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TicTacToe/tictactoe">Tic-Tac-Toe</a><a href="/MoleMash/molemash">Mole Mash</a><a href="/SpaceRocks/spacerocks">Space Rocks</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noam's Game Hub for Mac · free games app for macOS</title>
+    <meta name="description" content="Get Noam's Game Hub as a free Mac app: all the games in their own window with a Dock icon, no browser tabs. For Apple Silicon and Intel Macs.">
+    <link rel="canonical" href="https://noamtoder.com/app">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Noam's Game Hub for Mac">
+    <meta property="og:description" content="All the free games in their own Mac app, with a Dock icon.">
+    <meta property="og:url" content="https://noamtoder.com/app">
+    <meta property="og:image" content="https://noamtoder.com/icons/icon-512.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Noam's Game Hub for Mac",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "macOS",
+      "description": "A free Mac app with all the games from Noam's Game Hub in their own window.",
+      "url": "https://noamtoder.com/app",
+      "downloadUrl": "https://github.com/ntoder/noamtoder.com/releases/latest",
+      "image": "https://noamtoder.com/icons/icon-512.png",
+      "author": { "@type": "Person", "name": "Noam", "url": "https://noamtoder.com/about" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 72px; width: 100%; }
+        .hero { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; margin-bottom: 40px; }
+        .hero img { width: 132px; height: 132px; border-radius: 30px; box-shadow: 0 16px 50px #7c5cff55; }
+        .hero h2 { font-size: clamp(34px, 6vw, 54px); line-height: 1.05; font-weight: 800; margin-bottom: 10px; }
+        .hero p { color: var(--muted); font-size: 19px; line-height: 1.5; max-width: 620px; }
+        .dl { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+        .dl .big { display: inline-flex; flex-direction: column; background: var(--accent); color: #fff; text-decoration: none; border-radius: 14px; padding: 14px 24px; font-weight: 800; font-size: 18px; box-shadow: 0 10px 30px #7c5cff55; }
+        .dl .big small { font-weight: 600; font-size: 12px; opacity: .85; }
+        .dl .alt { color: var(--accent-2); font-weight: 700; text-decoration: none; }
+        .ver { color: var(--muted); font-size: 13px; margin-top: 10px; }
+        h3.sec { font-size: 26px; margin: 46px 0 16px; }
+        .feat { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+        .feat div { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+        .feat b { display: block; font-size: 17px; margin-bottom: 6px; }
+        .feat span { color: #cfd3f5; line-height: 1.55; font-size: 15px; }
+        .more { color: var(--muted); margin-top: 14px; line-height: 1.6; }
+        .install { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+        .install div { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+        .install h4 { font-size: 18px; margin-bottom: 8px; }
+        .install ol { padding-left: 20px; color: #cfd3f5; line-height: 1.6; display: grid; gap: 6px; font-size: 15px; }
+        code { background: #0b0d1a; border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-size: 13px; word-break: break-all; }
+        .files { display: grid; gap: 8px; }
+        .files a { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; color: var(--text); text-decoration: none; font-weight: 700; }
+        .files a:hover { border-color: var(--accent); }
+        .files a span { color: var(--muted); font-weight: 500; font-size: 13px; }
+        .faq h4 { font-size: 17px; margin: 18px 0 4px; }
+        .faq p { color: #cfd3f5; line-height: 1.65; }
+        a.inl { color: var(--accent-2); }
+        @media (max-width: 620px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero img { margin: 0 auto; width: 104px; height: 104px; } .dl { justify-content: center; } }
+    
+        .inapp { display: none; background: #1d3b2a; border: 1px solid #2f7a4d; color: #c9f5d9; border-radius: 14px; padding: 14px 18px; margin-bottom: 26px; font-weight: 700; }
+        body.is-app .inapp { display: block; }
+        .shot { display: block; margin: 0 auto; max-width: 100%; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 20px 60px #0008; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Game Hub</a>
+        <h1>Game Hub <span>for Mac</span></h1>
+        <a class="back" href="#download">Download</a>
+    </div>
+    <main>
+        <div class="inapp">✅ You're already using the Mac app. Updates show up by themselves.</div>
+        <section class="hero">
+            <img src="/icons/mac-app.png" alt="Noam's Game Hub app icon" width="132" height="132">
+            <div>
+                <h2>Noam's Game Hub for Mac</h2>
+                <p>All the games in their own app, with a Dock icon. No browser tabs, no searching for the website. Open it and play.</p>
+                <div class="dl">
+                    <a class="big" id="main" href="https://github.com/ntoder/noamtoder.com/releases/latest/download/NoamsGameHub-mac-arm64.dmg">⬇ Download for Mac<small id="mainSub">Free · Apple chip (M1, M2, M3, M4…)</small></a>
+                    <a class="alt" id="other" href="https://github.com/ntoder/noamtoder.com/releases/latest/download/NoamsGameHub-mac-x64.dmg">Older Intel Mac? Get this one →</a>
+                </div>
+                <div class="ver" id="ver">Always the newest version</div>
+            </div>
+        </section>
+
+        <h3 class="sec">What you get</h3>
+        <div class="feat">
+            <div><b>🎮 Every game</b><span>All the games, Arcade World, the Level Maker, the Game Studio and your Hub pet, the same as on the website.</span></div>
+            <div><b>🚀 Opens in one click</b><span>The Game Hub sits in your Dock and Launchpad like any other app.</span></div>
+            <div><b>🏆 Your account</b><span>Sign in once and stay signed in. Your scores, trophies and pet are the same everywhere.</span></div>
+            <div><b>🖥️ Full screen</b><span>Press Control-Command-F to play full screen with nothing in the way.</span></div>
+            <div><b>✨ Always up to date</b><span>New games show up in the app the moment they're on the website.</span></div>
+            <div><b>🪶 No extras</b><span>No tracking added by the app. Links to other websites open in your normal browser.</span></div>
+        </div>
+
+        <h3 class="sec" id="download">Download</h3>
+        <div class="files" id="list">
+            <a href="https://github.com/ntoder/noamtoder.com/releases/latest/download/NoamsGameHub-mac-arm64.dmg">🍎 Mac with Apple chip (M1, M2, M3, M4…) <span>NoamsGameHub-mac-arm64.dmg</span></a>
+            <a href="https://github.com/ntoder/noamtoder.com/releases/latest/download/NoamsGameHub-mac-x64.dmg">🍎 Mac with Intel chip <span>NoamsGameHub-mac-x64.dmg</span></a>
+        </div>
+        <p class="more">Not sure which one? Click the <b>Apple menu → About This Mac</b>. If it says <b>Chip: Apple M…</b>, get the first one. If it says <b>Processor: Intel</b>, get the second one.</p>
+
+        <h3 class="sec">How to install</h3>
+        <div class="install">
+            <div><h4>1. Put it in Applications</h4><ol>
+                <li>Open the file you downloaded.</li>
+                <li>Drag <b>Noam's Game Hub</b> onto the <b>Applications</b> folder.</li></ol></div>
+            <div><h4>2. Open it the first time</h4><ol>
+                <li>Open Terminal (press Command-Space and type <b>Terminal</b>).</li>
+                <li>Paste <code>xattr -cr "/Applications/Noam's Game Hub.app"</code> and press Enter.</li>
+                <li>Open the Game Hub from Applications or Launchpad. You only do this once.</li></ol></div>
+            <div><h4>Or without Terminal</h4><ol>
+                <li>Open the app. When the Mac says it can't check it, click <b>Done</b>.</li>
+                <li>Go to <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li></ol></div>
+        </div>
+        <p class="more">The Mac shows this warning for any app that hasn't paid Apple for a signing certificate. It doesn't mean something is wrong.</p>
+
+        <h3 class="sec">No download? Use Safari</h3>
+        <p class="more">On macOS Sonoma or newer, open <a class="inl" href="/">noamtoder.com</a> in Safari, then click <b>File → Add to Dock</b>. You get a Game Hub icon in your Dock with no download at all.</p>
+
+        <h3 class="sec">Questions</h3>
+        <div class="faq">
+            <h4>Is the app free?</h4>
+            <p>Yes. The app is free, and so are the games. Premium works in the app the same as on the website.</p>
+            <h4>Do I need the internet?</h4>
+            <p>Yes. The app loads the games from noamtoder.com, so new games show up right away.</p>
+            <h4>Is there a Windows or iPhone app?</h4>
+            <p>Not yet. On an iPhone or iPad, open the site in Safari, tap Share, then <b>Add to Home Screen</b>.</p>
+            <h4>Who makes it?</h4>
+            <p>Noam, who makes all the games on <a class="inl" href="/">Noam's Game Hub</a>. Questions or ideas: <a class="inl" href="mailto:noam@noamtoder.com">noam@noamtoder.com</a>.</p>
+        </div>
+    </main>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam · <a href="/" style="color:inherit">Game Hub</a> · <a href="/about" style="color:inherit">About</a> · <a href="/privacy" style="color:inherit">Privacy</a> · </footer>
+    <script>
+    (async () => {
+        if (/NoamGameHubApp/.test(navigator.userAgent)) document.body.classList.add("is-app");
+        let he = false; try { he = localStorage.getItem("gh_lang") === "he"; } catch (e) {}
+        const base = "https://github.com/ntoder/noamtoder.com/releases/latest/download/";
+        // Guess the chip: Chrome and Firefox name the graphics chip; Intel Macs show Intel/AMD
+        let intel = false;
+        try {
+            const gl = document.createElement("canvas").getContext("webgl");
+            const ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
+            const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
+            intel = /Intel|AMD|Radeon|NVIDIA/i.test(r) && !/Apple M|Apple GPU/i.test(r);
+        } catch (e) {}
+        if (intel) {
+            const m = document.getElementById("main"), o = document.getElementById("other");
+            m.href = base + "NoamsGameHub-mac-x64.dmg"; document.getElementById("mainSub").textContent = "Free · Intel Mac";
+            o.href = base + "NoamsGameHub-mac-arm64.dmg"; o.textContent = "Mac with Apple chip? Get this one →";
+        }
+        try {
+            const r = await fetch("https://api.github.com/repos/ntoder/noamtoder.com/releases/latest", { headers: { Accept: "application/vnd.github+json" } });
+            if (!r.ok) throw new Error(r.status);
+            const rel = await r.json();
+            const sz = {}; (rel.assets || []).forEach((a) => (sz[a.name] = a.size));
+            if (!/^app-v/.test(rel.tag_name)) throw new Error("not the Mac app release");
+            const v = rel.tag_name.replace(/^\D+/, ""), d = new Date(rel.published_at).toLocaleDateString(he ? "he-IL" : undefined);
+            document.getElementById("ver").textContent = he ? `גרסה ${v} · יצאה ב־${d}` : `Version ${v} · released ${d}`;
+            document.querySelectorAll("#list a span").forEach((s) => { const n = s.textContent; if (sz[n]) s.textContent = `${n} · ${Math.round(sz[n] / 1e6)} MB`; });
+        } catch (e) { /* the links still go to the newest version */ }
+    })();
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

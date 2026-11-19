@@ -1,45 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
-    <link rel="shortcut icon" href="/favicon.png" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Race through the maze eating every dot while colourful ghosts chase you. Free to play in your browser on Noam's Game Hub.">
+    <meta name="description" content="Race through the maze eating every dot while colourful ghosts chase you. Free to play in your browser on Noam&#x27;s Game Hub.">
     <title>Maze Muncher · Noam's Game Hub</title>
-    <link rel="stylesheet" href="pacman.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>Maze Muncher</h1>
-        <div class="info">
-            <div class="score-board">
-                <p>Score: <span id="score">0</span></p>
-                <p>Lives: <span id="lives">3</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Maze <span>Muncher</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="456" height="504"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Maze Muncher</h2>
+                <p id="startText">Arrow keys / WASD or swipe to move.<br>Eat every dot. Grab a big ⚪ to turn the ghosts blue, then eat them!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
             </div>
-            <button id="startBtn" class="start-btn">Start Game</button>
-            <button id="pauseBtn" class="pause-btn">Pause</button>
-        </div>
-        <canvas id="gameCanvas" width="560" height="620"></canvas>
-        <div class="controls">
-            <p>Use Arrow Keys to move the muncher</p>
-            <p id="gameStatus"></p>
+            
         </div>
     </div>
-    <script src="pacman.js"></script>
+    <div class="touch"><button data-k="up">⬆</button><button data-k="left">⬅</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">Each ghost hunts you in its own way. Use the side tunnels to escape!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), T = 24, BEST = "mazeBest";
+        Kit.stat("best", Kit.best(BEST));
+        // # wall  . dot  o power  - ghost door  (space) empty
+        const MAP = [
+            "###################",
+            "#........#........#",
+            "#o##.###.#.###.##o#",
+            "#.................#",
+            "#.##.#.#####.#.##.#",
+            "#....#...#...#....#",
+            "####.### # ###.####",
+            "   #.#       #.#   ",
+            "####.# ##-## #.####",
+            "    .  #   #  .    ",
+            "####.# ##### #.####",
+            "   #.#       #.#   ",
+            "####.# ##### #.####",
+            "#........#........#",
+            "#.##.###.#.###.##.#",
+            "#o.#.....P.....#.o#",
+            "##.#.#.#####.#.#.##",
+            "#....#...#...#....#",
+            "#.######.#.######.#",
+            "#.................#",
+            "###################"
+        ];
+        const W = MAP[0].length, H = MAP.length;
+        const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+        let grid, dots, player, ghosts, score, lives, level, fright, alive, phase, phaseT, readyT, fruit, combo, fx = Kit.particles(), mouth = 0;
+
+        const wall = (x, y) => { if (x < 0 || x >= W) return false; const c = grid[y] && grid[y][x]; return c === "#" || c === "-"; };
+        const wallFor = (g, x, y) => { if (x < 0 || x >= W) return false; const c = grid[y] && grid[y][x]; return c === "#" || (c === "-" && !(g && (g.mode === "eaten" || g.leaving))); };
+
+        function loadLevel() {
+            grid = MAP.map((r) => r.split(""));
+            dots = 0; grid.forEach((r) => r.forEach((c) => { if (c === "." || c === "o") dots++; }));
+            fruit = null; resetActors();
+        }
+        function resetActors() {
+            player = { x: 9, y: 15, px: 9, py: 15, dir: "left", next: "left", t: 0 };
+            const cols = ["#ff4d4d", "#ff8de0", "#4dd2ff", "#ffb04d"];
+            ghosts = cols.map((c, i) => ({ x: 8 + (i % 3), y: 9, px: 8 + (i % 3), py: 9, dir: "up", t: 0, color: c, i, mode: "house", wait: i * 2.5 + 0.5, leaving: false }));
+            fright = 0; phase = "scatter"; phaseT = 7; readyT = 1.6; combo = 0;
+        }
+        function reset() { score = 0; lives = 3; level = 1; loadLevel(); hud(); }
+        function hud() { Kit.stat("score", score); Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—"); Kit.stat("level", level); }
+
+        function canGo(a, d, g) { const [dx, dy] = DIRS[d]; let nx = a.x + dx; if (nx < 0) nx = W - 1; if (nx >= W) nx = 0; return !wallFor(g, nx, a.y + dy); }
+        function advance(a, speed, dt, g) {
+            a.t += speed * dt;
+            while (a.t >= 1) {
+                a.t -= 1;
+                const [dx, dy] = DIRS[a.dir];
+                a.x += dx; a.y += dy;
+                if (a.x < 0) a.x = W - 1; if (a.x >= W) a.x = 0;
+                if (g) g.arrived(); else arrivedPlayer();
+            }
+            const [dx, dy] = DIRS[a.dir];
+            a.px = a.x + dx * a.t; a.py = a.y + dy * a.t;
+            if (a.px < -0.5) a.px += W; if (a.px > W - 0.5) a.px -= W;
+        }
+        function arrivedPlayer() {
+            const c = grid[player.y][player.x];
+            if (c === ".") { grid[player.y][player.x] = " "; dots--; score += 10; if (dots % 2) beep(480, 0.04, "square", 0.025); }
+            if (c === "o") { grid[player.y][player.x] = " "; dots--; score += 50; fright = Math.max(3, 8 - level); combo = 0;
+                ghosts.forEach((g) => { if (g.mode === "chase" || g.mode === "scatter") { g.mode = "fright"; g.dir = opposite(g.dir); } }); tune([300, 400, 500], 0.05, "triangle"); }
+            if (fruit && player.x === fruit.x && player.y === fruit.y) { score += 100 * level; tune([880, 1100], 0.06, "triangle"); fx.burst(fruit.x * T + T / 2, fruit.y * T + T / 2, "#ff4d8d", 16); fruit = null; }
+            if (dots === 140 || dots === 70) if (!fruit) fruit = { x: 9, y: 11, t: 9 };
+            hud();
+            if (canGo(player, player.next)) player.dir = player.next;
+            if (!canGo(player, player.dir)) player.t = 0, player.stopped = true; else player.stopped = false;
+            if (dots === 0) levelUp();
+        }
+        const opposite = (d) => ({ up: "down", down: "up", left: "right", right: "left" }[d]);
+
+        function ghostTarget(g) {
+            if (g.mode === "eaten") return [9, 9];
+            if (g.mode === "scatter") return [[W - 1, -2], [0, -2], [W - 1, H + 1], [0, H + 1]][g.i];
+            const [dx, dy] = DIRS[player.dir];
+            if (g.i === 0) return [player.x, player.y];
+            if (g.i === 1) return [player.x + dx * 4, player.y + dy * 4];
+            if (g.i === 2) { const r = ghosts[0], px = player.x + dx * 2, py = player.y + dy * 2; return [2 * px - r.x, 2 * py - r.y]; }
+            const far = Math.hypot(g.x - player.x, g.y - player.y) > 8;
+            return far ? [player.x, player.y] : [0, H + 1];
+        }
+        function makeArrive(g) {
+            g.arrived = () => {
+                if (g.mode === "eaten" && g.x === 9 && g.y === 9) { g.mode = "house"; g.wait = 1; g.leaving = false; return; }
+                if (g.leaving && g.y <= 7) g.leaving = false;
+                const opts = Object.keys(DIRS).filter((d) => d !== opposite(g.dir) && canGo(g, d, g));
+                if (!opts.length) { g.dir = opposite(g.dir); return; }
+                if (g.mode === "fright") { g.dir = Kit.pick(opts); return; }
+                const [tx, ty] = g.leaving ? [9, 7] : ghostTarget(g);
+                let best = opts[0], bd = 1e9;
+                for (const d of ["up", "left", "down", "right"]) {
+                    if (!opts.includes(d)) continue;
+                    const [dx, dy] = DIRS[d], dist = (g.x + dx - tx) ** 2 + (g.y + dy - ty) ** 2;
+                    if (dist < bd) { bd = dist; best = d; }
+                }
+                g.dir = best;
+            };
+        }
+
+        function levelUp() {
+            alive = false; tune([523, 659, 784, 1047, 1319], 0.09, "square", 0.05);
+            setTimeout(() => { level++; loadLevel(); hud(); alive = true; }, 1400);
+        }
+        function loseLife() {
+            alive = false; lives--; hud(); beep(400, 0.6, "sawtooth", 0.06, -350);
+            fx.burst(player.px * T + T / 2, player.py * T + T / 2, "#ffc94d", 30, 4);
+            setTimeout(() => {
+                if (lives <= 0) return end();
+                resetActors(); alive = true;
+            }, 1300);
+        }
+        function end() {
+            game.stop(); Kit.setBest(BEST, score);
+            $("overText").textContent = `Score ${score.toLocaleString()} · reached level ${level}`;
+            Kit.show("over"); Kit.save(score);
+        }
+
+        const game = Kit.loop((dt) => {
+            mouth += dt * 12;
+            if (alive) {
+                if (readyT > 0) readyT -= dt;
+                else {
+                    const pSpeed = 7 + level * 0.3;
+                    if (!player.stopped || canGo(player, player.next)) {
+                        if (player.stopped && canGo(player, player.next)) { player.dir = player.next; player.stopped = false; }
+                        if (player.t === 0 && !canGo(player, player.dir)) { player.stopped = true; if (canGo(player, player.next)) player.dir = player.next; }
+                        if (!player.stopped) advance(player, pSpeed, dt);
+                    }
+                    // reverse instantly
+                    if (player.next === opposite(player.dir) && canGo(player, player.next) && player.t > 0) {
+                        const [dx, dy] = DIRS[player.dir]; player.x += dx; player.y += dy; player.t = 1 - player.t; player.dir = player.next;
+                        if (player.x < 0) player.x = W - 1; if (player.x >= W) player.x = 0;
+                    }
+                    if (fright > 0) { fright -= dt; if (fright <= 0) ghosts.forEach((g) => { if (g.mode === "fright") g.mode = phase; }); }
+                    else if ((phaseT -= dt) <= 0) { phase = phase === "scatter" ? "chase" : "scatter"; phaseT = phase === "chase" ? 20 : 6; ghosts.forEach((g) => { if (g.mode === phase || g.mode === "chase" || g.mode === "scatter") { g.mode = phase; g.dir = opposite(g.dir); } }); }
+                    if (fruit && (fruit.t -= dt) <= 0) fruit = null;
+                    for (const g of ghosts) {
+                        if (!g.arrived) makeArrive(g);
+                        if (g.mode === "house") { g.py = 9 + Math.sin(mouth / 3 + g.i) * 0.2; if ((g.wait -= dt) <= 0) { g.mode = phase; g.leaving = true; g.x = 9; g.y = 9; g.t = 0; g.dir = "up"; } continue; }
+                        const sp = g.mode === "eaten" ? 14 : g.mode === "fright" ? 4 : g.y === 9 && (g.x < 4 || g.x > 14) ? 4 : 6.2 + level * 0.35;
+                        advance(g, sp, dt, g);
+                        const d = Math.hypot(g.px - player.px, g.py - player.py);
+                        if (d < 0.6) {
+                            if (g.mode === "fright") { g.mode = "eaten"; combo++; const pts = 200 * 2 ** (combo - 1); score += pts; hud(); beep(900, 0.12, "square", 0.06, 500); fx.burst(g.px * T + T / 2, g.py * T + T / 2, "#4d6bff", 16); }
+                            else if (g.mode !== "eaten") return loseLife();
+                        }
+                    }
+                }
+            }
+            fx.update(dt); draw();
+        });
+
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, cv.width, cv.height);
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const c = grid[y][x], cx = x * T + T / 2, cy = y * T + T / 2;
+                if (c === "#") {
+                    ctx.fillStyle = "#1e2a7a"; Kit.rr(ctx, x * T + 2, y * T + 2, T - 4, T - 4, 6); ctx.fill();
+                    ctx.strokeStyle = "#7c5cff"; ctx.lineWidth = 1.5; ctx.stroke();
+                } else if (c === "-") { ctx.fillStyle = "#ff8de0"; ctx.fillRect(x * T, y * T + T / 2 - 2, T, 4); }
+                else if (c === ".") { ctx.fillStyle = "#ffd9b0"; ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, 7); ctx.fill(); }
+                else if (c === "o") { const r = 6 + Math.sin(mouth / 2) * 1.5; ctx.fillStyle = "#ffd9b0"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); }
+            }
+            if (fruit) Kit.text(ctx, "🍒", fruit.x * T + T / 2, fruit.y * T + T / 2 + 1, 18);
+            // player
+            if (alive || readyT > 0 || lives > 0) {
+                const px = player.px * T + T / 2, py = player.py * T + T / 2, open = alive && !player.stopped ? Math.abs(Math.sin(mouth)) * 0.8 : 0.3;
+                const ang = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[player.dir];
+                ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(px, py); ctx.arc(px, py, T / 2 - 1, ang + open / 2, ang + Math.PI * 2 - open / 2); ctx.closePath(); ctx.fill();
+            }
+            for (const g of ghosts) {
+                const x = g.px * T + T / 2, y = g.py * T + T / 2, r = T / 2 - 1;
+                const flash = g.mode === "fright" && fright < 2 && Math.floor(mouth) % 2;
+                if (g.mode !== "eaten") {
+                    ctx.fillStyle = g.mode === "fright" ? (flash ? "#eef0ff" : "#3d4dff") : g.color;
+                    ctx.beginPath(); ctx.arc(x, y - 2, r, Math.PI, 0); ctx.lineTo(x + r, y + r);
+                    for (let i = 0; i < 4; i++) ctx.lineTo(x + r - (i + 0.5) * (r / 2), y + r - (i % 2 ? 0 : 5));
+                    ctx.lineTo(x - r, y + r); ctx.closePath(); ctx.fill();
+                }
+                if (g.mode === "fright") { ctx.fillStyle = flash ? "#ff4d4d" : "#ffd9b0"; ctx.fillRect(x - 5, y - 4, 3, 3); ctx.fillRect(x + 2, y - 4, 3, 3); continue; }
+                const [dx, dy] = DIRS[g.dir];
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x - 4, y - 3, 3.6, 0, 7); ctx.arc(x + 4, y - 3, 3.6, 0, 7); ctx.fill();
+                ctx.fillStyle = "#1b2a99"; ctx.beginPath(); ctx.arc(x - 4 + dx * 1.6, y - 3 + dy * 1.6, 1.8, 0, 7); ctx.arc(x + 4 + dx * 1.6, y - 3 + dy * 1.6, 1.8, 0, 7); ctx.fill();
+            }
+            fx.draw(ctx);
+            if (readyT > 0 && alive) Kit.text(ctx, level > 1 && readyT > 1.4 ? `LEVEL ${level}` : "READY!", cv.width / 2, 11 * T + T / 2, 16, "#ffc94d", "center", "'Press Start 2P', monospace", 400);
+        }
+
+        function start() { reset(); alive = true; Kit.hide("start"); Kit.hide("over"); game.start(); tune([523, 659, 784, 659, 523, 784], 0.1, "square", 0.04); }
+        Kit.onKeys({ ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Enter: "start", Space: "start" },
+            (a) => { if (DIRS[a]) player.next = a; else if (!game.running) start(); });
+        Kit.touchButtons((k) => { if (DIRS[k]) player.next = k; });
+        Kit.swipe(cv, (d) => { player.next = d; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); alive = false; draw();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -52,11 +262,19 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
         <section><h2>About Maze Muncher</h2><p>Race through the maze eating every dot while colourful ghosts chase you. Eat all the dots to win the level. If a ghost catches you, you lose a life. You have three lives to clear the board.</p></section>
         <section><h3>How to play</h3><table><tr><td>Arrow keys</td><td>Move through the maze</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Clear one area of the maze at a time.</li><li>Watch where the ghosts are before turning into a long corridor.</li><li>Leave a few dots near an escape route for the end.</li></ul></section>
+        <section><h3>Tips</h3><ul><li>Clear one area of the maze at a time.</li><li>Watch where the ghosts are before turning into a long corridor.</li><li>Leave a few dots near an escape route for the end.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Maze Muncher</h3><p>In Maze Muncher, the ghosts are the obstacle and the dots are the goal, so the trick is to collect dots without getting cornered. Long corridors are dangerous because a ghost can enter from either end. Before you turn into one, glance at where the ghosts are. Junctions, where you can turn in three or four directions, are the safest places to be when a ghost is near. The tunnels at the sides of the maze are your emergency exit: run through one and you come out on the other side, far from the ghost behind you.</p><p>Clear the maze one area at a time instead of zig-zagging all over it. If you leave single dots scattered everywhere, the end of the level turns into a long, risky hunt. It's also smart to leave a few dots near an escape route for last, so you finish the level heading somewhere safe instead of into a dead end.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Learn the shape of the maze and practise turning at junctions without stopping.</li><li><b>Getting good:</b> Clear one area at a time and always check for ghosts before entering a long corridor.</li><li><b>Expert:</b> Plan your route through the whole maze so you never have to come back for one lonely dot.</li></ul><h3>Did you know?</h3><p>Maze Muncher is inspired by Pac-Man, released by Namco in 1980. Its designer, Toru Iwatani, wanted a game that would appeal to everyone, not just fans of shooting games. In the original, each of the four ghosts chases the player in its own way, which is why they don't all follow the same path.</p><h3>Questions players ask</h3><h4>How many lives do I have?</h4><p>You start with three lives. A ghost catching you costs one.</p><h4>How do I win a level?</h4><p>Eat every dot in the maze.</p><h4>Can I play on a phone?</h4><p>Yes. Swipe in the direction you want to go, or use the on-screen buttons.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/Tetris/tetris">Block Drop</a><a href="/BubbleBobble/bubblebobble">Bubble Blaster</a><a href="/Soccer/soccer">Soccer</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
@@ -66,7 +284,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

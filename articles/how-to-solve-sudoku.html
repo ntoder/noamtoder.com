@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sudoku never needs guessing. Learn the logical techniques that solve easy puzzles in minutes and hard puzzles without a hint.">
+    <title>How to solve Sudoku: techniques from easy to hard · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🔢</div>
+        <h1 class="t">How to solve Sudoku: techniques from easy to hard</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 15 November 2026 · 8 min read</div>
+        
+<p>The rule of Sudoku fits in one sentence: every row, every column and every 3×3 box must contain the numbers 1 to 9 exactly once. Yet hard puzzles can feel impossible. The secret is that a well-made Sudoku never needs guessing. Every number can be worked out with logic, and a small set of techniques is enough to solve almost everything. Here they are, from easiest to hardest.</p>
+
+<h2>Start where there's least to think about</h2>
+<p>Look for a row, column or box that is almost full. If eight numbers are already there, the ninth is obvious. Even with six or seven filled in, there are only a few options to check. Filling these in early gives you more clues for everything else.</p>
+
+<h2>Technique 1: scan one number at a time</h2>
+<p>Pick a number, say 7. Look at each 3×3 box that doesn't have a 7 yet. For each empty square in that box, check whether a 7 already appears in the same row or column. If only one square in the box is left where a 7 could go, it must go there. Then do the same for 8, then 9, and so on. This "cross-hatching" solves most easy puzzles completely.</p>
+
+<h2>Technique 2: the only number that fits</h2>
+<p>Sometimes it's easier to look at one square instead of one number. Check its row, its column and its box, and list every number already used. If eight different numbers appear, the square can only be the ninth. This works well for squares in busy parts of the grid.</p>
+
+<h2>Technique 3: use notes</h2>
+<p>On medium and hard puzzles, you'll reach a point where nothing is obvious. That's when to switch on notes. In our <a href="/Sudoku/sudoku">Sudoku</a> game, press <b>N</b> and pencil in every possible number for each empty square. It takes a minute, but it turns a puzzle you can't see into one you can. Every time you place a number, remove it from the notes in the same row, column and box.</p>
+
+<h2>Technique 4: naked singles and hidden singles</h2>
+<p>With notes in place, look for two things. A <b>naked single</b> is a square with only one note left; that's the answer. A <b>hidden single</b> is a number that appears in the notes of only one square in a row, column or box. Even if that square has other notes, the hidden number must go there, because nowhere else can take it.</p>
+
+<h2>Technique 5: pairs</h2>
+<p>If two squares in the same row each have exactly the same two notes, say 3 and 8, then those two squares will hold the 3 and the 8 between them. That means no other square in that row can be a 3 or an 8, so you can erase those notes everywhere else in the row. The same works in columns and boxes. Pairs are often the key that unlocks a hard puzzle.</p>
+
+<h2>Technique 6: pointing</h2>
+<p>Suppose that inside one box, all the squares that could hold a 5 are in the same row. The 5 for that box must be somewhere in that row, so no square in the rest of the row, outside the box, can be a 5. Erase those notes. This technique sounds complicated, but once you've seen it a few times, you'll spot it quickly.</p>
+
+<h2>Common mistakes</h2>
+<ul>
+  <li><b>Guessing.</b> If you guess and you're wrong, the mistake can hide for a long time. Our game ends after three mistakes, so it pays to be sure.</li>
+  <li><b>Forgetting to update notes.</b> Every number you place removes options elsewhere. Clean up your notes right away.</li>
+  <li><b>Staring at one area.</b> If you're stuck, move to a different part of the grid, or scan a different number.</li>
+</ul>
+
+<h2>A fun fact</h2>
+<p>A Sudoku needs at least 17 starting numbers to have only one solution. This was proved by mathematicians using a huge computer search in 2012. Our puzzles always have exactly one answer, so the logic above will always get you there.</p>
+
+        <div class="cta"><a class="btn" href="/Sudoku/sudoku">▶ Play Sudoku</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/chess-for-beginners">♟️ Chess for beginners: 10 rules that win your first games<span>You don&#x27;t need to memorise openings to start winning. These ten simple rules fix the mistakes almost every new player makes.</span></a><a href="/articles/word-guess-strategy">🟩 Word Guess strategy: the best first words and how to think<span>Why CRANE and SLATE are great starting words, how to use yellow letters properly, and the trick for when many words are still possible.</span></a><a href="/articles/learn-world-flags">🌍 How to learn the world&#x27;s flags: tricks for telling similar flags apart<span>Chad or Romania? Ireland or Ivory Coast? Simple tricks for remembering flags, and the best way to practise them.</span></a><a href="/articles/touch-typing-for-kids">⌨️ Learn to touch type: a simple guide for kids and beginners<span>Typing without looking is one of the most useful computer skills there is. Here&#x27;s how to start, and how to practise without getting bored.</span></a><a href="/articles/mental-math-tricks">🧮 8 mental math tricks that make you faster at sums<span>Add 9 by adding 10, multiply by 5 by halving, and more. Simple tricks that make mental maths quicker and less scary.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,35 +1,307 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Trap the monsters inside bubbles, then pop them for points. Free to play in your browser on Noam's Game Hub.">
+    <meta name="description" content="Trap the monsters inside bubbles, then pop them for points. Free to play in your browser on Noam&#x27;s Game Hub.">
     <title>Bubble Blaster · Noam's Game Hub</title>
-    <link rel="stylesheet" href="bubblebobble.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>🫧 Bubble Blaster</h1>
-        <div class="info">
-            <div class="score-board">
-                <p>Score: <span id="score">0</span></p>
-                <p>Level: <span id="level">1</span></p>
-                <p>Lives: <span id="lives">3</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Bubble <span>Blaster</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="level">1</b><small>Round</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="512"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Bubble Blaster</h2>
+                <p id="startText">⬅ ➡ to move, ⬆ to jump, Space to blow a bubble.<br>Trap a monster in a bubble, then touch it to pop it.<br>Pop several at once for a combo! Hold ⬆ to bounce on bubbles.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
             </div>
-            <button id="startBtn" class="start-btn">Start Game</button>
-        </div>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div class="controls">
-            <p>Arrow Keys to Move & Jump | A to Shoot Bubbles</p>
-            <p id="gameStatus"></p>
+            
         </div>
     </div>
-    <script src="bubblebobble.js"></script>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button><button data-k="jump">⤒</button><button data-k="fire">◯</button></div>
+    <p class="hint">Be quick! A monster that escapes from its bubble turns red and angry.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, T = 32, CW = W / T, CH = H / T, BEST = "bubbleBest";
+        Kit.stat("best", Kit.best(BEST));
+        // # wall, = platform you can jump up through, E enemy, P player start
+        const LEVELS = [
+        `####################
+        #..................#
+        #..................#
+        #....E.......E.....#
+        #..=====....=====..#
+        #..................#
+        #..................#
+        #.......E..........#
+        #....==========....#
+        #..................#
+        #..................#
+        #..E...........E...#
+        #..=====....=====..#
+        #..................#
+        #..P...............#
+        ####################`,
+        `####################
+        #..................#
+        #.E..............E.#
+        #====..........====#
+        #..................#
+        #......E....E......#
+        #.....========.....#
+        #..................#
+        #.E..............E.#
+        #====..........====#
+        #..................#
+        #.......E..........#
+        #.....========.....#
+        #..................#
+        #..P...............#
+        ####################`,
+        `####################
+        #..................#
+        #..E....E....E.....#
+        #.===..===..===..=.#
+        #..................#
+        #..................#
+        #=......E.......E.=#
+        #==....=====....===#
+        #..................#
+        #...E..........E...#
+        #..====......====..#
+        #..................#
+        #........E.........#
+        #.....=========....#
+        #..P...............#
+        ####################`,
+        `####################
+        #.........E........#
+        #......=======.....#
+        #..E...........E...#
+        #.====.......====..#
+        #..................#
+        #........E.........#
+        #...============...#
+        #..................#
+        #.E..............E.#
+        #===....====....===#
+        #..................#
+        #......E....E......#
+        #....==========....#
+        #..P...............#
+        ####################`
+        ];
+        let grid, pl, enemies, bubbles, fruits, score, lives, level, state = "ready", t = 0, fx = Kit.particles(), fireCd = 0, combo = 0, comboT = 0, startT = 0, floats = [];
+
+        function load(n) {
+            const rows = LEVELS[(n - 1) % LEVELS.length].split("\n").map((r) => r.trim());
+            grid = rows.map((r) => r.split("").map((c) => (c === "#" ? 1 : c === "=" ? 2 : 0)));
+            enemies = []; bubbles = []; fruits = []; floats = [];
+            const fast = 1 + Math.floor((n - 1) / LEVELS.length) * 0.25 + (n - 1) * 0.04;
+            rows.forEach((r, y) => r.split("").forEach((c, x) => {
+                if (c === "E") enemies.push({ x: x * T + 2, y: y * T + 4, w: 28, h: 28, vx: (Math.random() < 0.5 ? -1 : 1) * 70 * fast, vy: 0, ground: false, trapped: null, angry: false, jumpT: Kit.rand(1, 3), sp: fast, kind: Kit.randi(0, 2) });
+                if (c === "P") pl = { x: x * T + 2, y: y * T + 2, w: 26, h: 30, vx: 0, vy: 0, ground: false, face: 1, inv: 2 };
+            }));
+            startT = 1.5; Kit.stat("level", level);
+        }
+        function solidAt(px, py, fromAbove, prevBottom) {
+            const cx = Math.floor(px / T), cy = Math.floor(py / T);
+            if (cy < 0 || cy >= CH || cx < 0 || cx >= CW) return false;
+            const v = grid[cy][cx];
+            if (v === 1) return true;
+            if (v === 2 && fromAbove && prevBottom <= cy * T + 2) return true;
+            return false;
+        }
+        function wallAt(px, py) {
+            const cx = Math.floor(px / T), cy = Math.floor(py / T);
+            if (cy <= 0 || cy >= CH - 1) return cx <= 0 || cx >= CW - 1;
+            return grid[cy][cx] === 1;
+        }
+        function physics(o, dt) {
+            o.vy = Math.min(o.vy + 1800 * dt, 520);
+            o.x += o.vx * dt;
+            if (o.vx > 0 && (wallAt(o.x + o.w, o.y + 2) || wallAt(o.x + o.w, o.y + o.h - 2))) { o.x = Math.floor((o.x + o.w) / T) * T - o.w - 0.01; o.hitWall = true; }
+            if (o.vx < 0 && (wallAt(o.x, o.y + 2) || wallAt(o.x, o.y + o.h - 2))) { o.x = (Math.floor(o.x / T) + 1) * T + 0.01; o.hitWall = true; }
+            const prevBottom = o.y + o.h;
+            o.y += o.vy * dt; o.ground = false;
+            if (o.vy >= 0) {
+                for (const px of [o.x + 3, o.x + o.w - 3]) if (solidAt(px, o.y + o.h, true, prevBottom)) {
+                    o.y = Math.floor((o.y + o.h) / T) * T - o.h; o.vy = 0; o.ground = true; break;
+                }
+            } else if (o.y < T) { o.y = T; o.vy = 0; }
+        }
+        function blow() {
+            if (fireCd > 0 || state !== "play") return;
+            fireCd = 0.33; beep(720, 0.08, "sine", 0.05, 300);
+            bubbles.push({ x: pl.x + pl.w / 2 + pl.face * 14, y: pl.y + 14, vx: pl.face * 520, vy: 0, r: 15, life: 7, shot: 0.42, enemy: null });
+        }
+        function addScore(n, x, y) { score += n; Kit.stat("score", score); floats.push({ x, y, s: "+" + n, t: 0.9 }); }
+        function pop(b, chain) {
+            b.dead = true;
+            fx.burst(b.x, b.y, b.enemy ? "#ffc94d" : "#9fe8ff", b.enemy ? 18 : 6, 3);
+            if (b.enemy) {
+                combo = comboT > 0 ? combo + 1 : 1; comboT = 0.6;
+                const pts = 500 * combo; addScore(pts, b.x, b.y - 10);
+                tune([660 + combo * 80, 990 + combo * 80], 0.05, "square", 0.05);
+                fruits.push({ x: b.x - 12, y: b.y, vy: -300, w: 24, h: 24, vx: Kit.rand(-80, 80), kind: Kit.randi(0, 3), life: 8, ground: false });
+                b.enemy.gone = true;
+            } else beep(400, 0.04, "sine", 0.03);
+            // pop nearby bubbles too (chain reaction)
+            for (const o of bubbles) if (!o.dead && o.enemy && Math.hypot(o.x - b.x, o.y - b.y) < 44) setTimeout(() => !o.dead && pop(o, true), 90);
+        }
+        function hurt() {
+            if (pl.inv > 0) return;
+            lives--; Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—");
+            beep(200, 0.4, "sawtooth", 0.06, -120); fx.burst(pl.x + 13, pl.y + 15, "#ffffff", 20, 4);
+            if (lives <= 0) { state = "dead"; const best = Kit.setBest(BEST, score); Kit.save(score);
+                $("overText").innerHTML = `Score ${score.toLocaleString()} · round ${level}<br>Best ${best.toLocaleString()}`; setTimeout(() => Kit.show("over"), 600); return; }
+            pl.inv = 2.2;
+        }
+        function update(dt) {
+            if (startT > 0) { startT -= dt; }
+            const left = Kit.keys.has("left"), right = Kit.keys.has("right");
+            pl.vx = left ? -210 : right ? 210 : 0; if (left) pl.face = -1; if (right) pl.face = 1;
+            if (Kit.keys.has("jump") && pl.ground) { pl.vy = -640; beep(500, 0.06, "triangle", 0.04, 200); }
+            physics(pl, dt);
+            if (pl.inv > 0) pl.inv -= dt;
+            fireCd -= dt; comboT -= dt;
+            // bubbles
+            for (const b of bubbles) {
+                if (b.dead) continue;
+                b.life -= dt;
+                if (b.shot > 0) {
+                    b.shot -= dt; b.x += b.vx * dt; b.vx *= Math.pow(0.02, dt);
+                    if (b.x < T + b.r || b.x > W - T - b.r) { b.x = Math.max(T + b.r, Math.min(W - T - b.r, b.x)); b.shot = 0; }
+                    if (!b.enemy) for (const e of enemies) if (!e.trapped && !e.gone && Math.hypot(e.x + 14 - b.x, e.y + 14 - b.y) < 26) {
+                        e.trapped = b; b.enemy = e; b.life = 6; b.shot = 0; addScore(100, b.x, b.y); beep(300, 0.12, "sine", 0.05, 400); break;
+                    }
+                } else {
+                    b.y -= 55 * dt; b.x += Math.sin(t * 2 + b.r * 3 + b.life) * 18 * dt;
+                    if (b.y < T + b.r + 6) { b.y = T + b.r + 6; b.x += (W / 2 - b.x) * 0.4 * dt; }
+                    // bubbles push gently apart
+                    for (const o of bubbles) if (o !== b && !o.dead && o.shot <= 0) { const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy); if (d > 0 && d < b.r * 2) { b.x += dx / d * 30 * dt; b.y += dy / d * 30 * dt; } }
+                }
+                if (b.enemy) { b.enemy.x = b.x - 14; b.enemy.y = b.y - 14; }
+                // player touches a bubble: pop it, or bounce on top
+                if (b.shot <= 0 && Math.hypot(pl.x + 13 - b.x, pl.y + 15 - b.y) < b.r + 14) {
+                    if (pl.vy > 0 && pl.y + pl.h < b.y && Kit.keys.has("jump")) { pl.vy = -560; }
+                    else pop(b);
+                }
+                if (b.life <= 0 && !b.dead) {
+                    b.dead = true;
+                    if (b.enemy) { const e = b.enemy; e.trapped = null; e.angry = true; e.vy = -200; e.vx = (Math.random() < 0.5 ? -1 : 1) * 120 * e.sp; beep(150, 0.2, "square", 0.05, 100); }
+                }
+            }
+            bubbles = bubbles.filter((b) => !b.dead);
+            // enemies
+            for (const e of enemies) {
+                if (e.gone || e.trapped) continue;
+                const sp = (e.angry ? 1.6 : 1) * e.sp;
+                if (Math.abs(e.vx) < 10) e.vx = 70 * sp;
+                e.vx = Math.sign(e.vx) * 70 * sp * (startT > 0 ? 0.3 : 1);
+                e.hitWall = false; physics(e, dt);
+                if (e.hitWall) e.vx = -e.vx;
+                e.jumpT -= dt;
+                if (e.ground && e.jumpT <= 0) { e.jumpT = Kit.rand(1.2, 3.2) / sp; if (pl.y < e.y - 20 || Math.random() < 0.3) e.vy = -660; else if (Math.random() < 0.5) e.vx = Math.sign(pl.x - e.x || 1) * 70 * sp; }
+                if (!pl.inv && Kit.hit(pl, { x: e.x + 4, y: e.y + 4, w: e.w - 8, h: e.h - 6 })) hurt();
+            }
+            // fruit
+            for (const f of fruits) { if (f.got) continue; f.life -= dt; f.hitWall = false; physics(f, dt); if (f.ground) f.vx = 0; if (f.hitWall) f.vx = -f.vx;
+                if (Kit.hit(pl, f)) { f.got = true; addScore(200, f.x + 12, f.y); beep(1200, 0.06, "square", 0.04); setTimeout(() => beep(1600, 0.08, "square", 0.04), 60); } }
+            fruits = fruits.filter((f) => !f.got && f.life > 0);
+            for (const f of floats) { f.t -= dt; f.y -= 40 * dt; } floats = floats.filter((f) => f.t > 0);
+            if (enemies.every((e) => e.gone) && state === "play") {
+                state = "clear"; addScore(1000, W / 2, H / 2); tune([523, 659, 784, 1047, 1319], 0.09, "square", 0.05);
+                setTimeout(() => { level++; load(level); state = "play"; }, 2200);
+            }
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); else if (state === "clear") { for (const f of fruits) physics(f, dt); } fx.update(dt); draw(); });
+
+        const ECOL = ["#ff4d8d", "#a15cff", "#ff9d4d"];
+        const FRUIT = ["🍒", "🍌", "🍉", "🍇"];
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#14183a"); g.addColorStop(1, "#0b0d1a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            const hue = ["#7c5cff", "#2ee6c9", "#ff4d8d", "#ffc94d"][(level - 1) % 4];
+            for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
+                const v = grid[y][x]; if (!v) continue;
+                ctx.fillStyle = v === 1 ? hue + "aa" : hue; Kit.rr(ctx, x * T + 1, y * T + (v === 2 ? 2 : 1), T - 2, v === 2 ? 14 : T - 2, 4); ctx.fill();
+                ctx.fillStyle = "#ffffff30"; ctx.fillRect(x * T + 4, y * T + 4, T - 8, 3);
+            }
+            for (const f of fruits) { ctx.font = "22px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(FRUIT[f.kind], f.x + 12, f.y + 12); }
+            for (const e of enemies) {
+                if (e.gone) continue;
+                const x = e.x, y = e.y, c = e.angry ? "#ff2a2a" : ECOL[e.kind];
+                ctx.fillStyle = c; Kit.rr(ctx, x + 2, y + 4, 24, 22, 8); ctx.fill();
+                ctx.fillRect(x + 4, y + 22, 5, 6 + Math.sin(t * 16 + x) * 2); ctx.fillRect(x + 19, y + 22, 5, 6 - Math.sin(t * 16 + x) * 2);
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x + 10, y + 13, 5, 0, 7); ctx.arc(x + 19, y + 13, 5, 0, 7); ctx.fill();
+                ctx.fillStyle = "#0b0d1a"; const lx = Math.sign(e.vx) * 2; ctx.beginPath(); ctx.arc(x + 10 + lx, y + 13, 2.2, 0, 7); ctx.arc(x + 19 + lx, y + 13, 2.2, 0, 7); ctx.fill();
+                if (e.angry) { ctx.strokeStyle = "#0b0d1a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 5, y + 6); ctx.lineTo(x + 13, y + 9); ctx.moveTo(x + 24, y + 6); ctx.lineTo(x + 16, y + 9); ctx.stroke(); }
+            }
+            for (const b of bubbles) {
+                const wob = 1 + Math.sin(t * 6 + b.x) * 0.04, warn = b.enemy && b.life < 1.8 && Math.floor(t * 8) % 2;
+                ctx.fillStyle = b.enemy ? (warn ? "#ff4d8d33" : "#2ee6c933") : "#9fe8ff22";
+                ctx.strokeStyle = b.enemy ? (warn ? "#ff4d8d" : "#2ee6c9") : "#9fe8ff"; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r * wob, b.r / wob, 0, 0, 7); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.arc(b.x - b.r * 0.4, b.y - b.r * 0.4, 3, 0, 7); ctx.fill();
+            }
+            // player: a round blob with a little snorkel
+            if (!(pl.inv > 0 && Math.floor(t * 12) % 2) && state !== "dead") {
+                const col = Kit.skin("bubblebobble", "#2ee6a0"), x = pl.x, y = pl.y, f = pl.face, sq = pl.ground ? 1 + Math.sin(t * (pl.vx ? 18 : 4)) * 0.04 : 0.94;
+                ctx.save(); ctx.translate(x + 13, y + 30); ctx.scale(1 / sq, sq);
+                ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0, -14, 14, 15, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.ellipse(-2 * f, -8, 8, 6, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(5 * f, -19, 5, 0, 7); ctx.fill();
+                ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(6.5 * f, -19, 2.4, 0, 7); ctx.fill();
+                ctx.fillStyle = "#ffc94d"; ctx.fillRect(f > 0 ? 10 : -16, -13, 6, 4);
+                ctx.restore();
+            }
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.max(0, f.t / 0.9); Kit.text(ctx, f.s, f.x, f.y, 14, "#ffffff"); }
+            ctx.globalAlpha = 1;
+            if (startT > 0 && state === "play") Kit.text(ctx, `ROUND ${level}`, W / 2, H / 2 - 20, 26, "#ffffff", "center", "'Press Start 2P', monospace", 400);
+            if (state === "clear") Kit.text(ctx, "ROUND CLEAR!", W / 2, H / 2 - 20, 24, "#ffc94d", "center", "'Press Start 2P', monospace", 400);
+        }
+        function start() {
+            score = 0; lives = 3; level = 1; Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️");
+            load(1); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([523, 659, 784], 0.08);
+        }
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "jump", KeyW: "jump", KeyZ: "jump", Space: "+fire", KeyX: "+fire", KeyJ: "+fire", Enter: "enter" }, (a) => {
+            if (a === "fire") blow();
+            if ((a === "enter" || a === "fire") && state === "dead" && !$("over").classList.contains("hidden")) start();
+        });
+        Kit.touchButtons((k) => { if (k === "fire") blow(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        level = 1; score = 0; lives = 3; load(1); state = "ready"; game.start();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -42,12 +314,20 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
         <section><h2>About Bubble Blaster</h2><p>Trap the monsters inside bubbles, then pop them for points. Jump between platforms, blow bubbles at the enemies and clear every monster to move to the next level. Watch out: touching a monster costs you a life.</p></section>
-        <section><h3>How to play</h3><table><tr><td>Arrow keys</td><td>Move and jump</td></tr><tr><td>A</td><td>Blow a bubble</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Shoot bubbles from a platform above the monsters.</li><li>Pop trapped monsters quickly before they escape.</li><li>Keep moving so monsters can't corner you.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/Chess/chess">Chess</a><a href="/Soccer/soccer">Soccer</a><a href="/Game2048/2048">2048</a><a href="/">All games →</a></div></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡</td><td>Move</td></tr><tr><td>⬆</td><td>Jump</td></tr><tr><td>Space</td><td>Blow a bubble</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Trapped monsters float up. Pop several close together for a combo bonus.</li><li>Pop trapped monsters quickly before they escape and get angry.</li><li>Collect the fruit that drops for extra points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Bubble Blaster</h3><p>In Bubble Blaster you never hit monsters directly. You trap them first, then pop them. Blow a bubble at a monster to trap it, and it floats upward. Then touch or jump into the bubble to pop it. Don't wait too long, though: a trapped monster eventually breaks free, and it comes back angrier and faster than before.</p><p>The best points come from popping several trapped monsters close together for a combo. When a few monsters are near each other, trap all of them first, then pop the bubbles one after another. Use the platforms to stay above the monsters when you can, because it's easier to aim bubbles at enemies walking below you than at enemies jumping down on you. And grab the fruit that drops after a pop for extra points.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Practise trapping a monster and popping it right away.</li><li><b>Getting good:</b> Trap two or three monsters before popping them for a combo.</li><li><b>Expert:</b> Clear levels quickly by herding monsters together and popping them in one chain.</li></ul><h3>Did you know?</h3><p>This game is inspired by Bubble Bobble, an arcade game by Taito from 1986, starring two little dragons named Bub and Bob. It was famous for being one of the first popular games designed for two players to play together, helping each other instead of competing.</p><h3>Questions players ask</h3><h4>How do I defeat a monster?</h4><p>Blow a bubble at it to trap it, then touch the bubble to pop it.</p><h4>What happens if I wait too long?</h4><p>The monster escapes from the bubble and gets angry, which makes it faster.</p><h4>What is the fruit for?</h4><p>Fruit drops after you pop monsters. Collect it for bonus points.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Chess/chess">Chess</a><a href="/Soccer/soccer">Soccer</a><a href="/TicTacToe/tictactoe">Tic-Tac-Toe</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
@@ -56,7 +336,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

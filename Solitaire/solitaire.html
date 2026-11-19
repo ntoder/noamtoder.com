@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Classic Klondike solitaire, the card game everyone knows. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Solitaire · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Solitaire</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="time">0:00</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center"><span class="seg" id="draw"><button data-n="1">Draw 1</button><button data-n="3">Draw 3</button></span><button class="btn ghost" id="undoBtn" style="padding:8px 14px">↶ Undo</button><button class="btn ghost" id="autoBtn" style="padding:8px 14px">✨ Auto finish</button><button class="btn" id="newBtn" style="padding:8px 14px">＋ New game</button></div>
+            <div class="frame"><canvas id="c" width="820" height="660"></canvas>
+            <div class="overlay hidden" id="over"><div><h2>You Win! 🎉</h2><p id="overText"></p><button class="btn" id="againBtn">↻ New game</button></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Drag cards to move them. Double-click (or tap on a phone) a card to send it to the best place. Build each suit from A to K.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, CW = 96, CH = 134, GAP = (W - 7 * CW) / 8, TOPY = 18, TABY = TOPY + CH + 26, BEST = "solitaireBest";
+        const SUITS = ["♠", "♥", "♦", "♣"], RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+        const red = (c) => c.s === 1 || c.s === 2;
+        const colX = (i) => GAP + i * (CW + GAP);
+        let stock, waste, found, tab, score, moves, time, timer, drag = null, history = [], won = false, t = 0, celebrate = [], lastTap = { c: null, t: 0 }, drawN = 1;
+        try { drawN = +localStorage.getItem("solDraw") || 1; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function deal() {
+            const deck = []; for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) deck.push({ s, r, up: false });
+            for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+            tab = Array.from({ length: 7 }, (_, i) => { const pile = deck.splice(0, i + 1); pile[pile.length - 1].up = true; return pile; });
+            stock = deck; waste = []; found = [[], [], [], []]; score = 0; moves = 0; time = 0; history = []; won = false; celebrate = [];
+            clearInterval(timer); timer = setInterval(() => { if (!won) { time++; Kit.stat("time", fmt(time)); } }, 1000);
+            stats(); Kit.hide("over");
+        }
+        const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        function stats() { Kit.stat("score", score); Kit.stat("moves", moves); Kit.stat("time", fmt(time)); }
+        function snap() { history.push(JSON.stringify({ stock, waste, found, tab, score })); if (history.length > 200) history.shift(); }
+        function undo() { const h = history.pop(); if (!h || won) return; ({ stock, waste, found, tab, score } = JSON.parse(h)); moves++; stats(); beep(400, 0.03, "triangle", 0.03); }
+        function tabOffset(pile) { const extra = pile.length; const room = H - TABY - CH - 10; let down = 14, up = 28; const need = pile.reduce((a, c) => a + (c.up ? up : down), 0); if (need > room) { const k = room / need; down *= k; up *= k; } return { down, up }; }
+        function cardPos(pile, i) { const o = tabOffset(pile); let y = 0; for (let k = 0; k < i; k++) y += pile[k].up ? o.up : o.down; return y; }
+        function canFound(c, fi) { const f = found[fi]; return f.length ? f[f.length - 1].s === c.s && f[f.length - 1].r === c.r - 1 : c.r === 0; }
+        function canTab(c, ti) { const p = tab[ti]; if (!p.length) return c.r === 12; const top = p[p.length - 1]; return top.up && red(top) !== red(c) && top.r === c.r + 1; }
+        function flipTops() { for (const p of tab) if (p.length && !p[p.length - 1].up) { p[p.length - 1].up = true; score += 5; } }
+        function moveCards(src, n, dest) {
+            snap();
+            const cards = src.pile.splice(src.pile.length - n, n);
+            if (dest.kind === "found") { found[dest.i].push(...cards); score += src.kind === "found" ? 0 : 10; beep(660 + found[dest.i].length * 20, 0.06, "triangle", 0.05); }
+            else { tab[dest.i].push(...cards); if (src.kind === "waste") score += 5; if (src.kind === "found") score = Math.max(0, score - 15); beep(440, 0.04, "triangle", 0.04); }
+            moves++; flipTops(); stats(); checkWin();
+        }
+        function checkWin() {
+            if (found.every((f) => f.length === 13)) {
+                won = true; clearInterval(timer);
+                const bonus = Math.max(0, 900 - time) * 2, total = score + bonus;
+                Kit.save(total); const best = Kit.setBest(BEST, total);
+                $("overText").innerHTML = `Solved in ${fmt(time)} and ${moves} moves<br>${score} + ${bonus} time bonus = ${total} points · best ${best}`;
+                tune([523, 659, 784, 1047, 1319, 1568], 0.1, "triangle", 0.06);
+                for (let i = 0; i < 4; i++) for (let k = 0; k < 13; k++) celebrate.push({ c: found[i][k], x: colX(3 + i), y: TOPY, vx: Kit.rand(-260, -60) * (Math.random() < 0.5 ? 1 : -1), vy: Kit.rand(-200, 0), d: (i * 13 + k) * 0.08 });
+                setTimeout(() => Kit.show("over"), 2600);
+            }
+        }
+        function drawStock() {
+            snap();
+            if (!stock.length) { if (!waste.length) { history.pop(); return; } stock = waste.reverse().map((c) => ({ ...c, up: false })); waste = []; score = Math.max(0, score - (drawN === 1 ? 100 : 0)); beep(300, 0.05, "triangle", 0.04); }
+            else { for (let k = 0; k < drawN && stock.length; k++) { const c = stock.pop(); c.up = true; waste.push(c); } beep(600, 0.03, "triangle", 0.03); }
+            moves++; stats();
+        }
+        function autoMove(src, card) {
+            // try the foundations first, then any tableau pile
+            if (src.pile[src.pile.length - 1] === card) for (let f = 0; f < 4; f++) if (canFound(card, f)) return moveCards(src, 1, { kind: "found", i: f }), true;
+            const n = src.pile.length - src.pile.indexOf(card);
+            for (let k = 0; k < 7; k++) { if (src.kind === "tab" && src.i === k) continue; if (canTab(card, k) && !(card.r === 12 && src.kind === "tab" && src.pile.indexOf(card) === 0)) return moveCards(src, n, { kind: "tab", i: k }), true; }
+            beep(150, 0.05, "triangle", 0.03); return false;
+        }
+        function autoFinish() {
+            if (stock.length || waste.length || tab.some((p) => p.some((c) => !c.up))) return;
+            const step = () => {
+                for (let k = 0; k < 7; k++) { const p = tab[k]; if (!p.length) continue; const c = p[p.length - 1]; for (let f = 0; f < 4; f++) if (canFound(c, f)) { moveCards({ kind: "tab", i: k, pile: p }, 1, { kind: "found", i: f }); if (!won) setTimeout(step, 70); return; } }
+            };
+            step();
+        }
+        // ---- hit testing
+        function hit(x, y) {
+            if (y >= TOPY && y <= TOPY + CH) {
+                if (x >= colX(0) && x <= colX(0) + CW) return { kind: "stock" };
+                if (x >= colX(1) && x <= colX(1) + CW + (drawN === 3 ? 40 : 0) && waste.length) return { kind: "waste", pile: waste, idx: waste.length - 1 };
+                for (let f = 0; f < 4; f++) if (x >= colX(3 + f) && x <= colX(3 + f) + CW) return { kind: "found", i: f, pile: found[f], idx: found[f].length - 1 };
+            }
+            for (let k = 0; k < 7; k++) {
+                if (x < colX(k) || x > colX(k) + CW) continue;
+                const p = tab[k];
+                for (let i = p.length - 1; i >= 0; i--) { const cy = TABY + cardPos(p, i); if (y >= cy && y <= cy + CH && p[i].up) return { kind: "tab", i: k, pile: p, idx: i }; if (y >= cy && y <= cy + CH) return { kind: "tabdown", i: k }; }
+                if (!p.length && y >= TABY && y <= TABY + CH) return { kind: "tabempty", i: k };
+            }
+            return null;
+        }
+        function dropTarget(x, y, cards) {
+            const c = cards[0];
+            for (let f = 0; f < 4; f++) if (cards.length === 1 && Math.abs(x - (colX(3 + f) + CW / 2)) < CW * 0.7 && Math.abs(y - (TOPY + CH / 2)) < CH * 0.8 && canFound(c, f)) return { kind: "found", i: f };
+            let best = null, bd = 1e9;
+            for (let k = 0; k < 7; k++) { const p = tab[k], ty = TABY + (p.length ? cardPos(p, p.length - 1) : 0) + CH / 2, d = Math.hypot(x - (colX(k) + CW / 2), y - ty); if (d < bd && Math.abs(x - (colX(k) + CW / 2)) < CW * 0.8 && canTab(c, k)) { bd = d; best = { kind: "tab", i: k }; } }
+            return best;
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (won) return; const p = Kit.point(cv, e), h = hit(p.x, p.y); if (!h) return;
+            if (h.kind === "stock") return drawStock();
+            if (!h.pile || h.idx < 0) return;
+            const card = h.pile[h.idx];
+            if (h.kind === "waste" && h.idx !== waste.length - 1) return;
+            if (h.kind === "found" && h.idx !== h.pile.length - 1) return;
+            const now = performance.now();
+            if (lastTap.c === card && now - lastTap.t < 350) { lastTap = { c: null, t: 0 }; drag = null; autoMove(h, card); return; }
+            lastTap = { c: card, t: now };
+            const cx = colX(h.kind === "tab" ? h.i : h.kind === "waste" ? 1 : 3 + h.i) + (h.kind === "waste" && drawN === 3 ? Math.min(2, waste.length - 1) * 20 : 0);
+            const cy = h.kind === "tab" ? TABY + cardPos(h.pile, h.idx) : TOPY;
+            drag = { src: h, n: h.pile.length - h.idx, cards: h.pile.slice(h.idx), dx: p.x - cx, dy: p.y - cy, x: p.x, y: p.y, moved: false, sx: p.x, sy: p.y };
+            try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+        });
+        cv.addEventListener("pointermove", (e) => { if (!drag) return; const p = Kit.point(cv, e); drag.x = p.x; drag.y = p.y; if (Math.hypot(p.x - drag.sx, p.y - drag.sy) > 6) drag.moved = true; });
+        cv.addEventListener("pointerup", (e) => {
+            if (!drag) return; const d = drag; drag = null;
+            if (!d.moved) { if (e.pointerType !== "mouse") { lastTap = { c: null, t: 0 }; autoMove(d.src, d.cards[0]); } return; }     // single tap on touch = auto move
+            const tgt = dropTarget(d.x - d.dx + CW / 2, d.y - d.dy + 20, d.cards);
+            if (tgt && !(tgt.kind === d.src.kind && tgt.i === d.src.i)) moveCards(d.src, d.n, tgt); else beep(150, 0.04, "triangle", 0.02);
+        });
+        function card(c, x, y) {
+            ctx.fillStyle = "#00000044"; Kit.rr(ctx, x + 2, y + 3, CW, CH, 9); ctx.fill();
+            if (!c.up) {
+                const g = ctx.createLinearGradient(x, y, x + CW, y + CH); g.addColorStop(0, Kit.skin("solitaire", "#7c5cff")); g.addColorStop(1, "#3a2a9a");
+                ctx.fillStyle = g; Kit.rr(ctx, x, y, CW, CH, 9); ctx.fill(); ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 2; Kit.rr(ctx, x + 6, y + 6, CW - 12, CH - 12, 6); ctx.stroke();
+                Kit.text(ctx, "★", x + CW / 2, y + CH / 2, 30, "#ffffff55"); return;
+            }
+            ctx.fillStyle = "#fdfcff"; Kit.rr(ctx, x, y, CW, CH, 9); ctx.fill(); ctx.strokeStyle = "#c8ccdf"; ctx.lineWidth = 1; ctx.stroke();
+            const col = red(c) ? "#e0294a" : "#1a1d33", rk = RANKS[c.r], st = SUITS[c.s];
+            ctx.fillStyle = col; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = "800 20px Inter, sans-serif"; ctx.fillText(rk, x + 8, y + 7);
+            ctx.font = "18px serif"; ctx.fillText(st, x + 8, y + 29);
+            ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = c.r >= 10 ? "800 40px Inter, sans-serif" : "44px serif"; ctx.fillText(c.r >= 10 ? rk : st, x + CW / 2, y + CH / 2 + 10);
+            if (c.r >= 10) { ctx.font = "22px serif"; ctx.fillText(st, x + CW / 2, y + CH / 2 + 40); }
+        }
+        function slot(x, y, label) { ctx.strokeStyle = "#ffffff33"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); Kit.rr(ctx, x, y, CW, CH, 9); ctx.stroke(); ctx.setLineDash([]); if (label) Kit.text(ctx, label, x + CW / 2, y + CH / 2, 30, "#ffffff33"); }
+        function draw() {
+            const g = ctx.createRadialGradient(W / 2, H / 3, 50, W / 2, H / 2, W); g.addColorStop(0, "#1f8a55"); g.addColorStop(1, "#0f4a2e");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            // stock and waste
+            if (stock.length) card({ up: false }, colX(0), TOPY); else slot(colX(0), TOPY, "↻");
+            if (waste.length) { const show = waste.slice(-(drawN === 3 ? 3 : 1)); show.forEach((c, i) => { if (drag && drag.src.kind === "waste" && i === show.length - 1) return; card(c, colX(1) + i * 20, TOPY); }); } else slot(colX(1), TOPY);
+            for (let f = 0; f < 4; f++) { const p = found[f]; const vis = drag && drag.src.kind === "found" && drag.src.i === f ? p.length - 1 : p.length; if (vis > 0) card(p[vis - 1], colX(3 + f), TOPY); else slot(colX(3 + f), TOPY, "A"); }
+            for (let k = 0; k < 7; k++) {
+                const p = tab[k]; if (!p.length) slot(colX(k), TABY, "K");
+                const hideFrom = drag && drag.src.kind === "tab" && drag.src.i === k ? drag.src.idx : p.length;
+                for (let i = 0; i < Math.min(p.length, hideFrom); i++) card(p[i], colX(k), TABY + cardPos(p, i));
+            }
+            if (drag && drag.moved) drag.cards.forEach((c, i) => card(c, drag.x - drag.dx, drag.y - drag.dy + i * 28));
+            else if (drag) drag.cards.forEach((c, i) => card(c, drag.x - drag.dx, drag.y - drag.dy + i * (drag.src.kind === "tab" ? tabOffset(drag.src.pile).up : 0)));
+            for (const c of celebrate) { if (c.d > 0) continue; card(c.c, c.x, c.y); }
+            if (!won && !stock.length && !waste.length && tab.every((p) => p.every((c) => c.up))) Kit.text(ctx, "Tap ✨ Auto finish!", W / 2, H - 16, 16, "#ffc94d");
+        }
+        const game = Kit.loop((dt) => {
+            t += dt;
+            for (const c of celebrate) { if (c.d > 0) { c.d -= dt; continue; } c.vy += 900 * dt; c.x += c.vx * dt; c.y += c.vy * dt; if (c.y > H - CH) { c.y = H - CH; c.vy *= -0.75; } }
+            draw();
+        });
+        $("undoBtn").onclick = undo; $("newBtn").onclick = deal; $("againBtn").onclick = deal; $("autoBtn").onclick = autoFinish;
+        document.querySelectorAll("#draw button").forEach((b) => {
+            b.classList.toggle("active", +b.dataset.n === drawN);
+            b.onclick = () => { drawN = +b.dataset.n; try { localStorage.setItem("solDraw", drawN); } catch (e) {} document.querySelectorAll("#draw button").forEach((x) => x.classList.toggle("active", x === b)); deal(); };
+        });
+        addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ") { e.preventDefault(); undo(); } if (e.code === "Space") { e.preventDefault(); drawStock(); } });
+        deal(); game.start();
+        if (window.__test) window.__test.sol = () => ({ tab, found, stock, waste });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Solitaire</h2><p>Classic Klondike solitaire, the card game everyone knows. Build four piles, one for each suit, from Ace up to King. In the seven columns you can stack cards in descending order with alternating red and black colours, and only a King can go in an empty column. Turn cards from the stock when you're stuck. Choose to draw one card at a time or three for a harder game. Undo as much as you like.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag</td><td>Move cards</td></tr><tr><td>Double-click / tap</td><td>Send a card to the best place</td></tr><tr><td>Space</td><td>Draw from the stock</td></tr><tr><td>Ctrl+Z</td><td>Undo</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Turning over face-down cards in the columns is usually the best move.</li><li>Don't rush to fill an empty column unless you have a King ready.</li><li>Move Aces and Twos to the foundations as soon as you can.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Solitaire</h3><p>In Klondike Solitaire, the hidden cards in the columns are what you need to reach. The best move is usually the one that turns over a face-down card. When you have a choice between moves, pick the one that frees a card from the column with the most face-down cards.</p><p>Move Aces and Twos to the foundations right away, but be a little careful with higher cards. Sometimes you need a black 5 in the columns to hold a red 4. Don't empty a column unless you have a King ready to move into it, because only Kings can fill an empty space. Draw-three mode is harder, because you can only reach every third card in the stock, so think about the order of the stock before drawing.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play draw-one and focus on turning over hidden cards.</li><li><b>Getting good:</b> Only empty a column when you have a King to move, and use Undo to explore options.</li><li><b>Expert:</b> Win in draw-three mode by planning the order you go through the stock.</li></ul><h3>Did you know?</h3><p>Solitaire was included with Windows from 1990, partly to help people get used to dragging and dropping with a mouse. It became one of the most-played computer games ever. Not every deal can be won, even with perfect play, which is part of what makes winning satisfying.</p><h3>Questions players ask</h3><h4>Can I undo?</h4><p>Yes, as many times as you like. Press Ctrl+Z or the Undo button.</p><h4>What's the difference between draw one and draw three?</h4><p>Draw three turns over three stock cards at a time and only the top one can be played, which makes the game harder.</p><h4>Can I move cards automatically?</h4><p>Double-click or tap a card to send it to the best place.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SeaBattle/seabattle">Sea Battle</a><a href="/WordGuess/wordguess">Word Guess</a><a href="/RhythmTap/rhythmtap">Rhythm Tap</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

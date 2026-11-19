@@ -1,44 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Steer a growing snake around the board and eat the food. Free to play in your browser on Noam's Game Hub.">
-    <title>Snake Game</title>
-    <link rel="stylesheet" href="snake.css">
+    <meta name="description" content="Steer a growing snake around the board and eat the food. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Snake · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>Snake Game</h1>
-        <div class="info">
-            <div class="score-board">
-                <p>Score: <span id="score">0</span></p>
-                <p>High Score: <span id="highScore">0</span></p>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Snake</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="length">3</b><small>Length</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Snake</h2>
+                <p id="startText">Arrow keys / WASD or swipe to steer.<br>Eat 🍎 to grow. Golden ★ apples are worth 50!<br>Space or tap to pause.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
             </div>
-            <button id="startBtn" class="start-btn">Start Game</button>
-            <button id="pauseBtn" class="pause-btn">Pause</button>
-        </div>
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
-        <div class="controls">
-            <p>Use Arrow Keys to control the snake</p>
-            <p id="gameStatus"></p>
+            
         </div>
     </div>
-    <script src="snake.js"></script>
+    <div class="touch"><button data-k="up">⬆</button><button data-k="left">⬅</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">The snake speeds up with every apple. Don't hit the walls or your tail!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d");
+        const N = 20, S = cv.width / N, BEST = "snakeBest2";
+        Kit.stat("best", Kit.best(BEST));
+        let snake, dir, queue, food, gold, score, stepTime, acc, alive, paused, eaten, fx = Kit.particles();
+
+        function reset() {
+            snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }];
+            dir = { x: 1, y: 0 }; queue = []; score = 0; eaten = 0; stepTime = 0.14; acc = 0; gold = null; paused = false;
+            placeFood(); Kit.stat("score", 0); Kit.stat("length", snake.length);
+        }
+        function free() {
+            let p;
+            do { p = { x: Kit.randi(0, N - 1), y: Kit.randi(0, N - 1) }; }
+            while (snake.some((s) => s.x === p.x && s.y === p.y) || (food && food.x === p.x && food.y === p.y));
+            return p;
+        }
+        function placeFood() { food = free(); }
+
+        function turn(d) {
+            const v = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[d];
+            if (!v) return;
+            const last = queue.length ? queue[queue.length - 1] : dir;
+            if (v.x === -last.x && v.y === -last.y) return;       // can't reverse into yourself
+            if (v.x === last.x && v.y === last.y) return;
+            if (queue.length < 3) queue.push(v);
+        }
+
+        function step() {
+            if (queue.length) dir = queue.shift();
+            const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+            if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N || snake.some((s, i) => i < snake.length - 1 && s.x === head.x && s.y === head.y)) return die();
+            snake.unshift(head);
+            let grow = false;
+            if (head.x === food.x && head.y === food.y) {
+                grow = true; score += 10; eaten++;
+                beep(520 + Math.min(eaten, 30) * 12, 0.07, "square", 0.05);
+                fx.burst(head.x * S + S / 2, head.y * S + S / 2, "#ff4d8d", 12);
+                placeFood();
+                stepTime = Math.max(0.065, 0.14 - eaten * 0.0025);
+                if (!gold && Math.random() < 0.18) gold = { ...free(), t: 6 };
+            } else if (gold && head.x === gold.x && head.y === gold.y) {
+                grow = true; score += 50; gold = null;
+                tune([660, 880, 1100], 0.06, "triangle", 0.06);
+                fx.burst(head.x * S + S / 2, head.y * S + S / 2, "#ffc94d", 24, 4);
+            }
+            if (!grow) snake.pop();
+            Kit.stat("score", score); Kit.stat("length", snake.length);
+        }
+
+        function die() {
+            alive = false; game.stop(); beep(180, 0.4, "sawtooth", 0.06, -120);
+            Kit.setBest(BEST, score);
+            $("overText").textContent = `Score ${score} · length ${snake.length}`;
+            Kit.show("over"); draw(); Kit.save(score);
+        }
+
+        const game = Kit.loop((dt) => {
+            if (!paused) {
+                acc += dt;
+                while (acc >= stepTime && alive) { acc -= stepTime; step(); }
+                if (gold && (gold.t -= dt) <= 0) gold = null;
+            }
+            fx.update(dt); draw();
+        });
+
+        function draw() {
+            ctx.fillStyle = "#0f1124"; ctx.fillRect(0, 0, cv.width, cv.height);
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if ((x + y) % 2) { ctx.fillStyle = "#12152b"; ctx.fillRect(x * S, y * S, S, S); }
+            // food
+            const pulse = 1 + Math.sin(performance.now() / 160) * 0.08;
+            ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(food.x * S + S / 2, food.y * S + S / 2, S * 0.36 * pulse, 0, 7); ctx.fill();
+            ctx.fillStyle = "#2ee6a0"; ctx.fillRect(food.x * S + S / 2 - 1, food.y * S + 3, 3, 5);
+            if (gold) {
+                ctx.globalAlpha = gold.t < 2 ? (Math.sin(performance.now() / 60) > 0 ? 1 : 0.3) : 1;
+                ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(gold.x * S + S / 2, gold.y * S + S / 2, S * 0.4 * pulse, 0, 7); ctx.fill();
+                Kit.text(ctx, "★", gold.x * S + S / 2, gold.y * S + S / 2 + 1, S * 0.5, "#0b0d1a"); ctx.globalAlpha = 1;
+            }
+            // snake
+            const color = Kit.skin("snake", "#2ee6c9");
+            snake.forEach((s, i) => {
+                const t = 1 - i / (snake.length + 4);
+                ctx.fillStyle = color; ctx.globalAlpha = 0.45 + t * 0.55;
+                Kit.rr(ctx, s.x * S + 2, s.y * S + 2, S - 4, S - 4, i === 0 ? 8 : 6); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            const h = snake[0], ex = dir.x * 4, ey = dir.y * 4;
+            ctx.fillStyle = "#0b0d1a";
+            ctx.beginPath(); ctx.arc(h.x * S + S / 2 + ex - dir.y * 5, h.y * S + S / 2 + ey - dir.x * 5, 3, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(h.x * S + S / 2 + ex + dir.y * 5, h.y * S + S / 2 + ey + dir.x * 5, 3, 0, 7); ctx.fill();
+            fx.draw(ctx);
+            if (paused) { ctx.fillStyle = "rgba(11,13,26,.6)"; ctx.fillRect(0, 0, cv.width, cv.height); Kit.text(ctx, "PAUSED", cv.width / 2, cv.height / 2, 22); }
+        }
+
+        function start() {
+            reset(); alive = true; Kit.hide("start"); Kit.hide("over"); game.start(); beep(440, 0.08);
+        }
+        Kit.onKeys({ ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", KeyP: "pause", Space: "pause", Enter: "start" },
+            (a) => {
+                if (a === "start" || (!alive && a === "pause")) return alive ? null : start();
+                if (a === "pause") { if (alive) paused = !paused; return; }
+                if (alive) turn(a);
+            });
+        Kit.touchButtons((k) => alive && turn(k));
+        Kit.swipe(cv, (d) => alive && turn(d), () => { if (alive) paused = !paused; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); draw();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -51,11 +169,19 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
         <section><h2>About Snake</h2><p>Steer a growing snake around the board and eat the food. Every bite makes the snake longer and adds to your score. Crash into a wall or into your own tail and the game is over.</p></section>
         <section><h3>How to play</h3><table><tr><td>Arrow keys</td><td>Change direction</td></tr><tr><td>Pause</td><td>Take a break</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Move along the edges of the board to keep the middle free.</li><li>Plan your path a few moves ahead once the snake gets long.</li><li>Never turn back toward your own tail.</li></ul></section>
+        <section><h3>Tips</h3><ul><li>Move along the edges of the board to keep the middle free.</li><li>Plan your path a few moves ahead once the snake gets long.</li><li>Never turn back toward your own tail.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Snake</h3><p>Early in a game of Snake, almost anything works because the snake is short and slow. In our version the snake speeds up with every apple, so the decisions you make get faster as the snake gets longer. The real game starts once your snake fills a good part of the board. From then on, the danger isn't the walls, it's your own tail. The best habit is to leave yourself room: don't race straight to the food if it means trapping yourself in a corner with no way out.</p><p>Many strong players move in long, tidy lines, like mowing a lawn, sweeping back and forth across the board and only cutting across when the food is close. This keeps the snake's body in neat rows and leaves a clear path behind the head. When the snake is very long, think about where your tail will be a few moves from now. The tail keeps moving, so a gap that's blocked now may open up just in time.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Avoid the walls and get used to turning early. Reach 10 pieces of food.</li><li><b>Getting good:</b> Travel along the edges and keep the middle of the board open. Never turn back toward your own body.</li><li><b>Expert:</b> Sweep the board in tidy rows and plan around where your tail will be. Long snakes need a plan, not quick reactions.</li></ul><h3>Did you know?</h3><p>The idea behind Snake goes back to an arcade game called Blockade from 1976, where two players left trails behind them. Snake became famous in 1997 when Nokia put it on its mobile phones, and for millions of people it was the first game they ever played on a phone.</p><h3>Questions players ask</h3><h4>Can I pause?</h4><p>Yes, use the Pause button to take a break without losing your game.</p><h4>Can I go through the walls?</h4><p>No. Hitting a wall ends the game, just like hitting your own tail.</p><h4>How do I play on a phone?</h4><p>Swipe in the direction you want the snake to turn, or use the on-screen arrows.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
         <section><h3>More games</h3><div class="gh-more"><a href="/Pacman/pacman">Maze Muncher</a><a href="/Mario/mario">Pixel Jumper</a><a href="/MotorRacing/motorracing">Motor Racing</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
@@ -65,7 +191,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

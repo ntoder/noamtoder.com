@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast table-tennis style duel against the computer. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Paddle Battle · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Paddle <span>Battle</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 - 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="500"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Paddle Battle</h2>
+                <p id="startText"><span class="seg" id="diff"><button data-d="easy">Easy</button><button data-d="normal">Normal</button><button data-d="hard">Hard</button></span>Move your paddle with the mouse, your finger, or ⬆ ⬇ / W S.<br>Hit the ball with the edge of your paddle to send it at an angle.<br>First to 7 points wins!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Match Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Rematch</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">The ball gets faster with every hit. Winning on Hard gives the most points.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "paddleBest", WIN = 7, PH = 90, PW = 14;
+        const AI = { easy: 300, normal: 420, hard: 560 };
+        let diff = "normal", me, cpu, ball, trail = [], my, their, state = "ready", t = 0, serveT = 0, shake = 0, rally = 0, fx = Kit.particles(), mouseY = null;
+        try { diff = localStorage.getItem("paddleDiff") || "normal"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        function serve(dir) {
+            ball = { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 9, dir }; serveT = 1; rally = 0; trail = [];
+        }
+        function reset() { me = { y: H / 2 - PH / 2, vy: 0 }; cpu = { y: H / 2 - PH / 2 }; my = 0; their = 0; stats(); serve(Math.random() < 0.5 ? -1 : 1); }
+        function stats() { Kit.stat("score", `${my} - ${their}`); }
+        function hitPaddle(px, py, side) {
+            const rel = (ball.y - (py + PH / 2)) / (PH / 2);                         // -1 top … 1 bottom
+            const sp = Math.min(1100, Math.hypot(ball.vx, ball.vy) * 1.06 + 8);
+            const ang = rel * 0.95;
+            ball.vx = Math.cos(ang) * sp * side; ball.vy = Math.sin(ang) * sp;
+            ball.x = side > 0 ? px + PW + ball.r : px - ball.r;
+            rally++; beep(side > 0 ? 440 : 330, 0.05, "square", 0.05);
+            fx.burst(ball.x, ball.y, side > 0 ? Kit.skin("paddlebattle", "#2ee6c9") : "#ff4d8d", 10, 3);
+        }
+        function point(mine) {
+            if (mine) { my++; tune([660, 880], 0.07, "square", 0.05); } else { their++; beep(160, 0.3, "sawtooth", 0.05, -60); }
+            shake = 0.35; fx.burst(ball.x, ball.y, "#ffffff", 26, 5); stats();
+            if (my >= WIN || their >= WIN) return end();
+            serve(mine ? 1 : -1);
+        }
+        function end() {
+            state = "dead";
+            const win = my > their, sc = my * 100 + (win ? (WIN - their) * 50 + (diff === "hard" ? 300 : diff === "normal" ? 100 : 0) : 0);
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `${win ? "🏆 You win" : "😢 Computer wins"} ${my} - ${their}<br>${sc} points · best ${best}`;
+            if (win) tune([523, 659, 784, 1047], 0.1, "triangle", 0.06);
+            Kit.show("over");
+        }
+        function update(dt) {
+            // you
+            const up = Kit.keys.has("up"), down = Kit.keys.has("down");
+            if (up || down) { mouseY = null; me.vy += ((down ? 1 : -1) * 560 - me.vy) * Math.min(1, dt * 14); }
+            else if (mouseY !== null) me.vy = (mouseY - PH / 2 - me.y) * 14;
+            else me.vy *= Math.pow(0.001, dt);
+            me.y = Math.max(0, Math.min(H - PH, me.y + me.vy * dt));
+            // computer: follows the ball with some lag, gets better as the rally grows
+            const target = ball.vx > 0 ? ball.y + ball.vy * Math.min(0.25, (W - 40 - ball.x) / Math.max(1, ball.vx)) - PH / 2 : H / 2 - PH / 2;
+            const sp = AI[diff] + rally * 6, dy = target - cpu.y;
+            cpu.y += Math.max(-sp * dt, Math.min(sp * dt, dy * (diff === "easy" ? 0.8 : 1)));
+            cpu.y = Math.max(0, Math.min(H - PH, cpu.y));
+            // ball
+            if (serveT > 0) { serveT -= dt; ball.y = H / 2 + Math.sin(t * 4) * 20; if (serveT <= 0) { ball.vx = 380 * ball.dir; ball.vy = Kit.rand(-180, 180); beep(600, 0.05, "triangle", 0.04); } return; }
+            for (let s = 0; s < 3; s++) {
+                ball.x += ball.vx * dt / 3; ball.y += ball.vy * dt / 3;
+                if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); beep(260, 0.03, "triangle", 0.03); }
+                if (ball.y > H - ball.r) { ball.y = H - ball.r; ball.vy = -Math.abs(ball.vy); beep(260, 0.03, "triangle", 0.03); }
+                if (ball.vx < 0 && ball.x - ball.r < 30 + PW && ball.x > 20 && ball.y > me.y - 6 && ball.y < me.y + PH + 6) hitPaddle(30, me.y, 1);
+                if (ball.vx > 0 && ball.x + ball.r > W - 30 - PW && ball.x < W - 20 && ball.y > cpu.y - 6 && ball.y < cpu.y + PH + 6) hitPaddle(W - 30 - PW, cpu.y, -1);
+                if (ball.x < -20) return point(false);
+                if (ball.x > W + 20) return point(true);
+            }
+            trail.push({ x: ball.x, y: ball.y }); if (trail.length > 14) trail.shift();
+        }
+        function draw() {
+            ctx.save();
+            if (shake > 0) ctx.translate(Kit.rand(-6, 6) * shake, Kit.rand(-6, 6) * shake);
+            const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, "#0f1a33"); g.addColorStop(0.5, "#12152b"); g.addColorStop(1, "#2a1230");
+            ctx.fillStyle = g; ctx.fillRect(-10, -10, W + 20, H + 20);
+            ctx.fillStyle = "#ffffff22"; for (let y = 10; y < H; y += 30) ctx.fillRect(W / 2 - 2, y, 4, 16);
+            Kit.text(ctx, my, W / 2 - 80, 60, 56, "#ffffff22", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, their, W / 2 + 80, 60, 56, "#ffffff22", "center", "'Press Start 2P', monospace", 400);
+            const mc = Kit.skin("paddlebattle", "#2ee6c9");
+            for (const [x, y, c] of [[30, me.y, mc], [W - 30 - PW, cpu.y, "#ff4d8d"]]) { ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 18; Kit.rr(ctx, x, y, PW, PH, 7); ctx.fill(); }
+            ctx.shadowBlur = 0;
+            trail.forEach((p, i) => { ctx.globalAlpha = i / trail.length * 0.4; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(p.x, p.y, ball.r * i / trail.length, 0, 7); ctx.fill(); });
+            ctx.globalAlpha = 1; ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 16; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+            fx.draw(ctx);
+            if (rally >= 6) Kit.text(ctx, `Rally ${rally}!`, W / 2, H - 30, 16, "#ffc94d");
+            ctx.restore();
+        }
+        const game = Kit.loop((dt) => { t += dt; if (shake > 0) shake -= dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        Kit.onKeys({ ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", Enter: "enter", Space: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        cv.addEventListener("pointermove", (e) => { mouseY = Kit.point(cv, e).y; });
+        cv.addEventListener("pointerdown", (e) => { mouseY = Kit.point(cv, e).y; });
+        document.querySelectorAll("#diff button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.d === diff);
+            b.onclick = () => { diff = b.dataset.d; try { localStorage.setItem("paddleDiff", diff); } catch (e) {} document.querySelectorAll("#diff button").forEach((x) => x.classList.toggle("active", x === b)); };
+        });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Paddle Battle</h2><p>A fast table-tennis style duel against the computer. Move your paddle up and down to bounce the ball back, and aim with the edge of the paddle to send it flying at sharp angles. The ball speeds up with every hit, so long rallies get very intense. The first player to reach 7 points wins the match.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse / finger</td><td>Move your paddle</td></tr><tr><td>⬆ ⬇ / W S</td><td>Move with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hitting the ball near the end of your paddle makes a steep angle that is hard to return.</li><li>Move back toward the middle after each hit.</li><li>Watch where the ball will bounce off the wall, not just where it is now.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Paddle Battle</h3><p>Paddle Battle is won with angles, not speed. Where the ball hits your paddle decides where it goes: the middle sends it back fairly straight, and the ends send it off at a steep angle that bounces off the walls. A steep shot is much harder for the computer to reach, so try to meet the ball with the end of your paddle when you have time.</p><p>After every hit, drift back toward the middle of your side. From the middle you can reach almost any return, but if you stay at the edge where you last hit, a shot to the other corner will get past you. Watch the ball's path, not the ball itself: work out where it will bounce off the top or bottom wall and move there early. The ball speeds up with every hit, so long rallies get harder, and that's where good positioning pays off.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Keep rallies going on Easy by moving early instead of chasing the ball.</li><li><b>Getting good:</b> Start aiming with the ends of your paddle and return to the middle after every shot.</li><li><b>Expert:</b> On Hard, use steep angles to pull the computer to one side, then send the next shot to the other.</li></ul><h3>Did you know?</h3><p>Paddle Battle is inspired by Pong, released by Atari in 1972. It was one of the first video games to become a big commercial hit. Before that, in 1958, a physicist named William Higinbotham made a tennis game on a laboratory oscilloscope, called Tennis for Two, to entertain visitors.</p><h3>Questions players ask</h3><h4>Can I play with the mouse?</h4><p>Yes. Move the mouse or your finger to move the paddle. W and S or the arrow keys work too.</p><h4>Why does the ball keep getting faster?</h4><p>Every hit speeds it up a little, so long rallies become a real test.</p><h4>Which level gives the most points?</h4><p>Winning on Hard gives the most points.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FourInARow/fourinarow">Four in a Row</a><a href="/MineFinder/minefinder">Mine Finder</a><a href="/StackTower/stacktower">Stack Tower</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

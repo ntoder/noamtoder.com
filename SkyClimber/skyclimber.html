@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Help a bouncy little alien climb into the sky. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Sky Climber · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Sky <span>Climber</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="440" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Sky Climber</h2>
+                <p id="startText">Bounce from cloud to cloud and climb as high as you can!<br>⬅ ➡ / A D to move, or hold your finger where you want to go.<br>Springs launch you high. Brown platforms break! Stomp the bats from above.</p>
+                <button class="btn" id="startBtn">▶ Climb</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>You Fell!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Climb again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Go off one side of the screen and you come back on the other. On a phone you can also tilt to move.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "climbBest", PW = 64, PH = 12;
+        Kit.stat("best", Kit.best(BEST));
+        let pl, plats, enemies, coins, camY, topY, score, bonus, state = "ready", t = 0, fx = Kit.particles(), tilt = 0, pointerX = null, stars;
+        stars = Array.from({ length: 60 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 2 + 0.5, p: Math.random() * 0.5 + 0.1 }));
+        function plat(y) {
+            const h = -y, r = Math.random(), lvl = Math.min(1, h / 12000);
+            const kind = h < 400 ? "n" : r < 0.12 + lvl * 0.15 ? "move" : r < 0.22 + lvl * 0.2 ? "break" : r < 0.3 + lvl * 0.2 ? "cloud" : "n";
+            const p = { x: Kit.rand(0, W - PW), y, kind, vx: kind === "move" ? Kit.pick([-1, 1]) * Kit.rand(50, 90 + lvl * 80) : 0, gone: false, spring: kind === "n" && Math.random() < 0.08, used: 0 };
+            plats.push(p);
+            if (h > 1500 && Math.random() < 0.04 + lvl * 0.06) enemies.push({ x: Kit.rand(30, W - 30), y: y - 80, bx: 0, t: Math.random() * 6, dead: false });
+            if (Math.random() < 0.18) coins.push({ x: p.x + PW / 2, y: y - 30, got: false });
+        }
+        function reset() {
+            pl = { x: W / 2 - 18, y: H - 120, vx: 0, vy: -700, w: 36, h: 36, face: 1, squash: 0 };
+            plats = []; enemies = []; coins = []; camY = 0; score = 0; bonus = 0;
+            plats.push({ x: W / 2 - PW / 2, y: H - 60, kind: "n", vx: 0, gone: false, spring: false, used: 0 });
+            topY = H - 60;
+            while (topY > -H) { topY -= Kit.rand(55, 90); plat(topY); }
+            Kit.stat("score", 0);
+        }
+        function gap() { return Math.min(150, 60 + -camY / 120); }
+        function update(dt) {
+            // controls: keys, finger/mouse position, or phone tilt
+            let dir = (Kit.keys.has("right") ? 1 : 0) - (Kit.keys.has("left") ? 1 : 0);
+            if (!dir && pointerX !== null) dir = Math.max(-1, Math.min(1, (pointerX - (pl.x + pl.w / 2)) / 40));
+            if (!dir && Math.abs(tilt) > 3) dir = Math.max(-1, Math.min(1, tilt / 20));
+            pl.vx += (dir * 330 - pl.vx) * Math.min(1, dt * 9); if (dir) pl.face = Math.sign(dir);
+            pl.vy += 1500 * dt;
+            pl.x += pl.vx * dt; const prevBottom = pl.y + pl.h; pl.y += pl.vy * dt;
+            if (pl.x > W) pl.x = -pl.w; if (pl.x < -pl.w) pl.x = W;
+            if (pl.squash > 0) pl.squash -= dt * 4;
+            if (pl.vy > 0) for (const p of plats) {
+                if (p.gone) continue;
+                if (pl.x + pl.w - 6 > p.x && pl.x + 6 < p.x + PW && prevBottom <= p.y + 2 && pl.y + pl.h >= p.y) {
+                    if (p.kind === "break") { p.gone = true; p.fall = 0; fx.burst(p.x + PW / 2, p.y, "#c47a3a", 10, 3); beep(180, 0.08, "square", 0.04); continue; }
+                    pl.y = p.y - pl.h;
+                    const spring = p.spring && Math.abs(pl.x + pl.w / 2 - (p.x + PW / 2)) < 22;
+                    pl.vy = spring ? -1350 : -720; pl.squash = 1;
+                    if (spring) { p.used = 0.3; tune([523, 784, 1047], 0.05, "square", 0.05); } else beep(360 + Math.min(600, -camY / 40), 0.06, "triangle", 0.04);
+                    if (p.kind === "cloud") { p.gone = true; fx.burst(p.x + PW / 2, p.y, "#ffffff", 14, 2); }
+                    break;
+                }
+            }
+            for (const p of plats) { if (p.kind === "move" && !p.gone) { p.x += p.vx * dt; if (p.x < 0 || p.x > W - PW) p.vx *= -1; } if (p.gone && p.kind === "break") { p.fall += dt; p.y += 400 * dt; } if (p.used > 0) p.used -= dt; }
+            for (const e of enemies) {
+                if (e.dead) { e.y += 500 * dt; continue; }
+                e.t += dt; e.bx = Math.sin(e.t * 1.6) * 50;
+                const ex = e.x + e.bx, ey = e.y + Math.sin(e.t * 4) * 6;
+                if (Math.abs(pl.x + pl.w / 2 - ex) < 28 && Math.abs(pl.y + pl.h / 2 - ey) < 28) {
+                    if (pl.vy > 0 && pl.y + pl.h < ey) { e.dead = true; pl.vy = -900; bonus += 100; fx.burst(ex, ey, "#a15cff", 20, 4); tune([660, 990], 0.06, "square", 0.05); }
+                    else return lose();
+                }
+            }
+            for (const c of coins) if (!c.got && Math.abs(pl.x + pl.w / 2 - c.x) < 24 && Math.abs(pl.y + pl.h / 2 - c.y) < 24) { c.got = true; bonus += 25; fx.burst(c.x, c.y, "#ffc94d", 10, 2); beep(1319, 0.05, "square", 0.04); }
+            // camera follows upward only
+            const target = pl.y - H * 0.4;
+            if (target < camY) camY += (target - camY) * Math.min(1, dt * 8);
+            while (topY > camY - 100) { topY -= Kit.rand(gap() * 0.6, gap()); plat(topY); }
+            plats = plats.filter((p) => p.y < camY + H + 60); enemies = enemies.filter((e) => e.y < camY + H + 80); coins = coins.filter((c) => c.y < camY + H + 40 && !c.got);
+            score = Math.max(score, Math.floor((H - 120 - pl.y) / 10) + bonus); Kit.stat("score", score);
+            if (pl.y > camY + H + 40) lose();
+        }
+        function lose() {
+            if (state !== "play") return;
+            state = "dead"; beep(200, 0.6, "sawtooth", 0.06, -150);
+            Kit.save(score); const best = Kit.setBest(BEST, score);
+            setTimeout(() => { $("overText").innerHTML = `${score.toLocaleString()} points<br>Best ${best.toLocaleString()}`; Kit.show("over"); }, 500);
+        }
+        function draw() {
+            const h = -camY, k = Math.min(1, h / 15000);
+            const g = ctx.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, `rgb(${Math.round(60 - 50 * k)},${Math.round(150 - 140 * k)},${Math.round(230 - 180 * k)})`); g.addColorStop(1, `rgb(${Math.round(150 - 130 * k)},${Math.round(210 - 190 * k)},${Math.round(255 - 200 * k)})`);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffffff"; for (const s of stars) { ctx.globalAlpha = k * 0.9; const y = ((s.y - camY * s.p) % H + H) % H; ctx.fillRect(s.x, y, s.s, s.s); }
+            ctx.globalAlpha = 1;
+            ctx.save(); ctx.translate(0, -camY);
+            for (const p of plats) {
+                if (p.gone && p.kind !== "break") continue;
+                const col = { n: "#2ee6a0", move: "#4da3ff", break: "#c47a3a", cloud: "#ffffff" }[p.kind];
+                ctx.globalAlpha = p.gone ? Math.max(0, 1 - p.fall * 2) : 1;
+                ctx.fillStyle = col; Kit.rr(ctx, p.x, p.y, PW, PH, 6); ctx.fill();
+                ctx.fillStyle = "#00000022"; ctx.fillRect(p.x + 4, p.y + PH - 4, PW - 8, 3);
+                if (p.kind === "break") { ctx.strokeStyle = "#7a4a2a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x + 20, p.y); ctx.lineTo(p.x + 28, p.y + PH); ctx.moveTo(p.x + 44, p.y); ctx.lineTo(p.x + 38, p.y + PH); ctx.stroke(); }
+                if (p.spring) { const ext = p.used > 0 ? 14 : 6; ctx.fillStyle = "#c8ccdf"; ctx.fillRect(p.x + PW / 2 - 8, p.y - ext, 16, ext); ctx.fillStyle = "#ff4d8d"; ctx.fillRect(p.x + PW / 2 - 11, p.y - ext - 4, 22, 5); }
+                ctx.globalAlpha = 1;
+            }
+            for (const c of coins) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(c.x, c.y, 9 * Math.abs(Math.cos(t * 3 + c.x)) + 2, 10, 0, 0, 7); ctx.fill(); }
+            for (const e of enemies) {
+                const ex = e.x + e.bx, ey = e.y + Math.sin(e.t * 4) * 6;
+                ctx.fillStyle = "#a15cff"; ctx.beginPath(); ctx.arc(ex, ey, 18, 0, 7); ctx.fill();
+                const wing = Math.sin(t * 20) * 8; ctx.beginPath(); ctx.moveTo(ex - 14, ey); ctx.lineTo(ex - 34, ey - 8 + wing); ctx.lineTo(ex - 18, ey + 8); ctx.moveTo(ex + 14, ey); ctx.lineTo(ex + 34, ey - 8 + wing); ctx.lineTo(ex + 18, ey + 8); ctx.fill();
+                ctx.fillStyle = "#fff"; ctx.fillRect(ex - 8, ey - 6, 6, 6); ctx.fillRect(ex + 2, ey - 6, 6, 6);
+            }
+            // player: a bouncy little alien
+            const col = Kit.skin("skyclimber", "#ffc94d"), sq = 1 + Math.max(0, pl.squash) * 0.25, x = pl.x + pl.w / 2, y = pl.y + pl.h;
+            ctx.save(); ctx.translate(x, y); ctx.scale(sq, 1 / sq);
+            ctx.fillStyle = col; Kit.rr(ctx, -18, -36, 36, 36, 14); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-6 + pl.face * 4, -24, 6, 0, 7); ctx.arc(8 + pl.face * 4, -24, 6, 0, 7); ctx.fill();
+            ctx.fillStyle = "#0b0d1a"; ctx.beginPath(); ctx.arc(-5 + pl.face * 6, -24, 3, 0, 7); ctx.arc(9 + pl.face * 6, -24, 3, 0, 7); ctx.fill();
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(-6, -12, 12, 3);
+            ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -36); ctx.lineTo(4, -46); ctx.stroke(); ctx.fillStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(4, -48, 4, 0, 7); ctx.fill();
+            ctx.restore();
+            fx.draw(ctx);
+            ctx.restore();
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Space: "go", Enter: "go" }, (a) => { if (a === "go" && state !== "play" && (state === "ready" || !$("over").classList.contains("hidden"))) start(); });
+        cv.addEventListener("pointerdown", (e) => { pointerX = Kit.point(cv, e).x; });
+        cv.addEventListener("pointermove", (e) => { if (e.buttons || e.pointerType === "touch") pointerX = Kit.point(cv, e).x; });
+        addEventListener("pointerup", () => { pointerX = null; });
+        addEventListener("deviceorientation", (e) => { if (e.gamma != null) tilt = e.gamma; });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([392, 523, 659], 0.07, "triangle"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Sky Climber</h2><p>Help a bouncy little alien climb into the sky. It jumps by itself every time it lands, so you only steer left and right from platform to platform. Springs launch you extra high, blue platforms slide sideways, brown ones crumble and white clouds vanish after one bounce. Higher up the sky turns to space and bats start flying around. Stomp them from above, collect coins and see how high you can go.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ / A D</td><td>Move left and right</td></tr><tr><td>Mouse / finger</td><td>Hold where you want to go</td></tr><tr><td>Tilt (phone)</td><td>Lean to move</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Move off one edge of the screen to come back on the other side.</li><li>Land in the middle of a spring for a super jump.</li><li>Never land on a brown platform. It breaks right away.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Sky Climber</h3><p>Your alien in Sky Climber jumps by itself every time it lands, so your only job is steering. That sounds easy, but platforms get further apart as you climb. Always look at where the next platform is before you land on the current one, so you can start moving toward it on the way up.</p><p>The screen edges wrap around: move off the left side and you appear on the right. This is often the quickest way to reach a platform on the far side. Springs launch you extra high, so landing on one is a big boost, and landing on the middle of a spring gives a super jump. Avoid brown platforms, because they break the moment you land on them.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Get used to steering mid-jump and climb steadily.</li><li><b>Getting good:</b> Use the wrap-around edges and aim for springs.</li><li><b>Expert:</b> Plan two platforms ahead and keep climbing even when platforms are far apart.</li></ul><h3>Did you know?</h3><p>Sky Climber is in the same family as Doodle Jump (2009), one of the first big hits on smartphones. It used the phone's tilt sensor to steer, which felt new at the time. On a phone you can tilt to steer in Sky Climber too.</p><h3>Questions players ask</h3><h4>Can I tilt my phone to play?</h4><p>Yes, on many phones you can lean the phone to steer.</p><h4>Why did my platform disappear?</h4><p>Brown platforms break as soon as you land. Avoid them.</p><h4>How do I get a super jump?</h4><p>Land in the middle of a spring.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FruitSlash/fruitslash">Fruit Slash</a><a href="/HoopShot/hoopshot">Hoop Shot</a><a href="/MiniGolf/minigolf">Mini Golf</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

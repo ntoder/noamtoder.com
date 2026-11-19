@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Top scores for every game on Noam's Game Hub, this week and of all time.">
+    <title>Leaderboards · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 820px; margin: 0 auto; padding: 32px 16px 64px; width: 100%; }
+        .head { text-align: center; margin-bottom: 24px; }
+        .head h2 { font-family: 'Press Start 2P', monospace; font-size: clamp(18px, 4vw, 26px); line-height: 1.5; }
+        .head p { color: var(--muted); margin-top: 8px; }
+        .picker { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; }
+        .picker button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font: 600 13px Inter, sans-serif; cursor: pointer; }
+        .picker button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+        .tabs { display: flex; justify-content: center; gap: 6px; margin: 18px 0; }
+        .tabs button { padding: 9px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); color: var(--muted); font: 700 14px Inter, sans-serif; cursor: pointer; }
+        .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .board { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+        .board-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+        .board-title h3 { font-size: 20px; }
+        .board-title a { color: var(--accent-2); font-weight: 700; text-decoration: none; font-size: 14px; }
+        .row { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+        .row:last-child { border-bottom: 0; }
+        .row.me { background: rgba(124,92,255,.14); }
+        .rank { font-weight: 800; font-size: 18px; text-align: center; color: var(--muted); }
+        .rank.r1 { color: #ffd700; } .rank.r2 { color: #d9dcff; } .rank.r3 { color: #ff9d4d; }
+        .who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; color: #fff;
+              background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+        .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nm.gold { color: var(--gold); }
+        .score { font-weight: 800; font-size: 18px; color: var(--accent-2); }
+        .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+        .note { text-align: center; color: var(--muted); font-size: 13px; margin-top: 14px; }
+        .note a { color: var(--accent-2); }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Leader<span>boards</span></h1>
+        <a class="back" href="/profile">👤 Profile</a>
+    </div>
+    <main>
+        <div class="head">
+            <h2>🏆 Top players</h2>
+            <p>The best scores on Noam's Game Hub. Weekly boards reset every Monday.</p>
+        </div>
+        <div class="picker" id="picker"></div>
+        <div class="tabs">
+            <button data-scope="week" class="active">This week</button>
+            <button data-scope="all">All time</button>
+        </div>
+        <section class="board">
+            <div class="board-title"><h3 id="title">…</h3><a id="playLink" href="/">▶ Play</a></div>
+            <div id="rows"><div class="empty">Loading…</div></div>
+        </section>
+        <p class="note">Log in and play to get on the board. Names are checked to keep the hub friendly. <span style="color:var(--gold)">Gold names</span> are Premium players.</p>
+    </main>
+    <script type="module">
+        import { GAMES } from "/games.js";
+        import { TARGETS, FRAMES } from "/progress.js";
+        const $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const ids = Object.keys(TARGETS).filter((id) => GAMES[id]);
+        let game = new URLSearchParams(location.search).get("game");
+        if (!ids.includes(game)) game = ids[0];
+        let scope = "week";
+
+        $("picker").innerHTML = ids.map((id) => `<button data-id="${id}">${esc(GAMES[id].name)}</button>`).join("");
+        $("picker").onclick = (e) => { const b = e.target.closest("button"); if (b) { game = b.dataset.id; load(); } };
+        document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { scope = b.dataset.scope; load(); });
+
+        let hub;
+        async function load() {
+            history.replaceState(null, "", "/leaderboard?game=" + game);
+            document.querySelectorAll("#picker button").forEach((b) => b.classList.toggle("active", b.dataset.id === game));
+            document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.scope === scope));
+            $("title").textContent = GAMES[game].name;
+            $("playLink").href = GAMES[game].path;
+            $("rows").innerHTML = '<div class="empty">Loading…</div>';
+            try {
+                hub = hub || await import("/hub.js");
+                await hub.ready;
+                const rows = await hub.getLeaderboard(game, scope, 10);
+                const myUid = hub.state.user?.uid;
+                $("rows").innerHTML = rows.length ? rows.map((r, i) => {
+                    const f = FRAMES[r.frame || "none"];
+                    return `<div class="row${r.uid === myUid ? " me" : ""}">
+                        <div class="rank r${i + 1}">${i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</div>
+                        <div class="who"><span class="av" style="${f && r.premium ? f.css : ""}${r.avatar ? ";font-size:20px" : ""}">${esc(r.avatar || (r.name || "?").charAt(0).toUpperCase())}</span>
+                            <a class="nm${r.premium ? " gold" : ""}" href="/player?u=${encodeURIComponent(r.uid)}" style="color:inherit;text-decoration:none">${esc(r.name)}${r.premium ? " ★" : ""}</a>${r.uid === myUid ? ' <span class="you">(you)</span>' : ""}</div>
+                        <div class="score">${Number(r.best).toLocaleString()}</div>
+                    </div>`;
+                }).join("") : `<div class="empty">No scores yet ${scope === "week" ? "this week" : ""}. Be the first! <br><br><a class="btn" style="text-decoration:none" href="${GAMES[game].path}">▶ Play ${esc(GAMES[game].name)}</a></div>`;
+            } catch (e) {
+                console.warn(e);
+                $("rows").innerHTML = '<div class="empty">Couldn\'t load the leaderboard right now. Try again in a minute.</div>';
+            }
+        }
+        load();
+    </script>
+</body>
+</html>

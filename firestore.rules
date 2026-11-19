@@ -5,48 +5,266 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
-
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function hasProfile() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
     function isAdmin() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return hasProfile() && me().role == 'admin';
+    }
+    function notBanned() {
+      return hasProfile() && me().get('banned', false) != true;
+    }
+    function isPremiumUser() {
+      return hasProfile() && (me().get('premium', false) == true || me().role == 'admin');
+    }
+    // Fields only an admin may change on a user profile
+    function protectedKeys() {
+      return ['role', 'premium', 'premiumSince', 'email', 'createdAt', 'banned', 'redeemedCode'];
     }
 
     match /users/{uid} {
-      // Users can read their own profile; admins can read everyone's (admin dashboard)
+      // Users read their own profile; admins read everyone's
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
 
-      // A new user can only create their OWN profile, and only as a free, non-admin user
+      // New users create only their OWN profile, as a free, non-admin, non-banned user
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.role == 'user'
-        && request.resource.data.premium == false;
+        && request.resource.data.premium == false
+        && !('banned' in request.resource.data)
+        && !('premiumSince' in request.resource.data);
 
-      // Admins can change anything. Users can update their own profile
-      // (name, lastLogin) but can NEVER change role, premium, email or createdAt.
+      // Admins can change anything.
+      // Users can change their own name, frame, favorites, skins, daily challenges, lastLogin...
+      // but never the protected fields — EXCEPT turning on Premium with an unused redeem code
+      // in the same batch (see /codes below).
       allow update: if isAdmin()
-        || (signedIn()
-            && request.auth.uid == uid
-            && !request.resource.data.diff(resource.data).affectedKeys()
-                 .hasAny(['role', 'premium', 'email', 'createdAt']));
+        || (signedIn() && request.auth.uid == uid
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
+            // the comment timer can only be set to "now" (stops people skipping the wait)
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastCommentAt'])
+                || request.resource.data.lastCommentAt == request.time))
+        || (signedIn() && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['premium', 'premiumSince', 'redeemedCode'])
+            && request.resource.data.premium == true
+            && request.resource.data.premiumSince == request.time
+            && exists(/databases/$(database)/documents/codes/$(request.resource.data.redeemedCode))
+            && get(/databases/$(database)/documents/codes/$(request.resource.data.redeemedCode)).data.usedBy == null
+            && getAfter(/databases/$(database)/documents/codes/$(request.resource.data.redeemedCode)).data.usedBy == uid);
 
       allow delete: if isAdmin();
 
       // Saved scores / progress: users/{uid}/games/{gameId}
-      // Players read & write only their own; admins can read everyone's.
       match /games/{gameId} {
         allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
         allow write: if signedIn()
           && request.auth.uid == uid
+          && notBanned()
           && gameId.matches('^[a-z0-9_-]{1,40}$')
           && (!('best' in request.resource.data) || request.resource.data.best is number);
       }
     }
 
-    // Site settings (which games are Premium): anyone can read, only admins can change
+    // Admin stats: read every player's game data at once
+    match /{path=**}/games/{gameId} {
+      allow read: if isAdmin();
+    }
+
+    // Leaderboards: leaderboards/{game}/all/{uid}  and  leaderboards/{game}/weeks/{week}/scores/{uid}
+    // Anyone can read. Players write only their own entry, with their real profile name.
+    function validEntry(uid) {
+      return signedIn() && request.auth.uid == uid && notBanned()
+        && request.resource.data.keys().hasOnly(['name', 'avatar', 'best', 'premium', 'frame', 'updatedAt'])
+        && (!('avatar' in request.resource.data) || request.resource.data.avatar == me().get('avatar', ''))
+        && request.resource.data.best is number
+        && request.resource.data.best >= 0 && request.resource.data.best < 100000000
+        && request.resource.data.name == me().name
+        && request.resource.data.premium == isPremiumUser()
+        && request.resource.data.frame == me().get('frame', 'none')
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /leaderboards/{game}/all/{uid} {
+      allow read: if true;
+      allow write: if validEntry(uid);
+      allow delete: if isAdmin();
+    }
+    match /leaderboards/{game}/weeks/{week}/scores/{uid} {
+      allow read: if true;
+      allow write: if validEntry(uid);
+      allow delete: if isAdmin();
+    }
+
+    // Premium redeem codes: only admins create or list them.
+    // A player may claim an unused code for themselves (together with turning on their Premium).
+    match /codes/{code} {
+      allow read, create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn() && notBanned()
+            && resource.data.usedBy == null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy', 'usedAt', 'usedByName'])
+            && request.resource.data.usedBy == request.auth.uid
+            && request.resource.data.usedAt == request.time);
+    }
+
+    // Site settings (premium games, announcement): anyone can read, only admins can change
     match /settings/{doc} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Public player pages: players/{uid}. Anyone can look; you only write your own, with your real name.
+    match /players/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid && notBanned()
+        && request.resource.data.keys().hasOnly(['name', 'avatar', 'premium', 'frame', 'level', 'xp', 'ach', 'top', 'played', 'onlineWins', 'since', 'private', 'updatedAt'])
+        && request.resource.data.name == me().name
+        && request.resource.data.premium == isPremiumUser()
+        && request.resource.data.get('avatar', '') == me().get('avatar', '')
+        && request.resource.data.get('level', 1) is int && request.resource.data.get('level', 1) < 1000
+        && request.resource.data.get('ach', []).size() <= 200
+        && request.resource.data.get('top', []).size() <= 8
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    // Star ratings: ratings/{game}/votes/{uid} = { stars: 1..5 }
+    match /ratings/{game}/votes/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid && notBanned()
+        && request.resource.data.keys().hasOnly(['stars', 'updatedAt'])
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
+    // Comments: comments/{game}/posts/{id}. One comment every 30 seconds, max 300 characters.
+    match /comments/{game}/posts/{id} {
+      allow read: if true;
+      allow create: if signedIn() && notBanned()
+        && get(/databases/$(database)/documents/settings/site).data.get('commentsOff', false) != true
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'avatar', 'premium', 'text', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name == me().name
+        && request.resource.data.avatar == me().get('avatar', '')
+        && request.resource.data.premium == isPremiumUser()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 2 && request.resource.data.text.size() <= 300
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt == request.time
+        && (me().get('lastCommentAt', null) == null || me().lastCommentAt < request.time - duration.value(30, 's'));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+    match /{path=**}/posts/{id} {
+      allow read: if true;
+    }
+
+    // Reports of rude comments: players can file them, only the admin reads them
+    match /reports/{id} {
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['game', 'post', 'by', 'createdAt'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow read, delete: if isAdmin();
+    }
+
+    // Homepage numbers (ratings + player counts), rebuilt by the admin's browser
+    match /stats/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Online game rooms: rooms/{CODE}
+    function inRoom() {
+      return request.auth.uid == resource.data.host.uid
+        || (resource.data.guest != null && request.auth.uid == resource.data.guest.uid);
+    }
+    match /rooms/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && notBanned()
+        && code.matches('^[A-Z0-9]{5}$')
+        && request.resource.data.host.uid == request.auth.uid
+        && request.resource.data.guest == null
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.moves.size() == 0
+        && request.resource.data.game is string;
+      // join an open room as the guest
+      allow update: if signedIn() && notBanned()
+        && resource.data.guest == null && resource.data.status == 'waiting'
+        && request.auth.uid != resource.data.host.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest', 'status', 'updatedAt'])
+        && request.resource.data.guest.uid == request.auth.uid
+        && request.resource.data.status == 'playing';
+      // the two players play: moves, results, rematches, emojis, leaving
+      allow update: if signedIn() && inRoom()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moves', 'result', 'score', 'rematch', 'round', 'emote', 'status', 'leftBy', 'updatedAt'])
+        && request.resource.data.host == resource.data.host
+        && request.resource.data.guest == resource.data.guest
+        && request.resource.data.game == resource.data.game
+        && request.resource.data.moves.size() <= resource.data.moves.size() + 1
+        && request.resource.data.moves.size() <= 600
+        && request.resource.data.status in ['playing', 'left'];
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == resource.data.host.uid);
+    }
+
+    // Noametry levels made in the Level Maker: levels/{id}
+    function bumpOnly(field) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field])
+        && request.resource.data[field] == resource.data[field] + 1;
+    }
+    match /levels/{id} {
+      allow read: if true;
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['uid', 'author', 'avatar', 'title', 'code', 'plays', 'clears', 'likes', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.author == me().name
+        && request.resource.data.title is string && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 40
+        && request.resource.data.code is string && request.resource.data.code.size() <= 14000
+        && request.resource.data.plays == 0 && request.resource.data.clears == 0 && request.resource.data.likes == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && (bumpOnly('plays') || bumpOnly('clears')
+        || (bumpOnly('likes') && exists(/databases/$(database)/documents/levels/$(id)/likes/$(request.auth.uid))));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // Games made in the Game Studio: creations/{id}. Only approved ones are public.
+    function creationFields() {
+      return ['uid', 'author', 'avatar', 'title', 'desc', 'emoji', 'code', 'status', 'plays', 'likes', 'createdAt', 'updatedAt'];
+    }
+    function goodCreation() {
+      return request.resource.data.keys().hasOnly(creationFields())
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.author == me().name
+        && request.resource.data.status == 'pending'
+        && request.resource.data.title is string && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 40
+        && request.resource.data.get('desc', '') is string && request.resource.data.get('desc', '').size() <= 200
+        && request.resource.data.get('emoji', '') is string && request.resource.data.get('emoji', '').size() <= 8
+        && request.resource.data.code is string && request.resource.data.code.size() <= 60000;
+    }
+    match /creations/{id} {
+      allow read: if resource.data.status == 'approved' || isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && notBanned() && goodCreation()
+        && request.resource.data.plays == 0 && request.resource.data.likes == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        // the maker can change their game, and it goes back to Noam for checking
+        || (signedIn() && notBanned() && resource.data.uid == request.auth.uid && goodCreation()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plays', 'likes', 'createdAt']))
+        || (signedIn() && resource.data.status == 'approved' && (bumpOnly('plays')
+            || (bumpOnly('likes') && exists(/databases/$(database)/documents/creations/$(id)/likes/$(request.auth.uid)))));
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && request.auth.uid == uid;
+      }
     }
 
     // Everything else is locked by default

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Words are raining down on a little city. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Typing Rain · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Typing <span>Rain</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Typing Rain</h2>
+                <p id="startText">Words are falling on the city! Type each word before it lands.<br>Just start typing, and the word that begins with your letter is picked.<br>⭐ Gold words clear the whole sky. Backspace drops your current word.</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>City Flooded!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            <input id="typeIn" autocomplete="off" autocapitalize="off" spellcheck="false" style="position:absolute;opacity:0;left:0;bottom:0;width:1px;height:1px">
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">On a phone, tap the game to open the keyboard. Every 10 words is a new level with longer, faster words.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, GROUND = H - 50, BEST = "typeBest";
+        const WORDS = ("cat dog sun hat run sky red map cup box fox bee egg ice jam key owl pen toy van web zoo arm bat bus car day fan fun gum hop ink jet kid leg mix net " +
+            "apple tiger cloud bread chair dream earth flame grape house juice lemon magic night ocean piano queen river snake train water zebra robot pizza candy " +
+            "planet rocket garden castle dragon forest guitar island jungle kitten monkey orange pencil rabbit silver turtle window yellow button cookie shadow " +
+            "dinosaur elephant mountain treasure keyboard sandwich football airplane rainbow volcano penguin octopus chocolate adventure butterfly spaceship").split(" ");
+        Kit.stat("best", Kit.best(BEST));
+        let drops, score, lives, level, done, target, state = "ready", t = 0, spawnT = 0, fx = Kit.particles(), shots = [], typedMiss = 0, keystrokes = 0, correct = 0, startTime = 0;
+        const city = Array.from({ length: 18 }, (_, i) => ({ x: i * (W / 18), w: W / 18 - 4, h: Kit.rand(20, 60), alive: true }));
+        function reset() { drops = []; score = 0; lives = 5; level = 1; done = 0; target = null; spawnT = 0.5; shots = []; keystrokes = 0; correct = 0; city.forEach((c) => (c.alive = true)); stats(); }
+        function stats() { Kit.stat("score", score); Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—"); Kit.stat("level", level); }
+        function pickWord() {
+            const maxLen = 3 + level, minLen = level > 4 ? 5 : 3;
+            const pool = WORDS.filter((w) => w.length <= maxLen && w.length >= Math.min(minLen, maxLen) && !drops.some((d) => d.word[0] === w[0]));
+            return Kit.pick(pool.length ? pool : WORDS);
+        }
+        function spawn() {
+            const word = pickWord(); ctx.font = "800 22px Inter, sans-serif"; const w = ctx.measureText(word).width;
+            drops.push({ word, typed: 0, x: Kit.rand(20 + w / 2, W - 20 - w / 2), y: -10, vy: 28 + level * 7 + Kit.rand(0, 12), w, gold: Math.random() < 0.08 });
+        }
+        function key(ch) {
+            if (state !== "play") return;
+            keystrokes++;
+            if (!target) target = drops.filter((d) => d.word[0] === ch).sort((a, b) => b.y - a.y)[0] || null;
+            if (target && target.word[target.typed] === ch) {
+                target.typed++; correct++;
+                shots.push({ x: W / 2, y: GROUND, tx: target.x - target.w / 2 + ctx.measureText(target.word.slice(0, target.typed)).width, ty: target.y, t: 0.12 });
+                beep(500 + target.typed * 40, 0.03, "square", 0.03);
+                if (target.typed === target.word.length) {
+                    const d = target, pts = d.word.length * 10 * level * (d.gold ? 3 : 1);
+                    score += pts; done++; fx.burst(d.x, d.y, d.gold ? "#ffc94d" : "#2ee6c9", 22, 4);
+                    if (d.gold) { for (const o of drops) if (o !== d) { score += o.word.length * 5; fx.burst(o.x, o.y, "#ffc94d", 10, 3); } drops = []; tune([784, 988, 1319], 0.06, "square", 0.05); }
+                    else beep(880, 0.08, "triangle", 0.05);
+                    drops = drops.filter((x) => x !== d); target = null;
+                    if (done % 10 === 0) { level++; tune([523, 659, 784, 1047], 0.08, "square", 0.05); }
+                    stats();
+                }
+            } else { typedMiss++; beep(150, 0.05, "square", 0.03); }
+        }
+        function update(dt) {
+            spawnT -= dt;
+            if (spawnT <= 0) { spawn(); spawnT = Math.max(0.7, 2.2 - level * 0.18); }
+            for (const d of drops) d.y += d.vy * dt;
+            for (const d of drops.filter((d) => d.y > GROUND - 10)) {
+                lives--; fx.burst(d.x, GROUND, "#ff4d8d", 24, 4); beep(120, 0.3, "sawtooth", 0.06, -60);
+                const c = city.reduce((best, c) => (c.alive && Math.abs(c.x + c.w / 2 - d.x) < Math.abs(best.x + best.w / 2 - d.x) ? c : best), city.find((c) => c.alive) || city[0]); c.alive = false;
+                if (d === target) target = null;
+                drops = drops.filter((x) => x !== d); stats();
+                if (lives <= 0) return end();
+            }
+            for (const s of shots) s.t -= dt; shots = shots.filter((s) => s.t > 0);
+        }
+        function end() {
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            const mins = (performance.now() - startTime) / 60000, wpm = Math.round(correct / 5 / Math.max(mins, 0.1)), acc = keystrokes ? Math.round(correct / keystrokes * 100) : 100;
+            $("overText").innerHTML = `${score.toLocaleString()} points · level ${level}<br>${wpm} words per minute · ${acc}% accurate<br>Best ${best.toLocaleString()}`;
+            Kit.show("over");
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#0d1030"); g.addColorStop(1, "#2a1b6b");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            // rain streaks
+            ctx.strokeStyle = "#ffffff14"; ctx.lineWidth = 1;
+            for (let i = 0; i < 50; i++) { const x = (i * 83 + t * 40) % W, y = (i * 131 + t * 300) % H; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 14); ctx.stroke(); }
+            // city
+            for (const c of city) { ctx.fillStyle = c.alive ? "#3a2a7a" : "#1a1240"; ctx.fillRect(c.x + 2, GROUND - (c.alive ? c.h : 6), c.w, c.alive ? c.h : 6);
+                if (c.alive) { ctx.fillStyle = "#ffc94d55"; for (let y = GROUND - c.h + 8; y < GROUND - 6; y += 12) for (let x = c.x + 6; x < c.x + c.w - 4; x += 10) if ((x * y) % 7 < 4) ctx.fillRect(x, y, 4, 5); } }
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.fillStyle = Kit.skin("typingrain", "#2ee6c9"); ctx.beginPath(); ctx.moveTo(W / 2 - 16, GROUND + 10); ctx.lineTo(W / 2, GROUND - 12); ctx.lineTo(W / 2 + 16, GROUND + 10); ctx.fill();
+            for (const s of shots) { ctx.strokeStyle = "#2ee6c9"; ctx.lineWidth = 2; ctx.globalAlpha = s.t / 0.12; ctx.beginPath(); ctx.moveTo(s.x, s.y - 10); ctx.lineTo(s.tx, s.ty); ctx.stroke(); }
+            ctx.globalAlpha = 1;
+            ctx.font = "800 22px Inter, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+            for (const d of drops) {
+                const x = d.x - d.w / 2, danger = d.y > GROUND - 120;
+                ctx.fillStyle = d === target ? "#2ee6c933" : d.gold ? "#ffc94d22" : "#0b0d1a99"; Kit.rr(ctx, x - 10, d.y - 17, d.w + 20, 34, 10); ctx.fill();
+                if (d === target) { ctx.strokeStyle = "#2ee6c9"; ctx.lineWidth = 2; ctx.stroke(); }
+                const typed = d.word.slice(0, d.typed), rest = d.word.slice(d.typed);
+                ctx.fillStyle = "#2ee6c9"; ctx.fillText(typed, x, d.y);
+                ctx.fillStyle = d.gold ? "#ffc94d" : danger ? "#ff8fb0" : "#eef0ff"; ctx.fillText(rest, x + ctx.measureText(typed).width, d.y);
+            }
+            fx.draw(ctx);
+        }
+        const game = Kit.loop((dt) => { t += dt; if (state === "play") update(dt); fx.update(dt); draw(); });
+        const inp = $("typeIn");
+        addEventListener("keydown", (e) => {
+            if (e.target === inp) return;
+            if (state !== "play") { if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); if (state === "ready" || !$("over").classList.contains("hidden")) start(); } return; }
+            if (e.key === "Escape" || e.key === "Backspace") { if (target) { target.typed = 0; target = null; } return; }
+            if (/^[a-z]$/i.test(e.key)) { e.preventDefault(); key(e.key.toLowerCase()); }
+        });
+        // phones: a hidden text box brings up the keyboard
+        inp.addEventListener("input", () => { for (const ch of inp.value.toLowerCase()) if (/[a-z]/.test(ch)) key(ch); inp.value = ""; });
+        cv.addEventListener("pointerdown", () => { if (matchMedia("(hover: none)").matches) inp.focus(); });
+        function start() { reset(); state = "play"; startTime = performance.now(); Kit.hide("start"); Kit.hide("over"); if (matchMedia("(hover: none)").matches) inp.focus(); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Typing Rain</h2><p>Words are raining down on a little city. Type each word before it reaches the ground to blast it out of the sky. Just start typing: the word that begins with your first letter is chosen for you. Gold words clear every word on the screen. Each level brings longer words that fall faster. At the end you'll see your typing speed and accuracy.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Type letters</td><td>Shoot the falling words</td></tr><tr><td>Backspace / Esc</td><td>Let go of the word you're typing</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Type the lowest words first. They are the most dangerous.</li><li>Keep your fingers on the home row: A S D F and J K L.</li><li>Accuracy matters more than speed. Wrong letters waste time.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Typing Rain</h3><p>In Typing Rain, the word you start typing gets locked in as your target, so the order you choose matters. Always go for the lowest word on the screen first, since it's the closest to hitting the city. Words near the top can wait. If you start the wrong word by mistake, press Backspace or Esc to let go of it and pick another.</p><p>Speed comes from accuracy. Every wrong key costs time, and fixing mistakes costs even more. Keep your fingers resting on the home row (A S D F for the left hand, J K L for the right) and try not to look down at the keyboard. Every ten words starts a new level with longer and faster words, so the first levels are the perfect place to build good habits.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Type slowly and accurately, always choosing the lowest word.</li><li><b>Getting good:</b> Keep your fingers on the home row and stop looking at the keyboard.</li><li><b>Expert:</b> Read the next word while you're still typing the current one, so there's no pause between words.</li></ul><h3>Did you know?</h3><p>The keyboard layout most of us use, QWERTY, was designed for typewriters in the 1870s. A popular story says the letters were arranged to stop typewriter keys jamming, and people have argued about the details ever since. Touch typing, using all ten fingers without looking, was being taught in schools by the early 1900s.</p><h3>Questions players ask</h3><h4>Can I play on a phone?</h4><p>Yes. Tap the game to open your phone's keyboard.</p><h4>How do I switch to a different word?</h4><p>Press Backspace or Esc to let go of the word you're typing.</p><h4>What happens at each level?</h4><p>Every 10 words is a new level, with longer and faster words.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/touch-typing-for-kids">Learn to touch type: a simple guide</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/GemSwap/gemswap">Gem Swap</a><a href="/FruitSlash/fruitslash">Fruit Slash</a><a href="/Penalty/penalty">Penalty Shootout</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

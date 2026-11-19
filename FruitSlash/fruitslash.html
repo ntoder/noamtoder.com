@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Fruit is flying through the air, so grab your blade and slice it! Swipe across the screen to cut fruit in half with a burst of juice. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Fruit Slash · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Fruit <span>Slash</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Fruit Slash</h2>
+                <p id="startText">Swipe across the fruit to slice it!<br>Slice 3 or more in one swipe for a combo bonus. A golden fruit starts a FRENZY.<br>Don't let 3 fruits drop, and never slice a ✖ bomb!</p>
+                <button class="btn" id="startBtn">▶ Slice</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">With a mouse, just move it over the fruit. On a phone or tablet, swipe with your finger.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "fruitBest";
+        const FRUITS = [["🍉", "#ff4d6d"], ["🍊", "#ff9d4d"], ["🍎", "#ff3b3b"], ["🍋", "#ffe14d"], ["🍇", "#a15cff"], ["🍍", "#ffc94d"], ["🥝", "#7ed957"], ["🍑", "#ffb08a"], ["🍓", "#ff4d6d"]];
+        Kit.stat("best", Kit.best(BEST));
+        let items, halves, splats, trail, score, lives, state = "ready", t = 0, waveT = 0, combo = [], comboT = 0, floats = [], fx = Kit.particles(), elapsed = 0, frenzy = 0;
+        function reset() { items = []; halves = []; splats = []; trail = []; score = 0; lives = 3; waveT = 1; elapsed = 0; floats = []; Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️"); }
+        function toss() {
+            const lvl = Math.min(1, elapsed / 120), n = Kit.randi(1, 2 + Math.floor(lvl * 3));
+            for (let i = 0; i < n; i++) {
+                const x = Kit.rand(120, W - 120), bomb = elapsed > 8 && Math.random() < 0.1 + lvl * 0.12, gold = !bomb && Math.random() < 0.04;
+                items.push({ x, y: H + 40, vx: (W / 2 - x) * Kit.rand(0.15, 0.45) + Kit.rand(-60, 60), vy: -Kit.rand(620, 760), r: 34, rot: 0, vr: Kit.rand(-3, 3), bomb, gold, f: Kit.pick(FRUITS), cut: false });
+            }
+            waveT = Math.max(0.7, 1.9 - lvl * 1.1) * (frenzy > 0 ? 0.35 : 1);
+            beep(200, 0.06, "triangle", 0.02, 200);
+        }
+        function segHit(ax, ay, bx, by, cx, cy, r) {
+            const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy || 1, k = Math.max(0, Math.min(1, ((cx - ax) * dx + (cy - ay) * dy) / l));
+            return Math.hypot(ax + dx * k - cx, ay + dy * k - cy) < r;
+        }
+        function slice(a, b) {
+            for (const it of items) {
+                if (it.cut || !segHit(a.x, a.y, b.x, b.y, it.x, it.y, it.r)) continue;
+                it.cut = true;
+                if (it.bomb) { boom(it); continue; }
+                const ang = Math.atan2(b.y - a.y, b.x - a.x);
+                for (const s of [-1, 1]) halves.push({ x: it.x, y: it.y, vx: it.vx + Math.cos(ang + Math.PI / 2) * 120 * s, vy: it.vy * 0.4 + Math.sin(ang + Math.PI / 2) * 120 * s, rot: ang, vr: s * 4, side: s, f: it.f, life: 2 });
+                splats.push({ x: it.x, y: it.y, c: it.f[1], r: Kit.rand(30, 50), a: 0.6, rot: Math.random() * 6 });
+                fx.burst(it.x, it.y, it.f[1], 16, 4);
+                const pts = it.gold ? 50 : 10; score += pts; combo.push(it); comboT = 0.25;
+                if (it.gold) { frenzy = 5; floats.push({ x: it.x, y: it.y - 30, s: "FRENZY!", c: "#ffc94d", t: 1.4 }); tune([784, 988, 1319, 1568], 0.06, "square", 0.05); }
+                beep(700 + Math.random() * 300, 0.06, "sawtooth", 0.03, -300);
+                Kit.stat("score", score);
+            }
+        }
+        function boom(it) {
+            fx.burst(it.x, it.y, "#ffffff", 40, 7); fx.burst(it.x, it.y, "#ff9d4d", 30, 5); beep(70, 0.6, "sawtooth", 0.1, -30);
+            lives = 0; Kit.stat("lives", "—"); flash = 0.6; end("💥 You sliced a bomb!");
+        }
+        let flash = 0;
+        function miss() {
+            lives--; Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) || "—"); beep(150, 0.25, "square", 0.05, -60);
+            if (lives <= 0) end("You dropped 3 fruits.");
+        }
+        function end(why) {
+            if (state !== "play") return;
+            state = "dead"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            setTimeout(() => { $("overText").innerHTML = `${why}<br>${score.toLocaleString()} points · best ${best.toLocaleString()}`; Kit.show("over"); }, 700);
+        }
+        function update(dt) {
+            elapsed += dt; waveT -= dt; if (frenzy > 0) frenzy -= dt;
+            if (waveT <= 0) toss();
+            for (const it of items) {
+                it.vy += 700 * dt; it.x += it.vx * dt; it.y += it.vy * dt; it.rot += it.vr * dt;
+                if (it.y > H + 60 && it.vy > 0 && !it.cut) { it.cut = true; if (!it.bomb && frenzy <= 0) miss(); }
+            }
+            items = items.filter((i) => !i.cut);
+            comboT -= dt;
+            if (comboT <= 0 && combo.length) {
+                if (combo.length >= 3) { const b = combo.length * 10; score += b; Kit.stat("score", score); floats.push({ x: combo[combo.length - 1].x, y: combo[combo.length - 1].y - 40, s: `${combo.length} fruit combo +${b}`, c: "#2ee6c9", t: 1.2 }); tune([660, 880, 1100], 0.05, "triangle", 0.05); }
+                combo = [];
+            }
+        }
+        const game = Kit.loop((dt) => {
+            t += dt; if (flash > 0) flash -= dt;
+            if (state === "play") update(dt);
+            for (const h of halves) { h.vy += 700 * dt; h.x += h.vx * dt; h.y += h.vy * dt; h.rot += h.vr * dt; h.life -= dt; }
+            halves = halves.filter((h) => h.life > 0 && h.y < H + 80);
+            for (const s of splats) s.a -= dt * 0.12; splats = splats.filter((s) => s.a > 0);
+            for (const p of trail) p.t -= dt; trail = trail.filter((p) => p.t > 0);
+            for (const f of floats) { f.t -= dt; f.y -= 30 * dt; } floats = floats.filter((f) => f.t > 0);
+            fx.update(dt); draw();
+        });
+        function emoji(e, x, y, r, rot, clipSide) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+            if (clipSide) { ctx.beginPath(); ctx.rect(-r * 1.5, clipSide < 0 ? -r * 1.5 : 0, r * 3, r * 1.5); ctx.clip(); }
+            ctx.font = `${r * 2}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(e, 0, 2);
+            ctx.restore();
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#3a2414"); g.addColorStop(1, "#1e120a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#00000044"; ctx.lineWidth = 2; for (let x = 60; x < W; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 20, H); ctx.stroke(); }
+            for (const s of splats) { ctx.globalAlpha = s.a; ctx.fillStyle = s.c; ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = s.rot + i / 12 * 6.28, rr = s.r * (i % 2 ? 0.6 : 1); ctx.lineTo(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr); } ctx.fill(); }
+            ctx.globalAlpha = 1;
+            for (const h of halves) emoji(h.f[0], h.x, h.y, 34, h.rot, h.side);
+            for (const it of items) {
+                if (it.bomb) { ctx.fillStyle = "#1a1d33"; ctx.beginPath(); ctx.arc(it.x, it.y, 30, 0, 7); ctx.fill(); ctx.strokeStyle = "#ff4d4d"; ctx.lineWidth = 3; ctx.stroke(); Kit.text(ctx, "✖", it.x, it.y + 1, 26, "#ff4d4d"); ctx.fillStyle = Math.floor(t * 10) % 2 ? "#ffc94d" : "#ff4d4d"; ctx.beginPath(); ctx.arc(it.x + 18, it.y - 26, 6, 0, 7); ctx.fill(); }
+                else { if (it.gold) { ctx.shadowColor = "#ffc94d"; ctx.shadowBlur = 30; } emoji(it.f[0], it.x, it.y, it.r, it.rot); ctx.shadowBlur = 0; }
+            }
+            // blade trail
+            if (trail.length > 1) {
+                ctx.lineCap = "round"; ctx.lineJoin = "round";
+                for (let i = 1; i < trail.length; i++) { const a = trail[i - 1], b = trail[i]; ctx.strokeStyle = `rgba(255,255,255,${b.t * 4})`; ctx.lineWidth = 2 + b.t * 30; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+            }
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.min(1, f.t); Kit.text(ctx, f.s, f.x, f.y, 22, f.c); }
+            ctx.globalAlpha = 1;
+            if (frenzy > 0) Kit.text(ctx, `FRENZY ${Math.ceil(frenzy)}`, W / 2, 30, 18, "#ffc94d");
+            if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); }
+        }
+        let cutting = false;
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); cutting = true; const p = Kit.point(cv, e); trail.push({ ...p, t: 0.18 }); });
+        cv.addEventListener("pointermove", (e) => {
+            const p = Kit.point(cv, e);
+            if (!cutting && e.pointerType !== "mouse") return;
+            if (!cutting && e.pointerType === "mouse" && !e.buttons && state === "play") { /* mouse slices just by moving */ }
+            const last = trail[trail.length - 1];
+            trail.push({ ...p, t: 0.18 });
+            if (last && state === "play" && Math.hypot(p.x - last.x, p.y - last.y) > 3) slice(last, p);
+        });
+        addEventListener("pointerup", () => { cutting = false; });
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); tune([523, 659, 784], 0.07, "triangle"); }
+        Kit.onKeys({ Enter: "go", Space: "go" }, () => { if (state !== "play" && (state === "ready" || !$("over").classList.contains("hidden"))) start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); game.start();
+        if (window.__test) window.__test.items = () => items;
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Fruit Slash</h2><p>Fruit is flying through the air, so grab your blade and slice it! Swipe across the screen to cut fruit in half with a burst of juice. Slicing three or more fruits in one swipe gives a combo bonus, and a glowing golden fruit starts a frenzy where fruit rains down and nothing counts as a miss. Watch out for bombs: slicing one ends the game. Drop three fruits and the game is over too.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Move the mouse</td><td>Slice</td></tr><tr><td>Swipe (touch)</td><td>Slice</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Wait for fruit to reach the top of its jump, then slice several at once.</li><li>Keep an eye out for bombs before every swipe.</li><li>Golden fruit is rare. Slice it right away for a frenzy.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Fruit Slash</h3><p>In Fruit Slash, patience scores points. Fruit is thrown up in arcs, and it moves slowest at the very top of its flight. If you wait until several pieces are near the top together, one long swipe can cut them all, and slicing three or more fruits in one swipe gives a combo bonus.</p><p>Bombs start appearing after the first few seconds, so check the screen before every swipe. A swipe that's too long is the most common way to hit a bomb by accident. Short, quick swipes are safer when a bomb is around. Golden fruit is rare, so slice it as soon as you see it.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Slice every fruit and avoid bombs. Don't worry about combos yet.</li><li><b>Getting good:</b> Wait for fruit to reach the top and slice several in one swipe.</li><li><b>Expert:</b> Keep combos going while weaving short swipes around bombs.</li></ul><h3>Did you know?</h3><p>Slicing games became hugely popular with Fruit Ninja in 2010, which was one of the early games to show off touch screens: you used your finger as a blade. It was later adapted for motion-control consoles and even virtual reality.</p><h3>Questions players ask</h3><h4>How do I slice with a mouse?</h4><p>Just move the mouse over the fruit. No clicking needed.</p><h4>What happens if I hit a bomb?</h4><p>Slicing a bomb ends your round straight away, so watch for them.</p><h4>What if I miss a fruit?</h4><p>Every fruit that falls without being sliced costs one of your three lives.</p><h4>What does golden fruit do?</h4><p>Golden fruit is rare and gives a big bonus. Slice it right away.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/AirHockey/airhockey">Air Hockey</a><a href="/Penalty/penalty">Penalty Shootout</a><a href="/Bowling/bowling">Bowling</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

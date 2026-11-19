@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The classic game of noughts and crosses. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Tic-Tac-Toe · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Tic-Tac-<span>Toe</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            <div><div style="margin-bottom:10px"><span class="seg" id="mode"><button data-m="easy">🤖 Easy</button><button data-m="hard">🤖 Unbeatable</button><button data-m="2p">👥 2 Players</button><button data-m="online">🌐 Online</button></span></div>
+            <div class="frame"><canvas id="c" width="450" height="450"></canvas></div></div>
+            <div class="side" style="width:200px"><div class="panel"><small>Status</small><b id="status" style="font-size:15px"></b></div>
+            <div class="panel"><small>Score</small><div style="display:flex;justify-content:space-around;font-weight:800"><div><div style="color:#2ee6c9;font-size:22px" id="tx">0</div><small style="margin:0">X</small></div><div><div style="font-size:22px" id="td">0</div><small style="margin:0">Draws</small></div><div><div style="color:#ff4d8d;font-size:22px" id="to">0</div><small style="margin:0">O</small></div></div></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Click a square, or press 1–9. Can you beat the Unbeatable computer? (Spoiler: a draw is the best you can do!)</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), S = cv.width / 3;
+        const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+        let b, turn, mode = "hard", over, win, anim, tally = { x: 0, o: 0, d: 0 }, first = "x", t = 0, prevMode = "hard";
+        const net = Kit.net, online = () => mode === "online";
+        try { mode = localStorage.getItem("tttMode") || "hard"; } catch (e) {}
+        function check(bd) { for (const l of LINES) if (bd[l[0]] && bd[l[0]] === bd[l[1]] && bd[l[1]] === bd[l[2]]) return { p: bd[l[0]], l }; return bd.every(Boolean) ? { p: "d" } : null; }
+        function mm(bd, p) {
+            const w = check(bd); if (w) return w.p === "o" ? 10 : w.p === "x" ? -10 : 0;
+            let best = p === "o" ? -99 : 99;
+            for (let i = 0; i < 9; i++) if (!bd[i]) { bd[i] = p; const v = mm(bd, p === "o" ? "x" : "o") * 0.9; bd[i] = ""; best = p === "o" ? Math.max(best, v) : Math.min(best, v); }
+            return best;
+        }
+        function cpuMove() {
+            const free = b.map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+            if (mode === "easy" && Math.random() < 0.55) return Kit.pick(free);
+            let best = free[0], bv = -99;
+            for (const i of Kit.pick([free, free.slice().reverse()])) { b[i] = "o"; const v = mm(b, "x"); b[i] = ""; if (v > bv) { bv = v; best = i; } }
+            return best;
+        }
+        function reset() { b = Array(9).fill(""); turn = online() ? "x" : first; over = false; win = null; anim = Array(9).fill(0); status(); if (mode !== "2p" && !online() && turn === "o") setTimeout(() => move(cpuMove()), 450); }
+        function status() {
+            $("status").textContent = online() ? (over ? (win.p === "d" ? "It's a draw!" : win.p === net.mySide ? "🏆 You win!" : "Your friend wins") : turn === net.mySide ? `Your turn (${turn.toUpperCase()})` : "Friend's turn…") :
+                over ? (win.p === "d" ? "It's a draw!" : mode === "2p" ? `${win.p.toUpperCase()} wins!` : win.p === "x" ? "🏆 You win!" : "The computer wins") :
+                mode === "2p" ? `${turn.toUpperCase()}'s turn` : turn === "x" ? "Your turn (X)" : "Computer is thinking…";
+            $("tx").textContent = tally.x; $("to").textContent = tally.o; $("td").textContent = tally.d;
+        }
+        function move(i) {
+            if (over || b[i]) return;
+            b[i] = turn; anim[i] = 0.001; beep(turn === "x" ? 520 : 390, 0.07, "triangle", 0.05);
+            const w = check(b);
+            if (w) {
+                over = true; win = w; tally[w.p]++;
+                if (online()) net.over(w.p === "d" ? "draw" : w.p);
+                if (w.p === "d") beep(330, 0.2, "triangle", 0.04); else if (mode === "2p" || (online() ? w.p === net.mySide : w.p === "x")) tune([523, 659, 784, 1047], 0.09, "triangle", 0.05); else beep(160, 0.35, "sawtooth", 0.05, -60);
+                first = first === "x" ? "o" : "x";
+                status(); return;
+            }
+            turn = turn === "x" ? "o" : "x"; status();
+            if (mode !== "2p" && !online() && turn === "o") setTimeout(() => move(cpuMove()), 450);
+        }
+        function play(i) {
+            if (online()) { if (!net.myTurn() || over || b[i]) return; move(i); net.send(i); return; }
+            if (mode !== "2p" && turn !== "x") return;
+            move(i);
+        }
+        function draw() {
+            ctx.fillStyle = "#12152b"; ctx.fillRect(0, 0, cv.width, cv.height);
+            ctx.strokeStyle = "#2a3060"; ctx.lineWidth = 8; ctx.lineCap = "round";
+            for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(k * S, 20); ctx.lineTo(k * S, cv.height - 20); ctx.stroke(); ctx.beginPath(); ctx.moveTo(20, k * S); ctx.lineTo(cv.width - 20, k * S); ctx.stroke(); }
+            for (let i = 0; i < 9; i++) {
+                if (!b[i]) continue;
+                const p = Math.min(1, anim[i]), cx = (i % 3) * S + S / 2, cy = Math.floor(i / 3) * S + S / 2, r = S * 0.28;
+                ctx.lineWidth = 14;
+                if (b[i] === "x") {
+                    ctx.strokeStyle = Kit.skin("tictactoe", "#2ee6c9");
+                    const p1 = Math.min(1, p * 2), p2 = Math.max(0, p * 2 - 1);
+                    ctx.beginPath(); ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx - r + 2 * r * p1, cy - r + 2 * r * p1); ctx.stroke();
+                    if (p2 > 0) { ctx.beginPath(); ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx + r - 2 * r * p2, cy - r + 2 * r * p2); ctx.stroke(); }
+                } else { ctx.strokeStyle = "#ff4d8d"; ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke(); }
+            }
+            if (win && win.l) {
+                const a = win.l[0], z = win.l[2], ax = (a % 3) * S + S / 2, ay = Math.floor(a / 3) * S + S / 2, zx = (z % 3) * S + S / 2, zy = Math.floor(z / 3) * S + S / 2;
+                ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 10; ctx.globalAlpha = 0.6 + Math.sin(t * 6) * 0.3;
+                ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(zx, zy); ctx.stroke(); ctx.globalAlpha = 1;
+            }
+            if (over && !online()) Kit.text(ctx, "Tap to play again", cv.width / 2, cv.height - 16, 14, "#9aa0c8");
+        }
+        const game = Kit.loop((dt) => { t += dt; for (let i = 0; i < 9; i++) if (anim[i] > 0 && anim[i] < 1) anim[i] += dt * 4; draw(); });
+        cv.addEventListener("pointerdown", (e) => {
+            if (over) return online() ? null : reset();
+            const p = Kit.point(cv, e); play(Math.floor(p.y / S) * 3 + Math.floor(p.x / S));
+        });
+        Kit.onKeys(Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ["Digit" + n, String(n)]).concat([["Enter", "r"]])), (a) => {
+            if (a === "r" || over) return over && !online() && reset();
+            play(+a - 1);
+        });
+        document.querySelectorAll("#mode button").forEach((bt) => {
+            bt.classList.toggle("active", bt.dataset.m === mode);
+            bt.onclick = () => { if (bt.dataset.m === "online") return net.open(); if (online()) net.leave(); mode = bt.dataset.m; tally = { x: 0, o: 0, d: 0 }; first = "x"; try { localStorage.setItem("tttMode", mode); } catch (e) {} document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x === bt)); reset(); };
+        });
+        const hl = () => document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("active", x.dataset.m === mode));
+        Kit.online({ sides: ["x", "o"], names: { x: "X", o: "O" },
+            start() { if (!online()) prevMode = mode; mode = "online"; tally = { x: 0, o: 0, d: 0 }; hl(); reset(); },
+            apply(m) { move(+m); },
+            leave() { if (online()) { mode = prevMode === "online" ? "hard" : prevMode; hl(); reset(); } } });
+        reset(); game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Tic-Tac-Toe</h2><p>The classic game of noughts and crosses. Take turns placing X and O on a three by three grid, and the first to get three in a line wins. Play the easy computer to warm up, try the unbeatable computer that never makes a mistake, or challenge a friend on the same screen. The score board keeps track of wins and draws.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap</td><td>Place your mark</td></tr><tr><td>1 to 9</td><td>Place a mark with the keyboard</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Starting in a corner gives you the most chances to win.</li><li>If you can't win, block your opponent's line.</li><li>Try to make two lines at once so your opponent can only block one.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Tic-Tac-Toe</h3><p>Tic-Tac-Toe is a solved game: if both players play perfectly, it always ends in a draw. That's why our Unbeatable computer can't be beaten, only held to a draw. To win against Easy, or against a friend, you need to set traps that your opponent misses.</p><p>The strongest opening is a corner. If your opponent answers anywhere except the centre, you can usually win by taking another corner and creating two lines at once, called a fork. If you're O and X takes a corner, always take the centre. As O, when X has two opposite corners, play an edge square, not a corner, or X will fork you. These few rules are enough to never lose.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Learn to block. If your opponent has two in a row, put your mark in the third square.</li><li><b>Getting good:</b> Start in a corner and look for forks: one move that makes two lines of two.</li><li><b>Expert:</b> Never lose to Unbeatable. A draw against it means you played perfectly.</li></ul><h3>Did you know?</h3><p>Games like Tic-Tac-Toe have been played for thousands of years. In 1952, a computer version called OXO was made at the University of Cambridge by A. S. Douglas, and it's often listed as one of the very first video games.</p><h3>Questions players ask</h3><h4>Can I really beat the Unbeatable computer?</h4><p>No. It plays perfectly. The best you can do is a draw, which is a great result.</p><h4>Can I play online?</h4><p>Yes. Press 🌐 Online, make a room and send the code to a friend.</p><h4>Can I use the keyboard?</h4><p>Yes, press 1 to 9 to place a mark.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MineFinder/minefinder">Mine Finder</a><a href="/ColorEcho/colorecho">Color Echo</a><a href="/MathBlitz/mathblitz">Math Blitz</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

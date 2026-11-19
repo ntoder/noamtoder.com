@@ -1,68 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-RX7DB1FEWY');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Shapes made of four blocks fall from the top of the board. Free to play in your browser on Noam's Game Hub.">
+    <meta name="description" content="Shapes made of four blocks fall from the top of the board. Free to play in your browser on Noam&#x27;s Game Hub.">
     <title>Block Drop · Noam's Game Hub</title>
-    <link rel="stylesheet" href="tetris.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
 </head>
 <body>
-    <div class="container">
-        <h1>Block Drop</h1>
-        <div class="game-wrapper">
-            <div class="main-game">
-                <canvas id="gameCanvas" width="300" height="600"></canvas>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Block <span>Drop</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lines">0</b><small>Lines</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            <div class="side"><div class="panel"><small>Hold (C)</small><canvas id="hold" width="110" height="80"></canvas></div><div class="panel" style="text-align:left;font-size:13px;line-height:1.7;color:#9aa0c8"><small>Keys</small>⬅ ➡ move<br>⬆ / X rotate<br>Z rotate back<br>⬇ soft drop<br>Space hard drop<br>C hold · P pause</div></div>
+            <div class="frame">
+            <canvas id="c" width="300" height="600"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Block Drop</h2>
+                <p id="startText">Fit the falling blocks together to clear lines.<br>Clear 4 at once for a big bonus!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
             </div>
-            <div class="sidebar">
-                <div class="info-box">
-                    <h3>Score</h3>
-                    <p id="score">0</p>
-                </div>
-                <div class="info-box">
-                    <h3>Lines</h3>
-                    <p id="lines">0</p>
-                </div>
-                <div class="info-box">
-                    <h3>Level</h3>
-                    <p id="level">1</p>
-                </div>
-                <div class="info-box">
-                    <h3>Next</h3>
-                    <canvas id="nextCanvas" width="120" height="120"></canvas>
-                </div>
-                <div class="button-group">
-                    <button id="startBtn" class="start-btn">Start</button>
-                    <button id="pauseBtn" class="pause-btn">Pause</button>
-                </div>
-                <div class="controls-info">
-                    <p><strong>Controls:</strong></p>
-                    <p>← → Move</p>
-                    <p>↓ Drop</p>
-                    <p>Space Rotate ↻</p>
-                    <p>Z Rotate ↺</p>
-                </div>
-            </div>
-        </div>
-        <div class="status">
-            <p id="gameStatus"></p>
+            <div class="side"><div class="panel"><small>Next</small><canvas id="next" width="110" height="210"></canvas></div></div>
         </div>
     </div>
-    <script src="tetris.js"></script>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="rot">⟳</button><button data-k="right">➡</button><button data-k="down">⬇</button><button data-k="drop">⤓</button><button data-k="hold">H</button></div>
+    <p class="hint">On phones: swipe ⬅ ➡ to move, tap to rotate, swipe ⬇ to drop, swipe ⬆ to hold.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), COLS = 10, ROWS = 20, S = cv.width / COLS, BEST = "blockBest";
+        const nx = $("next").getContext("2d"), hd = $("hold").getContext("2d");
+        Kit.stat("best", Kit.best(BEST));
+        const SHAPES = {
+            I: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], O: [[1, 1], [1, 1]],
+            T: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], S: [[0, 1, 1], [1, 1, 0], [0, 0, 0]], Z: [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
+            J: [[1, 0, 0], [1, 1, 1], [0, 0, 0]], L: [[0, 0, 1], [1, 1, 1], [0, 0, 0]]
+        };
+        const COLORS = { I: "#2ee6c9", O: "#ffc94d", T: "#a15cff", S: "#2ee6a0", Z: "#ff4d8d", J: "#4da3ff", L: "#ff9d4d" };
+        let board, cur, bag, queue, hold, canHold, score, lines, level, dropT, lockT, alive, paused, clearing, fx = Kit.particles();
+
+        function newBag() { const b = Object.keys(SHAPES); for (let i = b.length - 1; i > 0; i--) { const j = Kit.randi(0, i); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+        function nextType() { if (!bag.length) bag = newBag(); return bag.pop(); }
+        function piece(type) { const m = SHAPES[type].map((r) => r.slice()); return { type, m, x: Math.floor((COLS - m[0].length) / 2), y: type === "I" ? -1 : 0 }; }
+        function reset() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+            bag = []; queue = [nextType(), nextType(), nextType()]; hold = null; canHold = true;
+            score = 0; lines = 0; level = 1; dropT = 0; lockT = 0; paused = false; clearing = null;
+            spawn(); stats();
+        }
+        function stats() { Kit.stat("score", score); Kit.stat("lines", lines); Kit.stat("level", level); }
+        function spawn(type) {
+            cur = piece(type || queue.shift()); if (!type) queue.push(nextType());
+            if (collides(cur, 0, 0)) die();
+            drawSide();
+        }
+        function collides(p, dx, dy, m = p.m) {
+            for (let y = 0; y < m.length; y++) for (let x = 0; x < m[y].length; x++) {
+                if (!m[y][x]) continue;
+                const X = p.x + x + dx, Y = p.y + y + dy;
+                if (X < 0 || X >= COLS || Y >= ROWS) return true;
+                if (Y >= 0 && board[Y][X]) return true;
+            }
+            return false;
+        }
+        function rotate(dir) {
+            const m = cur.m, n = m.length;
+            const r = m.map((row, y) => row.map((_, x) => dir > 0 ? m[n - 1 - x][y] : m[x][n - 1 - y]));
+            for (const k of [0, -1, 1, -2, 2]) {                       // simple wall kicks
+                if (!collides(cur, k, 0, r)) { cur.m = r; cur.x += k; beep(700, 0.03, "square", 0.03); lockT = 0; return; }
+                if (!collides(cur, k, -1, r)) { cur.m = r; cur.x += k; cur.y -= 1; beep(700, 0.03, "square", 0.03); lockT = 0; return; }
+            }
+        }
+        function move(dx) { if (!collides(cur, dx, 0)) { cur.x += dx; lockT = 0; beep(300, 0.02, "square", 0.02); } }
+        function softDrop() { if (!collides(cur, 0, 1)) { cur.y++; score += 1; dropT = 0; stats(); } else lock(); }
+        function hardDrop() { let d = 0; while (!collides(cur, 0, 1)) { cur.y++; d++; } score += d * 2; beep(200, 0.06, "triangle", 0.05); lock(); }
+        function ghostY() { let d = 0; while (!collides(cur, 0, d + 1)) d++; return cur.y + d; }
+        function doHold() {
+            if (!canHold) return;
+            const t = cur.type;
+            if (hold) spawn(hold); else spawn();
+            hold = t; canHold = false; beep(500, 0.05, "triangle", 0.04); drawSide();
+        }
+        function lock() {
+            cur.m.forEach((row, y) => row.forEach((v, x) => { if (v && cur.y + y >= 0) board[cur.y + y][cur.x + x] = cur.type; }));
+            if (cur.y < 0 && cur.m.some((row, y) => cur.y + y < 0 && row.some(Boolean))) return die();
+            const full = [];
+            board.forEach((row, y) => { if (row.every(Boolean)) full.push(y); });
+            if (full.length) {
+                clearing = { rows: full, t: 0.25 };
+                const pts = [0, 100, 300, 500, 800][full.length] * level;
+                score += pts; lines += full.length;
+                full.forEach((y) => { for (let x = 0; x < COLS; x++) fx.burst(x * S + S / 2, y * S + S / 2, COLORS[board[y][x]], 3, 3); });
+                full.length === 4 ? tune([523, 659, 784, 1047], 0.07, "square", 0.06) : beep(600 + full.length * 120, 0.15, "triangle", 0.06);
+                const nl = Math.floor(lines / 10) + 1;
+                if (nl > level) { level = nl; setTimeout(() => tune([440, 660, 880], 0.08, "triangle"), 250); }
+                stats();
+            } else { canHold = true; spawn(); }
+            lockT = 0; stats();
+        }
+        function finishClear() {
+            board = board.filter((_, y) => !clearing.rows.includes(y));
+            while (board.length < ROWS) board.unshift(Array(COLS).fill(null));
+            clearing = null; canHold = true; spawn();
+        }
+        function speed() { return Math.max(0.05, 0.8 * Math.pow(0.85, level - 1)); }
+
+        const game = Kit.loop((dt) => {
+            if (!paused && alive) {
+                if (clearing) { if ((clearing.t -= dt) <= 0) finishClear(); }
+                else {
+                    dropT += dt;
+                    if (dropT >= speed()) { dropT = 0; if (!collides(cur, 0, 1)) cur.y++; }
+                    if (collides(cur, 0, 1)) { lockT += dt; if (lockT > 0.5) lock(); }
+                    if (Kit.keys.has("down")) { das.d += dt; if (das.d > 0.05) { das.d = 0; softDrop(); } }
+                    for (const k of ["left", "right"]) if (Kit.keys.has(k)) { das[k] += dt; if (das[k] > 0.17) { das[k] -= 0.05; move(k === "left" ? -1 : 1); } } else das[k] = 0;
+                }
+            }
+            fx.update(dt); draw();
+        });
+        const das = { left: 0, right: 0, d: 0 };
+
+        function cell(c, x, y, s, color, alpha = 1) {
+            c.globalAlpha = alpha; c.fillStyle = color;
+            Kit.rr(c, x + 1, y + 1, s - 2, s - 2, 4); c.fill();
+            c.fillStyle = "rgba(255,255,255,.22)"; c.fillRect(x + 4, y + 4, s - 8, 4);
+            c.globalAlpha = 1;
+        }
+        function draw() {
+            ctx.fillStyle = "#0f1124"; ctx.fillRect(0, 0, cv.width, cv.height);
+            ctx.strokeStyle = "#1a1e3a"; ctx.lineWidth = 1;
+            for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * S, 0); ctx.lineTo(x * S, cv.height); ctx.stroke(); }
+            for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * S); ctx.lineTo(cv.width, y * S); ctx.stroke(); }
+            board.forEach((row, y) => row.forEach((t, x) => {
+                if (!t) return;
+                const flashing = clearing && clearing.rows.includes(y);
+                cell(ctx, x * S, y * S, S, flashing ? "#ffffff" : COLORS[t], flashing ? 0.5 + clearing.t * 2 : 1);
+            }));
+            if (cur && alive && !clearing) {
+                const gy = ghostY();
+                cur.m.forEach((row, y) => row.forEach((v, x) => { if (v && gy + y >= 0) { ctx.strokeStyle = COLORS[cur.type]; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.strokeRect((cur.x + x) * S + 3, (gy + y) * S + 3, S - 6, S - 6); ctx.globalAlpha = 1; } }));
+                cur.m.forEach((row, y) => row.forEach((v, x) => { if (v && cur.y + y >= 0) cell(ctx, (cur.x + x) * S, (cur.y + y) * S, S, COLORS[cur.type]); }));
+            }
+            fx.draw(ctx);
+            if (paused) { ctx.fillStyle = "rgba(11,13,26,.7)"; ctx.fillRect(0, 0, cv.width, cv.height); Kit.text(ctx, "PAUSED", cv.width / 2, cv.height / 2, 22); }
+        }
+        function mini(c, type) {
+            c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+            if (!type) return;
+            const m = SHAPES[type], s = 22, h = m.filter((r) => r.some(Boolean)).length, w = m[0].length;
+            const top = m.findIndex((r) => r.some(Boolean));
+            const ox = (c.canvas.width - w * s) / 2, oy = (c.canvas.height - h * s) / 2 - top * s;
+            m.forEach((row, y) => row.forEach((v, x) => v && cell(c, ox + x * s, oy + y * s, s, COLORS[type], c === hd && !canHold ? 0.4 : 1)));
+        }
+        function drawSide() {
+            mini(hd, hold);
+            nx.clearRect(0, 0, nx.canvas.width, nx.canvas.height);
+            queue.forEach((t, i) => {
+                const m = SHAPES[t], s = 20, w = m[0].length, top = m.findIndex((r) => r.some(Boolean));
+                const ox = (nx.canvas.width - w * s) / 2, oy = 10 + i * 70 - top * s;
+                m.forEach((row, y) => row.forEach((v, x) => v && cell(nx, ox + x * s, oy + y * s, s, COLORS[t], i ? 0.75 : 1)));
+            });
+        }
+        function die() {
+            alive = false; game.stop(); draw(); beep(150, 0.5, "sawtooth", 0.06, -100);
+            Kit.setBest(BEST, score);
+            $("overText").textContent = `Score ${score.toLocaleString()} · ${lines} lines · level ${level}`;
+            Kit.show("over"); Kit.save(score);
+        }
+        function start() { reset(); alive = true; Kit.hide("start"); Kit.hide("over"); game.start(); tune([392, 523], 0.08); }
+
+        Kit.onKeys({ ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowDown: "down", KeyS: "down", ArrowUp: "rot", KeyX: "rot", KeyW: "rot",
+            KeyZ: "ccw", Space: "drop", KeyC: "hold", ShiftLeft: "hold", KeyP: "pause", Escape: "pause", Enter: "start" }, (a) => {
+            if (a === "start") return alive ? null : start();
+            if (!alive) return;
+            if (a === "pause") { paused = !paused; return; }
+            if (paused || clearing) return;
+            if (a === "left") move(-1); if (a === "right") move(1);
+            if (a === "down") softDrop(); if (a === "rot") rotate(1); if (a === "ccw") rotate(-1);
+            if (a === "drop") hardDrop(); if (a === "hold") doHold();
+        });
+        Kit.touchButtons((k) => {
+            if (!alive || paused || clearing) return;
+            if (k === "left") move(-1); if (k === "right") move(1); if (k === "rot") rotate(1); if (k === "drop") hardDrop(); if (k === "hold") doHold(); if (k === "down") softDrop();
+        });
+        Kit.swipe(cv, (d) => { if (!alive || clearing) return; if (d === "left") move(-1); if (d === "right") move(1); if (d === "down") hardDrop(); if (d === "up") doHold(); }, () => alive && !clearing && rotate(1));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        reset(); alive = false; draw();
+    })();
+    </script>
 
     <!-- Game info -->
     <style>
 body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
-.gh-info{direction:ltr;max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
 .gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
 .gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
 .gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
@@ -75,12 +221,20 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
 .gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
 .gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
 </style>
     <div class="gh-info">
         <section><h2>About Block Drop</h2><p>Shapes made of four blocks fall from the top of the board. Move and rotate them so they fit together. A full horizontal line disappears and gives you points, and clearing more lines at once gives bigger bonuses. The pieces fall faster at every level.</p></section>
         <section><h3>How to play</h3><table><tr><td>Left / right</td><td>Move</td></tr><tr><td>Up / Space / Z</td><td>Rotate</td></tr><tr><td>Down</td><td>Drop faster</td></tr></table></section>
-        <section><h3>Tips</h3><ul><li>Keep the board flat, with no tall towers.</li><li>Leave one column open for the long straight piece.</li><li>Check the next piece box to plan ahead.</li></ul></section>
-        <section><h3>More games</h3><div class="gh-more"><a href="/Mario/mario">Pixel Jumper</a><a href="/Chess/chess">Chess</a><a href="/Noametry/noametry">Noametry</a><a href="/">All games →</a></div></section>
+        <section><h3>Tips</h3><ul><li>Keep the board flat, with no tall towers.</li><li>Leave one column open for the long straight piece.</li><li>Check the next piece box to plan ahead.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Block Drop</h3><p>The most important skill in Block Drop is keeping the board flat. Tall towers and deep holes make every new piece harder to place. Try to drop each piece where it fits snugly without leaving a gap underneath it. A gap under a block can't be filled until the lines above it are cleared, so every hole you leave makes the game harder.</p><p>Leave one column empty, usually at the edge, and stack everything else neatly beside it. When the long straight piece arrives, drop it into the gap to clear up to four lines at once, which scores far more than clearing them one by one. Always glance at the next piece box: knowing what's coming lets you plan two pieces ahead instead of one.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Rotate pieces before they fall, and keep the stack low. Clear 10 lines.</li><li><b>Getting good:</b> Keep one column open for the long piece and aim for double and triple line clears.</li><li><b>Expert:</b> At high speed, decide where a piece goes as soon as it appears, using the next piece box to plan ahead.</li></ul><h3>Did you know?</h3><p>Tetris was created in 1984 by Alexey Pajitnov, a computer scientist working in Moscow. The name comes from tetra, Greek for four, because every piece is made of four squares, and from tennis, his favourite sport. It became world-famous when it was bundled with the Nintendo Game Boy in 1989.</p><h3>Questions players ask</h3><h4>How do I rotate a piece?</h4><p>Press Up, Space or Z. On a phone, use the rotate button.</p><h4>Why do pieces fall faster?</h4><p>The speed goes up every level, which also makes each line you clear worth more.</p><h4>Can I save a piece for later?</h4><p>Yes. Press H (or swipe up on a phone) to hold the current piece and swap it in when you need it. Holding the long straight piece for your open column is a classic trick.</p><h4>What scores the most?</h4><p>Clearing several lines with one piece. Four lines at once is the biggest bonus.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/history-of-arcade-games">From Pong to phones: a short history of arcade games</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Mario/mario">Pixel Jumper</a><a href="/Chess/chess">Chess</a><a href="/PaddleBattle/paddlebattle">Paddle Battle</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
@@ -89,7 +243,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
         var t = e.target && e.target.tagName;
         if (t === "INPUT" || t === "TEXTAREA") return;
         if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
-    }, { passive: false, capture: true });
+    }, { passive: false });
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

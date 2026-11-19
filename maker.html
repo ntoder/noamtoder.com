@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noametry Level Maker · Noam's Game Hub</title>
+    <meta name="description" content="Build your own Noametry levels with spikes, blocks and jump pads, beat them, and share them with friends. Play levels made by other players. Free, in your browser.">
+    <link rel="canonical" href="https://noamtoder.com/maker">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: none; user-select: none; }
+        .wrapm { max-width: 1100px; margin: 0 auto; padding: 14px 16px 50px; width: 100%; }
+        .top { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .top input { flex: 1; min-width: 180px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); padding: 10px 14px; font: 700 16px Inter, Rubik, sans-serif; outline: none; user-select: text; }
+        .top input:focus { border-color: var(--accent); }
+        .top select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); padding: 10px 12px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; }
+        .tb { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .tb button, .tb select, .tb a { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 8px 12px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; text-decoration: none; }
+        .tb button.on { border-color: var(--accent-2); background: #2ee6c922; }
+        .tb .sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+        .tb .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .tb .pub { background: #2ee6a0; border-color: #2ee6a0; color: #0b0d1a; }
+        .tb button:disabled { opacity: .45; cursor: default; }
+        .canvaswrap { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #0b0d1a; }
+        #mc { width: 100%; height: auto; display: block; touch-action: none; }
+        .scroll { width: 100%; margin-top: 8px; accent-color: var(--accent); }
+        .info { color: var(--muted); font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .ov { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(11,13,26,.82); text-align: center; padding: 16px; }
+        .ov.hidden { display: none; }
+        .ov h2 { font-size: 28px; margin-bottom: 6px; }
+        .ov p { color: var(--muted); margin-bottom: 14px; }
+        .ov .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .help { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin-top: 16px; color: #cfd3f5; line-height: 1.6; font-size: 15px; }
+        .help b { color: var(--text); }
+        .playbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+        .playbar h2 { font-size: 22px; }
+        .playbar .by { color: var(--muted); font-size: 14px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/levels">← Player levels</a>
+        <h1>Level <span>Maker</span></h1>
+        <a class="back" href="/Noametry/noametry">Noametry →</a>
+    </div>
+    <div class="wrapm">
+        <!-- playing someone's level -->
+        <div class="playbar hidden" id="playbar">
+            <h2 id="ptitle" data-noi18n></h2><span class="by" id="pby"></span>
+            <span style="margin-inline-start:auto" class="by" id="pstats"></span>
+        </div>
+        <!-- editing -->
+        <div id="editbar">
+            <div class="top">
+                <input id="title" maxlength="40" placeholder="Name your level" aria-label="Level name" data-noi18n>
+                <select id="speed" aria-label="Speed"><option value="300">🐢 Slow</option><option value="340" selected>🏃 Normal</option><option value="420">⚡ Fast</option></select>
+                <select id="theme" aria-label="Colour"><option value="0">💜 Purple</option><option value="1">💚 Teal</option><option value="2">💗 Pink</option><option value="3">💛 Gold</option><option value="4">💙 Blue</option><option value="5">🍀 Green</option></select>
+            </div>
+            <div class="tb">
+                <button data-tool="s" class="on">🔺 Spike</button>
+                <button data-tool="b">⬛ Block</button>
+                <button data-tool="d">🟡 Jump pad</button>
+                <button data-tool="x">🧽 Eraser</button>
+                <span class="sep"></span>
+                <button id="undoBtn">↶ Undo</button>
+                <button id="clearBtn">🗑 Clear</button>
+                <button id="exampleBtn">💡 Example</button>
+                <span class="sep"></span>
+                <button class="go" id="testBtn">▶ Test</button>
+                <button class="pub" id="pubBtn" disabled title="Beat your level first">🚀 Publish</button>
+                <button id="linkBtn">🔗 Share link</button>
+            </div>
+        </div>
+        <div class="canvaswrap">
+            <canvas id="mc" width="900" height="420" aria-label="Level"></canvas>
+            <div class="ov hidden" id="ov"><div>
+                <h2 id="ovT"></h2><p id="ovP"></p>
+                <div class="row" id="ovRow"></div>
+            </div></div>
+        </div>
+        <input type="range" class="scroll" id="scroll" min="0" max="100" value="0" aria-label="Scroll the level">
+        <div class="info"><span id="infoL">Click or drag on the grid to place things. Scroll with the slider, the mouse wheel or ← →.</span><span id="infoR" data-noi18n></span></div>
+
+        <p class="help" id="help">
+            <b>How to make a level:</b> pick a tool and click on the grid. Spikes kill, blocks can be landed on (but crash into their sides), and yellow jump pads give a super jump. Press <b>▶ Test</b> to play it (Space, click or tap to jump, hold to keep jumping). When you beat your own level, the <b>🚀 Publish</b> button unlocks so other players can find it on the <a href="/levels" style="color:var(--accent-2)">Player levels</a> page. You can also send a <b>🔗 Share link</b> to a friend without publishing. Your level saves by itself in this browser.
+        </p>
+    </div>
+
+    <script src="/game-kit.js"></script>
+    <script type="module">
+        import { ready, state, toast, LANG, isBanned } from "/hub.js";
+        import { textProblem } from "/progress.js";
+        import { db } from "/firebase-config.js";
+        import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        const he = LANG === "he", tr = (e, h) => (he ? h : e);
+        $title_ph: { document.getElementById("title").placeholder = tr("Name your level", "תנו שם לשלב"); }
+        const $ = (id) => document.getElementById(id);
+        const cv = $("mc"), ctx = cv.getContext("2d"), W = 900, H = 420, T = 34, GROUND = H - 80, ROWS = 8, START = 6;
+        const THEMES = [["#2a1b6b", "#7c5cff"], ["#0f3d4a", "#2ee6c9"], ["#4a1240", "#ff4d8d"], ["#3d2a08", "#ffc94d"], ["#0e2a52", "#4da3ff"], ["#123d1c", "#2ee6a0"]];
+        const { beep, tune } = Kit;
+
+        // ---------- Level data: cells keyed "x,y" -> "s" | "b" | "d" ----------
+        let L = { title: "", speed: 340, theme: 0, len: 120, cells: {} };
+        let undo = [], tool = "s", view = 0, mode = "edit", beaten = false, playing = null, published = null;
+        const key = (x, y) => x + "," + y;
+
+        // compact text code, used in share links: v1~speed~theme~len~cells (each cell = x base36 (2) + y (1) + type)
+        function encode(l = L) {
+            const cells = Object.entries(l.cells).map(([k, v]) => { const [x, y] = k.split(",").map(Number); return x.toString(36).padStart(2, "0") + y + v; }).sort().join("");
+            return ["1", l.speed, l.theme, l.len, cells].join("~");
+        }
+        function decode(code) {
+            const [v, sp, th, len, cells] = String(code || "").split("~");
+            if (v !== "1") return null;
+            const out = { title: "", speed: Math.min(420, Math.max(300, +sp || 340)), theme: (+th || 0) % 6, len: Math.min(400, Math.max(40, +len || 120)), cells: {} };
+            for (let i = 0; i + 4 <= (cells || "").length; i += 4) {
+                const x = parseInt(cells.slice(i, i + 2), 36), y = +cells[i + 2], t = cells[i + 3];
+                if (x >= 0 && x < out.len && y >= 0 && y < ROWS && "sbd".includes(t)) out.cells[key(x, y)] = t;
+            }
+            return out;
+        }
+        const saveLocal = () => { try { localStorage.setItem("gh_maker", JSON.stringify({ ...L, code: encode() })); } catch (e) {} };
+        function loadLocal() { try { const s = JSON.parse(localStorage.getItem("gh_maker")); if (s && s.code) { const d = decode(s.code); if (d) { d.title = s.title || ""; return d; } } } catch (e) {} return null; }
+
+        // the example is built from the same track pieces as Noametry itself, so it's always beatable
+        const CHUNKS = [
+            { len: 4, items: [["s", 0]] }, { len: 5, items: [["s", 0], ["s", 1]] }, { len: 4, items: [["b", 0, 1, 1]] },
+            { len: 8, items: [["b", 0, 1, 1], ["b", 3, 1, 2]] }, { len: 6, items: [["s", 0], ["s", 1], ["s", 2]] },
+            { len: 9, items: [["b", 0, 5, 1], ["s", 2, 0, 1]] }, { len: 10, items: [["d", 0], ["b", 4, 2, 3]] },
+            { len: 10, items: [["b", 0, 1, 1], ["b", 2, 1, 2], ["b", 4, 1, 3], ["s", 5], ["s", 6]] }
+        ];
+        function example() {
+            const cells = {}; let x = 12;
+            for (const i of [0, 2, 1, 3, 4, 6, 5, 0, 7, 1]) {
+                for (const it of CHUNKS[i].items) {
+                    const [k, ox] = it;
+                    if (k === "s") cells[key(x + ox, it[3] || 0)] = "s";
+                    else if (k === "d") cells[key(x + ox, 0)] = "d";
+                    else for (let c = 0; c < it[2]; c++) for (let r = 0; r < it[3]; r++) cells[key(x + ox + c, r + (it[4] || 0))] = "b";
+                }
+                x += CHUNKS[i].len + 5;
+            }
+            return encode({ speed: 340, theme: 1, len: x + 10, cells });
+        }
+        const EXAMPLE = example();
+
+        // ---------- Editor drawing ----------
+        function drawGrid(dist, edit) {
+            const [dark, neon] = THEMES[L.theme];
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, dark); g.addColorStop(1, "#0b0d1a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (edit) {
+                ctx.strokeStyle = "#ffffff10"; ctx.lineWidth = 1;
+                const off = dist % T;
+                for (let x = -off; x < W; x += T) { ctx.beginPath(); ctx.moveTo(x, GROUND - ROWS * T); ctx.lineTo(x, GROUND); ctx.stroke(); }
+                for (let r = 0; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, GROUND - r * T); ctx.lineTo(W, GROUND - r * T); ctx.stroke(); }
+                // start area and finish line
+                const sx = START * T - dist; ctx.fillStyle = "#2ee6a018"; ctx.fillRect(Math.max(0, -dist), GROUND - ROWS * T, Math.max(0, sx - Math.max(0, -dist)), ROWS * T);
+            }
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.fillStyle = neon; ctx.shadowColor = neon; ctx.shadowBlur = 12; ctx.fillRect(0, GROUND, W, 3); ctx.shadowBlur = 0;
+            // finish
+            const fx = L.len * T - dist;
+            if (fx < W + 40) {
+                for (let r = 0; r < 10; r++) for (let c = 0; c < 2; c++) { ctx.fillStyle = (r + c) % 2 ? "#ffffff" : "#0b0d1a"; ctx.fillRect(fx + c * 12, GROUND - (r + 1) * 24, 12, 24); }
+                Kit.text(ctx, tr("FINISH", "סיום"), fx + 12, GROUND - 252, 14, "#fff", "center", "'Press Start 2P', monospace", 400);
+            }
+            // cells
+            const x0 = Math.floor(dist / T) - 1, x1 = x0 + Math.ceil(W / T) + 2;
+            for (let x = x0; x <= x1; x++) for (let y = 0; y < ROWS; y++) {
+                const t = L.cells[key(x, y)]; if (!t) continue;
+                drawCell(t, x * T - dist, GROUND - (y + 1) * T, neon, playing && playing.used[key(x, y)]);
+            }
+        }
+        function drawCell(t, x, y, neon, used) {
+            if (t === "s") {
+                ctx.fillStyle = "#0b0d1a"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(x + 2, y + T); ctx.lineTo(x + T / 2, y + 2); ctx.lineTo(x + T - 2, y + T); ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = neon + "66"; ctx.beginPath(); ctx.moveTo(x + 10, y + T - 2); ctx.lineTo(x + T / 2, y + 14); ctx.lineTo(x + T - 10, y + T - 2); ctx.fill();
+            } else if (t === "b") {
+                ctx.fillStyle = "#0b0d1aee"; ctx.fillRect(x, y, T, T);
+                ctx.strokeStyle = neon; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, T - 2, T - 2);
+            } else {
+                ctx.fillStyle = used ? "#ffc94d66" : "#ffc94d"; ctx.shadowColor = "#ffc94d"; ctx.shadowBlur = 14;
+                ctx.beginPath(); ctx.ellipse(x + T / 2, y + T - 3, T / 2, 6, 0, Math.PI, 0); ctx.fill(); ctx.shadowBlur = 0;
+            }
+        }
+        function drawEditor() {
+            drawGrid(view, true);
+            // player start ghost
+            const [, neon] = THEMES[L.theme];
+            ctx.globalAlpha = 0.5; ctx.fillStyle = neon; ctx.fillRect(2 * T - view, GROUND - T, T, T); ctx.globalAlpha = 1;
+            if (hover) { ctx.strokeStyle = tool === "x" ? "#ff4d8d" : "#2ee6c9"; ctx.lineWidth = 2; ctx.strokeRect(hover.x * T - view + 1, GROUND - (hover.y + 1) * T + 1, T - 2, T - 2); }
+            $("infoR").textContent = `${Object.keys(L.cells).length} ${tr("pieces", "חלקים")} · ${Math.round(view / T)}/${L.len}`;
+        }
+
+        // ---------- Editing input ----------
+        let hover = null, painting = false, paintVal = null;
+        function cellAt(e) {
+            const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * W / r.width, my = (e.clientY - r.top) * H / r.height;
+            const x = Math.floor((mx + view) / T), y = Math.floor((GROUND - my) / T);
+            if (y < 0 || y >= ROWS || x < START || x >= L.len) return null;
+            return { x, y };
+        }
+        function paint(c) {
+            if (!c) return;
+            const k = key(c.x, c.y), want = tool === "x" ? undefined : tool;
+            if (L.cells[k] === want) return;
+            if (want) L.cells[k] = want; else delete L.cells[k];
+            beaten = false; refresh();
+            if (want) beep(want === "s" ? 700 : want === "b" ? 440 : 900, 0.03, "triangle", 0.03);
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (mode !== "edit") return;
+            e.preventDefault(); cv.setPointerCapture(e.pointerId);
+            undo.push(JSON.stringify(L.cells)); if (undo.length > 80) undo.shift();
+            painting = true; const c = cellAt(e); paint(c);
+        });
+        cv.addEventListener("pointermove", (e) => { if (mode !== "edit") return; hover = cellAt(e); if (painting) paint(hover); });
+        addEventListener("pointerup", () => { if (painting) { painting = false; saveLocal(); } });
+        cv.addEventListener("pointerleave", () => (hover = null));
+        cv.addEventListener("wheel", (e) => { if (mode !== "edit") return; e.preventDefault(); setView(view + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY)); }, { passive: false });
+        function setView(v) { view = Math.max(0, Math.min(L.len * T - W + 120, v)); $("scroll").value = Math.round(view / Math.max(1, L.len * T - W + 120) * 100); }
+        $("scroll").addEventListener("input", (e) => setView(e.target.value / 100 * (L.len * T - W + 120)));
+        document.querySelectorAll("[data-tool]").forEach((b) => b.onclick = () => { tool = b.dataset.tool; document.querySelectorAll("[data-tool]").forEach((x) => x.classList.toggle("on", x === b)); });
+        $("undoBtn").onclick = () => { const u = undo.pop(); if (u) { L.cells = JSON.parse(u); beaten = false; refresh(); saveLocal(); } };
+        $("clearBtn").onclick = (e) => {
+            const b = e.currentTarget; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = tr("Sure?", "בטוח?"); setTimeout(() => { delete b.dataset.armed; b.textContent = tr("🗑 Clear", "🗑 ניקוי"); }, 2500); return; }
+            undo.push(JSON.stringify(L.cells)); L.cells = {}; beaten = false; refresh(); saveLocal();
+        };
+        $("exampleBtn").onclick = () => { undo.push(JSON.stringify(L.cells)); const d = decode(EXAMPLE); L.cells = d.cells; L.len = d.len; beaten = false; refresh(); saveLocal(); toast(tr("💡 Example loaded. Change it however you like!", "💡 נטענה דוגמה. שנו אותה איך שרוצים!")); };
+        $("title").addEventListener("input", () => { L.title = $("title").value; saveLocal(); });
+        $("speed").onchange = () => { L.speed = +$("speed").value; beaten = false; refresh(); saveLocal(); };
+        $("theme").onchange = () => { L.theme = +$("theme").value; saveLocal(); };
+        addEventListener("keydown", (e) => {
+            if (e.target.tagName === "INPUT") return;
+            if (mode === "edit") {
+                if (e.key === "ArrowRight") setView(view + T * 3); else if (e.key === "ArrowLeft") setView(view - T * 3);
+                else if ((e.ctrlKey || e.metaKey) && e.key === "z") $("undoBtn").click();
+            }
+        });
+        function refresh() {
+            // the level is 30 tiles longer than its last piece, at least 40
+            const xs = Object.keys(L.cells).map((k) => +k.split(",")[0]);
+            L.len = Math.min(400, Math.max(40, (xs.length ? Math.max(...xs) : 0) + 14));
+            $("pubBtn").disabled = !beaten || !!published;
+            $("pubBtn").title = published ? tr("Already published", "כבר פורסם") : beaten ? "" : tr("Beat your level first", "קודם צריך לעבור את השלב");
+        }
+
+        // ---------- Playing ----------
+        let p, dist, holding = false, attempts = 0, fxp = Kit.particles();
+        function startPlay() {
+            mode = "play"; hideOv(); attempts++;
+            p = { x: 2 * T, y: GROUND - T, vy: 0, ang: 0, onGround: true, dead: false };
+            dist = 0; holding = false; playing = { used: {} };
+            tune([392, 523, 659], 0.07, "triangle");
+        }
+        function jump(power = -800) { p.vy = power; p.onGround = false; beep(power < -900 ? 900 : 520, 0.06, "triangle", 0.04, 200); }
+        function die() {
+            if (p.dead) return; p.dead = true; mode = "dead";
+            beep(120, 0.4, "sawtooth", 0.07, -60);
+            fxp.burst(p.x + T / 2, p.y + T / 2, THEMES[L.theme][1], 30, 5);
+            const pct = Math.min(99, Math.floor((p.x + dist) / (L.len * T) * 100));
+            setTimeout(() => showOv(tr("Crashed!", "התרסקת!"), tr(`${pct}% · attempt ${attempts}`, `${pct}% · ניסיון ${attempts}`), [[tr("↻ Try again", "↻ שוב"), startPlay, true], ...(playingOther ? [] : [[tr("✏️ Edit", "✏️ עריכה"), toEdit]])]), 500);
+        }
+        function win() {
+            mode = "won"; tune([523, 659, 784, 1047, 1319], 0.09, "triangle", 0.06);
+            for (let i = 0; i < 4; i++) fxp.burst(p.x + T / 2, p.y, ["#ffc94d", "#2ee6c9", "#ff4d8d", "#7c5cff"][i], 20, 5);
+            if (playingOther) { onCleared(); return; }
+            beaten = true; refresh();
+            showOv(tr("🎉 You beat your level!", "🎉 עברתם את השלב שלכם!"), tr(`Attempts: ${attempts}. Now you can publish it for everyone to play.`, `ניסיונות: ${attempts}. עכשיו אפשר לפרסם אותו לכולם.`),
+                [[tr("🚀 Publish", "🚀 פרסום"), publish, true], [tr("🔗 Share link", "🔗 קישור"), shareLink], [tr("✏️ Keep editing", "✏️ להמשיך לערוך"), toEdit]]);
+        }
+        function step(dt) {
+            const prevBottom = p.y + T;
+            dist += L.speed * dt;
+            p.vy += 2600 * dt; p.y += p.vy * dt;
+            let ground = GROUND;
+            const px = p.x + dist, cx0 = Math.floor(px / T) - 1, cx1 = cx0 + 3;
+            for (let cx = cx0; cx <= cx1; cx++) for (let cy = 0; cy < ROWS; cy++) {
+                const t = L.cells[key(cx, cy)]; if (!t) continue;
+                const ox = cx * T, oy = GROUND - (cy + 1) * T, inX = px + T - 4 > ox && px + 4 < ox + T;
+                if (t === "b" && inX) {
+                    if (prevBottom <= oy + 6 && p.y + T >= oy) ground = Math.min(ground, oy);
+                    else if (p.y + T > oy + 6 && p.y < oy + T) return die();
+                } else if (t === "s" && px + T - 8 > ox + 9 && px + 8 < ox + T - 9 && p.y + T > oy + 12 && p.y < oy + T) return die();
+                else if (t === "d" && inX && p.y + T >= oy + T - 10 && p.y < oy + T && !playing.used[key(cx, cy)]) {
+                    playing.used[key(cx, cy)] = true; p.y = oy + T - T; jump(-1150); fxp.burst(ox - dist + T / 2, oy + T, "#ffc94d", 14, 3);
+                }
+            }
+            if (p.y + T >= ground && p.vy >= 0) { p.y = ground - T; p.vy = 0; p.onGround = true; }
+            else if (p.y + T < ground - 1) p.onGround = false;
+            if (p.y > H) return die();
+            if (p.onGround && holding) jump();
+            if (px >= L.len * T) win();
+        }
+        const loop = Kit.loop((dt) => {
+            if (mode === "play") {
+                for (let i = 0; i < 2; i++) { if (mode !== "play") break; step(dt / 2); }
+                if (mode === "play") { if (!p.onGround) p.ang += dt * 9.5; else p.ang = Math.round(p.ang / (Math.PI / 2)) * (Math.PI / 2); }
+            }
+            fxp.update(dt);
+            if (mode === "edit") drawEditor();
+            else {
+                drawGrid(dist, false);
+                if (p && !p.dead) {
+                    const col = THEMES[L.theme][1];
+                    ctx.save(); ctx.translate(p.x + T / 2, p.y + T / 2); ctx.rotate(p.ang);
+                    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.fillRect(-T / 2, -T / 2, T, T); ctx.shadowBlur = 0;
+                    ctx.fillStyle = "#0b0d1a"; ctx.fillRect(-T / 2 + 6, -T / 2 + 6, T - 12, T - 12);
+                    ctx.fillStyle = col; ctx.fillRect(-6, -6, 12, 12); ctx.restore();
+                }
+                fxp.draw(ctx);
+                const prog = Math.min(1, ((p ? p.x : 0) + dist) / (L.len * T));
+                ctx.fillStyle = "#ffffff22"; Kit.rr(ctx, W / 2 - 160, 16, 320, 10, 5); ctx.fill();
+                ctx.fillStyle = THEMES[L.theme][1]; Kit.rr(ctx, W / 2 - 160, 16, Math.max(10, 320 * prog), 10, 5); ctx.fill();
+                Kit.text(ctx, `${Math.floor(prog * 100)}%`, W / 2 + 190, 21, 13, "#ffffffcc");
+                if (mode === "play" && dist < 380) Kit.text(ctx, tr(`Attempt ${attempts}`, `ניסיון ${attempts}`), W / 2 + 60 - dist, 120, 30, "#ffffffcc", "center", "'Press Start 2P', monospace", 400);
+            }
+        });
+        function press() {
+            if (mode === "play") { holding = true; if (p.onGround) jump(); }
+            else if (mode === "dead" && !$("ov").classList.contains("hidden")) startPlay();
+        }
+        Kit.onKeys({ Space: "jump", ArrowUp: "jump", KeyW: "jump" }, () => { if (document.activeElement && document.activeElement.tagName === "INPUT") return; press(); }, () => { holding = false; });
+        cv.addEventListener("pointerdown", (e) => { if (mode !== "edit") { e.preventDefault(); press(); } });
+        addEventListener("pointerup", () => { holding = false; });
+        function toEdit() { mode = "edit"; playing = null; hideOv(); }
+        $("testBtn").onclick = () => { if (!Object.keys(L.cells).length) { toast(tr("Put some spikes or blocks on the grid first!", "קודם שימו קוצים או קוביות על הלוח!")); return; } attempts = 0; startPlay(); };
+
+        function showOv(title, text, buttons) {
+            $("ovT").textContent = title; $("ovP").textContent = text;
+            $("ovRow").innerHTML = "";
+            for (const [label, fn, main] of buttons) { const b = document.createElement("button"); b.className = "btn" + (main ? "" : " ghost"); b.textContent = label; b.onclick = (e) => { e.stopPropagation(); fn(); }; $("ovRow").appendChild(b); }
+            $("ov").classList.remove("hidden");
+        }
+        function hideOv() { $("ov").classList.add("hidden"); }
+
+        // ---------- Sharing and publishing ----------
+        async function shareLink() {
+            const url = `${location.origin}/maker#c=${encode()}${L.title ? "&t=" + encodeURIComponent(L.title) : ""}`;
+            try { await navigator.clipboard.writeText(url); toast(tr("🔗 Link copied! Send it to a friend.", "🔗 הקישור הועתק! שלחו לחבר.")); }
+            catch (e) { toast(url.length < 300 ? url : tr("Couldn't copy the link.", "לא הצלחנו להעתיק.")); }
+        }
+        $("linkBtn").onclick = shareLink;
+        async function publish() {
+            await ready;
+            if (!state.user || !state.profile) { showOv(tr("Log in to publish", "התחברו כדי לפרסם"), tr("Publishing puts your level on the Player levels page with your name.", "פרסום שם את השלב בעמוד שלבי השחקנים עם השם שלכם."), [[tr("Log in", "התחברות"), () => (location.href = "/login?next=/maker"), true], [tr("Back", "חזרה"), toEdit]]); return; }
+            if (isBanned()) return toast(tr("Your account is suspended.", "החשבון שלך מושעה."));
+            const title = ($("title").value || "").trim();
+            if (title.length < 3) { toEdit(); $("title").focus(); return toast(tr("Give your level a name first (at least 3 letters).", "קודם תנו שם לשלב (לפחות 3 אותיות).")); }
+            const bad = textProblem(title); if (bad && bad !== "Write a bit more first.") { toEdit(); return toast(tr("Please choose a friendlier name.", "בחרו שם נחמד יותר.")); }
+            if (Object.keys(L.cells).length < 8) { toEdit(); return toast(tr("Add a few more pieces before publishing (at least 8).", "הוסיפו עוד כמה חלקים לפני פרסום (לפחות 8).")); }
+            try {
+                const ref = doc(collection(db, "levels"));
+                await setDoc(ref, { uid: state.user.uid, author: state.profile.name, avatar: state.profile.avatar || "", title, code: encode(), plays: 0, clears: 0, likes: 0, createdAt: serverTimestamp() });
+                published = ref.id; refresh();
+                const url = `${location.origin}/maker?l=${ref.id}`;
+                import("/social.js").then((m) => m.bumpStat("levels")).catch(() => {});
+                showOv(tr("🚀 Published!", "🚀 פורסם!"), tr("Your level is on the Player levels page. Share it so your friends can try it!", "השלב שלכם נמצא בעמוד שלבי השחקנים. שתפו אותו כדי שחברים ינסו!"),
+                    [[tr("🔗 Copy link", "🔗 העתקת קישור"), async () => { try { await navigator.clipboard.writeText(url); toast(tr("Link copied!", "הקישור הועתק!")); } catch (e) { toast(url); } }, true],
+                     [tr("💬 WhatsApp", "💬 וואטסאפ"), () => open(`https://wa.me/?text=${encodeURIComponent(tr(`Can you beat my Noametry level "${title}"? `, `תצליחו לעבור את השלב שלי "${title}"? `) + url)}`, "_blank")],
+                     [tr("See all levels", "לכל השלבים"), () => (location.href = "/levels")]]);
+            } catch (e) { console.warn(e); toast(tr("Couldn't publish. Try again.", "לא הצלחנו לפרסם. נסו שוב.")); }
+        }
+        $("pubBtn").onclick = publish;
+
+        // ---------- Playing a published or shared level ----------
+        let playingOther = null;
+        async function onCleared() {
+            const id = playingOther && playingOther.id;
+            let liked = false;
+            const like = async () => {
+                if (!id) return;
+                await ready; if (!state.user) { toast(tr("Log in to like levels", "התחברו כדי לעשות לייק")); return; }
+                try { const r = doc(db, "levels", id, "likes", state.user.uid); if ((await getDoc(r)).exists()) { toast(tr("You already liked it ❤️", "כבר עשיתם לייק ❤️")); return; } await setDoc(r, { at: serverTimestamp() }); await updateDoc(doc(db, "levels", id), { likes: increment(1) }); liked = true; toast(tr("❤️ Liked!", "❤️ אהבתם!")); } catch (e) { toast(tr("Couldn't like it.", "לא הצלחנו.")); }
+            };
+            if (id && state.user) { try { await updateDoc(doc(db, "levels", id), { clears: increment(1) }); } catch (e) {} }
+            showOv(tr("🎉 Level complete!", "🎉 עברתם את השלב!"), tr(`You beat "${L.title}" in ${attempts} attempt${attempts === 1 ? "" : "s"}.`, `עברתם את "${L.title}" ב־${attempts} ניסיונות.`),
+                [...(id ? [[tr("❤️ Like", "❤️ לייק"), like, true]] : []), [tr("↻ Play again", "↻ שוב"), () => { attempts = 0; startPlay(); }], [tr("🎲 More levels", "🎲 עוד שלבים"), () => (location.href = "/levels")], [tr("✏️ Make your own", "✏️ צרו משלכם"), () => (location.href = "/maker")]]);
+        }
+        async function boot() {
+            const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+            if (q.get("l") || h.get("c")) {
+                let lvl = null, meta = {};
+                if (q.get("l")) {
+                    try { const s = await getDoc(doc(db, "levels", q.get("l"))); if (s.exists()) { meta = { id: s.id, ...s.data() }; lvl = decode(meta.code); } } catch (e) {}
+                } else { lvl = decode(h.get("c")); meta = { title: h.get("t") || tr("A friend's level", "שלב של חבר") }; }
+                if (!lvl) { toast(tr("That level couldn't be found.", "לא מצאנו את השלב.")); return editBoot(); }
+                L = lvl; L.title = meta.title || "";
+                playingOther = meta;
+                $("editbar").classList.add("hidden"); $("help").classList.add("hidden"); $("scroll").classList.add("hidden"); $("infoL").textContent = tr("Space, click or tap to jump. Hold to keep jumping.", "רווח, קליק או נגיעה כדי לקפוץ. החזיקו כדי להמשיך לקפוץ."); $("infoR").textContent = "";
+                $("playbar").classList.remove("hidden");
+                $("ptitle").textContent = L.title;
+                $("pby").textContent = meta.author ? tr(`by ${meta.author}`, `מאת ${meta.author}`) : "";
+                $("pstats").textContent = meta.id ? `▶ ${meta.plays || 0} · 🏁 ${meta.clears || 0} · ❤️ ${meta.likes || 0}` : "";
+                document.title = `${L.title} · Noametry Level Maker`;
+                showOv(L.title, meta.author ? tr(`A Noametry level by ${meta.author}`, `שלב Noametry מאת ${meta.author}`) : tr("A Noametry level", "שלב Noametry"), [[tr("▶ Play", "▶ שחקו"), () => { attempts = 0; startPlay(); }, true]]);
+                if (meta.id) { await ready; if (state.user) try { await updateDoc(doc(db, "levels", meta.id), { plays: increment(1) }); } catch (e) {} }
+                return;
+            }
+            editBoot();
+        }
+        function editBoot() {
+            const saved = loadLocal();
+            if (saved) L = saved; else L = { ...decode(EXAMPLE), title: "" };
+            $("title").value = L.title || ""; $("speed").value = String(L.speed); $("theme").value = String(L.theme);
+            refresh();
+        }
+        boot(); loop.start();
+        window.__maker = { encode, decode, get L() { return L; }, win: () => win() };
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Every game on the hub, from Space Shooter to Dino Run, is built on the same simple idea. Here&#x27;s how it works.">
+    <title>How a browser game works: the game loop explained · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🎮</div>
+        <h1 class="t">How a browser game works: the game loop explained</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 4 November 2026 · 5 min read</div>
+        
+<p>When you play a game like <a href="/SpaceShooter/spaceshooter">Space Shooter</a>, it feels like everything happens at once: the stars move, aliens fly, lasers shoot and explosions sparkle. Under the hood, the computer is actually doing one small thing again and again, about 60 times every second. That one small thing is called the <b>game loop</b>.</p>
+
+<h2>The three steps of the game loop</h2>
+<p>Every frame (one picture on the screen), the game does three things in order:</p>
+<ol>
+  <li><b>Read the input.</b> Which keys are pressed? Did you tap the screen?</li>
+  <li><b>Update the world.</b> Move the ship, move each alien a little, move each laser up, and check whether anything crashed into anything.</li>
+  <li><b>Draw everything.</b> Clear the screen and draw every object in its new position.</li>
+</ol>
+<p>Then it starts again. Because it happens so fast, your eyes see smooth movement, just like a flip-book.</p>
+
+<h2>Drawing on a canvas</h2>
+<p>Most of the games on the hub draw on an HTML element called a <code>&lt;canvas&gt;</code>. Think of it as a blank sheet of paper that JavaScript can paint on. To draw a spaceship, the game tells the canvas: "move the pen here, draw a line there, fill it with this colour". Every frame, the canvas is wiped clean and painted again.</p>
+
+<h2>Moving things</h2>
+<p>Every object has a position, an <b>x</b> (left and right) and a <b>y</b> (up and down). To move an alien to the right, the game adds a little to its x each frame. To make the dinosaur in <a href="/DinoGame/dinogame">Dino Run</a> jump, the game gives it an upward speed, then gravity pulls a little bit of that speed away every frame until it falls back down. That's the same physics you learn about in science class.</p>
+
+<h2>Checking for crashes</h2>
+<p>How does the game know your laser hit an alien? It checks whether their boxes overlap. If the laser's x and y are inside the alien's box, it's a hit. This is called <b>collision detection</b>, and almost every game uses it, from <a href="/Breakout/breakout">Brick Smash</a> to <a href="/SubwaySurfer/subwaysurf">Subway Runner</a>.</p>
+
+<h2>Keeping it fair on every computer</h2>
+<p>Some computers are faster than others. If the game moved things by the same amount every frame, it would run faster on a fast computer. To fix this, good games measure how much time passed since the last frame and move things by that much. That way the game runs at the same speed everywhere.</p>
+
+<h2>Try it yourself</h2>
+<p>If you'd like to build your own game, read our next article: <a href="/articles/first-game">Make your first game in 30 lines of JavaScript</a>.</p>
+
+        <div class="cta"><a class="btn" href="/SpaceShooter/spaceshooter">▶ Play Space Shooter</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/chess-for-beginners">♟️ Chess for beginners: 10 rules that win your first games<span>You don&#x27;t need to memorise openings to start winning. These ten simple rules fix the mistakes almost every new player makes.</span></a><a href="/articles/how-to-solve-sudoku">🔢 How to solve Sudoku: techniques from easy to hard<span>Sudoku never needs guessing. Learn the logical techniques that solve easy puzzles in minutes and hard puzzles without a hint.</span></a><a href="/articles/word-guess-strategy">🟩 Word Guess strategy: the best first words and how to think<span>Why CRANE and SLATE are great starting words, how to use yellow letters properly, and the trick for when many words are still possible.</span></a><a href="/articles/learn-world-flags">🌍 How to learn the world&#x27;s flags: tricks for telling similar flags apart<span>Chad or Romania? Ireland or Ivory Coast? Simple tricks for remembering flags, and the best way to practise them.</span></a><a href="/articles/touch-typing-for-kids">⌨️ Learn to touch type: a simple guide for kids and beginners<span>Typing without looking is one of the most useful computer skills there is. Here&#x27;s how to start, and how to practise without getting bored.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="robots" content="noindex, follow">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b0d1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/noam/noam.css">
+  <title>Bookmarks & to-dos · Noam's Game Hub</title>
+  <meta name="description" content="Your NoamBrowser bookmarks and to-do list, from any computer or phone.">
+  <style>
+    .cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+    .folder { margin: 14px 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .bm { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; text-decoration: none; color: var(--text); }
+    .bm:hover { background: var(--surface-2); }
+    .bm img { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+    .bm .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+    .bm .u { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+    .x { width: 28px; height: 28px; border-radius: 8px; color: var(--muted); flex: none; opacity: 0; }
+    .bm:hover .x, .todo:hover .x, .x:focus { opacity: 1; } @media (hover: none) { .x { opacity: 1; } }
+    .x:hover { background: var(--surface-3); color: var(--hot); }
+    .todo { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; font-size: 15px; }
+    .todo input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+    .todo.done span { text-decoration: line-through; color: var(--muted); }
+    .todo span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .add { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+    .addbm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .addbm .in:first-child { grid-column: 1 / -1; }
+    .empty { color: var(--muted); font-size: 14px; padding: 10px 0; }
+    .search { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <main class="page"><h1>⭐ Bookmarks & to-dos</h1><p class="lead">Your NoamBrowser bookmarks and to-do list. Changes here show up on all your computers within a couple of minutes.</p><div id="app"></div></main>
+  <script src="/noam/noam-core.js"></script>
+  <script src="/noam/glue.js"></script>
+  <script src="/noam/noam-ui.js"></script>
+  <script type="module" src="/noam/noam-link.js"></script>
+  <script>
+    NoamUI.shell('bookmarks');
+    const D = NoamCore.data;
+    let q = '';
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+    function render(el) {
+      el.innerHTML = `<div class="cols">
+        <div class="card"><h2>Bookmarks</h2><input class="in search" id="q" placeholder="Search your bookmarks" value="${esc(q)}"><div id="bms"></div>
+          <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">➕ Add a bookmark</summary><div class="addbm" style="margin-top:10px"><input class="in" id="bu" placeholder="https://…" inputmode="url"><input class="in" id="bt" placeholder="Name (optional)"><input class="in" id="bf" placeholder="Folder (optional)" list="folders"><button class="btn primary" id="badd">Add</button></div><div class="err" id="berr"></div><datalist id="folders"></datalist></details></div>
+        <div class="card"><h2>To-do list</h2><div id="tds"></div><div class="add"><input class="in" id="tt" placeholder="Add a to-do" maxlength="300"><button class="btn primary" id="tadd">Add</button></div><button class="btn ghost" id="tclear" style="margin-top:12px">Clear finished</button></div>
+      </div>`;
+      const paint = () => {
+        const list = D.bookmarks().filter((b) => !q || (b.title + ' ' + b.url).toLowerCase().includes(q.toLowerCase()));
+        const groups = new Map(); for (const b of list) { const f = b.folder || ''; if (!groups.has(f)) groups.set(f, []); groups.get(f).push(b); }
+        const keys = [...groups.keys()].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
+        el.querySelector('#bms').innerHTML = list.length ? keys.map((f) => `${f ? `<div class="folder">📁 ${esc(f)}</div>` : ''}${groups.get(f).map((b) => `<a class="bm" href="${esc(b.url)}" target="_blank" rel="noopener"><img src="${esc(b.favicon && /^https?:|^data:image/.test(b.favicon) ? b.favicon : '/favicon.png')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="t">${esc(b.title || b.url)}</span><span class="u">${esc(host(b.url))}</span><button class="x" data-del="${esc(b.id)}" title="Remove">✕</button></a>`).join('')}`).join('') : `<p class="empty">${q ? 'No bookmarks match.' : 'No bookmarks yet. Bookmarks you save in NoamBrowser show up here.'}</p>`;
+        el.querySelector('#folders').innerHTML = [...new Set(D.bookmarks().map((b) => b.folder).filter(Boolean))].map((f) => `<option value="${esc(f)}">`).join('');
+        el.querySelectorAll('[data-del]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); D.removeBookmark(b.dataset.del); toast('Bookmark removed'); }));
+        const todos = D.todos();
+        el.querySelector('#tds').innerHTML = todos.length ? todos.map((t) => `<label class="todo ${t.done ? 'done' : ''}"><input type="checkbox" data-t="${esc(t.id)}" ${t.done ? 'checked' : ''}><span>${esc(t.text)}</span><button class="x" data-tx="${esc(t.id)}" title="Delete">✕</button></label>`).join('') : '<p class="empty">Nothing to do. Nice!</p>';
+        el.querySelectorAll('[data-t]').forEach((c) => (c.onchange = () => D.saveTodos(D.todos().map((t) => (t.id === c.dataset.t ? { ...t, done: c.checked, updated: Date.now() } : t)))));
+        el.querySelectorAll('[data-tx]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); D.saveTodos(D.todos().filter((t) => t.id !== b.dataset.tx)); }));
+      };
+      paint();
+      el.querySelector('#q').oninput = (e) => { q = e.target.value; paint(); };
+      const addT = () => { const i = el.querySelector('#tt'); const t = i.value.trim(); if (!t) return; D.saveTodos([...D.todos(), { text: t, done: false }]); i.value = ''; i.focus(); };
+      el.querySelector('#tadd').onclick = addT; el.querySelector('#tt').onkeydown = (e) => { if (e.key === 'Enter') addT(); };
+      el.querySelector('#tclear').onclick = () => D.saveTodos(D.todos().filter((t) => !t.done));
+      el.querySelector('#badd').onclick = () => { const err = el.querySelector('#berr'); err.textContent = ''; let u = el.querySelector('#bu').value.trim(); if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u; try { D.addBookmark({ url: u, title: el.querySelector('#bt').value.trim(), folder: el.querySelector('#bf').value.trim() }); ['#bu', '#bt', '#bf'].forEach((s) => (el.querySelector(s).value = '')); toast('⭐ Bookmark added'); } catch (e) { err.textContent = e.message; } };
+      NoamCore.on('data', paint);
+    }
+    NoamUI.gate(document.getElementById('app'), render, { title: 'Sign in to see your bookmarks' });
+  </script>
+</body>
+</html>

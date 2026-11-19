@@ -2,5 +2,6 @@ User-agent: *
 Disallow: /admin
 Disallow: /profile
 Disallow: /login
+Disallow: /zohoverify/
 
 Sitemap: https://noamtoder.com/sitemap.xml

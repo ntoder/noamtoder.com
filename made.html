@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Made by Players · games made by kids · Noam's Game Hub</title>
+    <meta name="description" content="Games made by players in the free Game Studio. Play them, like them, and remix them into your own game.">
+    <link rel="canonical" href="https://noamtoder.com/made">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; width: 100%; }
+        .hero { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
+        .hero h2 { font-size: clamp(26px, 5vw, 38px); font-weight: 800; }
+        .hero p { color: var(--muted); max-width: 640px; }
+        a.btn { text-decoration: none; }
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .tabs button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 999px; padding: 8px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; }
+        .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .g { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; color: var(--text); text-decoration: none; transition: transform .15s, border-color .15s; }
+        .g:hover { transform: translateY(-3px); border-color: var(--accent); }
+        .g .cov { height: 120px; display: grid; place-items: center; font-size: 60px; }
+        .g .b { padding: 12px 14px; display: grid; gap: 4px; }
+        .g b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .g span { color: var(--muted); font-size: 13px; }
+        .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+        .player { display: none; }
+        .player.on { display: block; }
+        .ph { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .ph .cov { font-size: 40px; }
+        .ph h2 { font-size: 26px; }
+        .ph .by { color: var(--muted); }
+        .ph .acts { margin-inline-start: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+        .ph .acts button, .ph .acts a { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 9px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; text-decoration: none; }
+        .frame { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; height: min(72vh, 680px); }
+        .frame iframe { width: 100%; height: 100%; border: 0; }
+        .desc { color: #cfd3f5; margin: 12px 0; line-height: 1.6; }
+        .note { color: var(--muted); font-size: 13px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Made by <span>Players</span></h1>
+        <a class="back" href="/studio">🧑‍💻 Studio →</a>
+    </div>
+    <main>
+        <section id="list">
+            <div class="hero">
+                <div><h2>🧑‍💻 Games made by players</h2><p>Every game here was made in the free Game Studio by a player, many of them kids learning to code. Play them, like the ones you enjoy, and press Remix to make your own version.</p></div>
+                <a class="btn" href="/studio">✏️ Make a game</a>
+            </div>
+            <div class="tabs" id="tabs"><button data-s="new" class="on">🆕 Newest</button><button data-s="plays">🔥 Most played</button><button data-s="likes">❤️ Most liked</button></div>
+            <div class="grid" id="grid"><p class="empty">Loading games…</p></div>
+        </section>
+        <section class="player" id="player">
+            <div class="ph">
+                <span class="cov" id="gEmoji"></span>
+                <div><h2 id="gTitle" data-noi18n></h2><div class="by" id="gBy" data-noi18n></div></div>
+                <div class="acts">
+                    <button id="likeBtn">❤️ Like</button>
+                    <a id="remixBtn" href="/studio">🔀 Remix</a>
+                    <button id="shareBtn">📤 Share</button>
+                    <a href="/made">← All games</a>
+                </div>
+            </div>
+            <div class="frame"><iframe id="gFrame" title="Game" sandbox="allow-scripts allow-pointer-lock"></iframe></div>
+            <p class="desc" id="gDesc" data-noi18n></p>
+            <p class="note">🎮 If the keyboard doesn't work, click on the game first. Made by a player in the Game Studio and checked by Noam before it was added. Something wrong with this game? <a href="mailto:noam@noamtoder.com" style="color:var(--accent-2)">Tell Noam</a>.</p>
+        </section>
+    </main>
+    <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam and players · <a href="/" style="color:inherit">Games</a> · <a href="/studio" style="color:inherit">Game Studio</a> · </footer>
+    <script type="module">
+        import { ready, state, LANG, toast } from "/hub.js";
+        import { buildDoc } from "/studio-run.js";
+        import { db } from "/firebase-config.js";
+        import { collection, query, where, orderBy, limit, getDocs, getDoc, setDoc, updateDoc, doc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        const he = LANG === "he", tr = (e, h) => (he ? h : e), $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const COLORS = ["#7c5cff", "#2ee6c9", "#ff4d8d", "#ffc94d", "#4da3ff", "#2ee6a0", "#ff8a3d"];
+        const color = (id) => COLORS[[...id].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length];
+        let sort = "new";
+        async function load() {
+            $("grid").innerHTML = `<p class="empty">${tr("Loading games…", "טוען משחקים…")}</p>`;
+            try {
+                // filter on the server, sort here (no extra database index needed)
+                const q = query(collection(db, "creations"), where("status", "==", "approved"), limit(300));
+                const val = (g) => (sort === "new" ? g.createdAt?.toMillis?.() || 0 : g[sort] || 0);
+                const rows = (await getDocs(q)).docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => val(b) - val(a)).slice(0, 60);
+                $("grid").innerHTML = rows.length ? rows.map((g) => `<a class="g" href="/made?g=${encodeURIComponent(g.id)}"><div class="cov" style="background:linear-gradient(135deg,${color(g.id)}55,#12152b)">${esc(g.emoji || "🎮")}</div><div class="b"><b data-noi18n>${esc(g.title)}</b><span data-noi18n>${esc(g.avatar || "")} ${esc(g.author)}</span><span>▶ ${g.plays || 0} · ❤️ ${g.likes || 0}</span></div></a>`).join("")
+                    : `<p class="empty">${tr("No games yet. Make the first one!", "עדיין אין משחקים. צרו את הראשון!")} <a href="/studio" style="color:var(--accent-2)">${tr("Open the Game Studio →", "לסטודיו ←")}</a></p>`;
+            } catch (e) { console.warn(e); $("grid").innerHTML = `<p class="empty">${tr("Games are unavailable right now.", "המשחקים לא זמינים כרגע.")}</p>`; }
+        }
+        $("tabs").onclick = (e) => { const b = e.target.closest("[data-s]"); if (!b) return; sort = b.dataset.s; document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b)); load(); };
+
+        async function play(id) {
+            $("list").classList.add("hidden"); $("player").classList.add("on");
+            let g = null;
+            try { const s = await getDoc(doc(db, "creations", id)); if (s.exists()) g = { id: s.id, ...s.data() }; } catch (e) {}
+            if (!g || g.status !== "approved") { $("gTitle").textContent = tr("This game isn't available.", "המשחק הזה לא זמין."); return; }
+            document.title = `${g.title} · Made by Players · Noam's Game Hub`;
+            $("gEmoji").textContent = g.emoji || "🎮"; $("gTitle").textContent = g.title;
+            $("gBy").textContent = `${tr("by", "מאת")} ${g.avatar || ""} ${g.author} · ▶ ${g.plays || 0} · ❤️ ${g.likes || 0}`;
+            $("gDesc").textContent = g.desc || "";
+            $("gFrame").onload = () => { try { $("gFrame").contentWindow.focus(); } catch (e) {} };
+            $("gFrame").srcdoc = buildDoc(g.code);
+            $("remixBtn").href = `/studio?remix=${encodeURIComponent(id)}`;
+            await ready;
+            if (state.user) { try { await updateDoc(doc(db, "creations", id), { plays: increment(1) }); } catch (e) {} }
+            $("likeBtn").onclick = async () => {
+                if (!state.user) { toast(`<a href="/login?next=${encodeURIComponent(location.pathname + location.search)}">${tr("Log in", "התחברו")}</a> ${tr("to like games", "כדי לעשות לייק")}`); return; }
+                try {
+                    const r = doc(db, "creations", id, "likes", state.user.uid);
+                    if ((await getDoc(r)).exists()) return toast(tr("You already liked it ❤️", "כבר עשיתם לייק ❤️"));
+                    await setDoc(r, { at: serverTimestamp() }); await updateDoc(doc(db, "creations", id), { likes: increment(1) });
+                    $("likeBtn").textContent = "❤️ " + tr("Liked", "אהבתם"); toast(tr("❤️ Liked! The maker will be happy.", "❤️ אהבתם! היוצר ישמח."));
+                } catch (e) { toast(tr("Couldn't like it.", "לא הצלחנו.")); }
+            };
+            $("shareBtn").onclick = async () => {
+                const url = `https://noamtoder.com/made?g=${id}`, text = tr(`Play "${g.title}", a game made by ${g.author}!`, `שחקו ב"${g.title}", משחק שיצר ${g.author}!`);
+                if (navigator.share) { try { await navigator.share({ text, url }); return; } catch (e) { return; } }
+                try { await navigator.clipboard.writeText(`${text} ${url}`); toast(tr("Link copied!", "הקישור הועתק!")); } catch (e) { toast(url); }
+            };
+        }
+        const id = new URLSearchParams(location.search).get("g");
+        if (id) play(id); else load();
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

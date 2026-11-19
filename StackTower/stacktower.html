@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build the tallest tower you can. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Stack Tower · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Stack <span>Tower</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Height</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="440" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Stack Tower</h2>
+                <p id="startText">Tap, click or press Space to drop the sliding block.<br>Anything hanging over the edge gets cut off.<br>Land it perfectly to keep your block big!</p>
+                <button class="btn" id="startBtn">▶ Build</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Tower Fell!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Build again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Three perfect drops in a row make your block grow back a little.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BH = 26, CO = 0.866, SI = 0.5, BEST = "stackBest";
+        Kit.stat("best", Kit.best(BEST));
+        let stack, cur, debris, cam, state = "ready", t = 0, combo = 0, score = 0, fx = Kit.particles(), flashT = 0, hue0 = Kit.rand(0, 360);
+        const colorFor = (i, l = 58) => `hsl(${(hue0 + i * 6) % 360} 75% ${l}%)`;
+        function iso(x, y, z) { return [W / 2 + (x - z) * CO, H * 0.62 + (x + z) * SI - y + cam]; }
+        function reset() {
+            stack = [{ x: -80, z: -80, w: 160, d: 160, y: 0, i: 0 }];
+            for (let k = 1; k < 4; k++) stack.unshift({ x: -80, z: -80, w: 160, d: 160, y: -k * BH, i: -k });
+            stack.sort((a, b) => a.y - b.y);
+            debris = []; cam = 0; combo = 0; score = 0; hue0 = Kit.rand(0, 360); Kit.stat("score", 0);
+            spawn();
+        }
+        function top() { return stack[stack.length - 1]; }
+        function spawn() {
+            const p = top(), axis = stack.length % 2 ? "x" : "z", n = score;
+            cur = { ...p, y: p.y + BH, i: p.i + 1, axis, dir: 1, speed: Math.min(330, 150 + n * 5), t: 0 };
+            cur[axis] = p[axis] - 230;
+        }
+        function place() {
+            const p = top(), a = cur.axis, len = a === "x" ? "w" : "d";
+            let delta = cur[a] - p[a];
+            const overlap = cur[len] - Math.abs(delta);
+            if (overlap <= 0) { debris.push({ ...cur, vy: 0, spin: 0 }); cur = null; return lose(); }
+            if (Math.abs(delta) < 5) {                                         // perfect!
+                cur[a] = p[a]; combo++; flashT = 0.4;
+                beep(523 * Math.pow(1.06, Math.min(combo, 12)), 0.12, "triangle", 0.06);
+                if (combo >= 3 && cur[len] < 160) { cur[len] = Math.min(160, cur[len] + 8); cur[a] -= 4; }
+                const [sx, sy] = iso(cur.x + cur.w / 2, cur.y + BH, cur.z + cur.d / 2); fx.burst(sx, sy, "#ffffff", 18, 3);
+            } else {
+                combo = 0;
+                const cut = { ...cur, vy: 0 };
+                if (delta > 0) { cut[a] = p[a] + p[len]; cut[len] = delta; cur[len] = overlap; }
+                else { cut[a] = cur[a]; cut[len] = -delta; cur[a] = p[a]; cur[len] = overlap; }
+                debris.push(cut); beep(300, 0.08, "square", 0.04);
+            }
+            stack.push({ x: cur.x, z: cur.z, w: cur.w, d: cur.d, y: cur.y, i: cur.i });
+            score++; Kit.stat("score", score);
+            if (score % 10 === 0) tune([523, 659, 784], 0.07, "square", 0.04);
+            if (stack.length > 40) stack.shift();
+            spawn();
+        }
+        function lose() {
+            state = "dead"; beep(140, 0.5, "sawtooth", 0.06, -60);
+            Kit.save(score); const best = Kit.setBest(BEST, score);
+            setTimeout(() => { $("overText").innerHTML = `Tower height: ${score}<br>Best ${best}`; Kit.show("over"); }, 900);
+        }
+        function box(b, col) {
+            const { x, y, z, w, d } = b;
+            const p = (X, Y, Z) => iso(X, Y, Z);
+            const A = p(x, y + BH, z), B = p(x + w, y + BH, z), C = p(x + w, y + BH, z + d), D = p(x, y + BH, z + d), Bb = p(x + w, y, z), Cb = p(x + w, y, z + d), Db = p(x, y, z + d);
+            const poly = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(...pts[0]); for (const q of pts.slice(1)) ctx.lineTo(...q); ctx.closePath(); ctx.fill(); };
+            poly([B, C, Cb, Bb], colorFor(b.i, 44));                          // right face
+            poly([D, C, Cb, Db], colorFor(b.i, 36));                          // left face
+            poly([A, B, C, D], col || colorFor(b.i, 62));                     // top
+        }
+        function update(dt) {
+            if (cur) {
+                const a = cur.axis; cur[a] += cur.dir * cur.speed * dt;
+                const p = top(); if (cur[a] > p[a] + 230) cur.dir = -1; if (cur[a] < p[a] - 230) cur.dir = 1;
+            }
+            const want = Math.max(0, top().y - 120);
+            cam += (want - cam) * Math.min(1, dt * 4);
+        }
+        const game = Kit.loop((dt) => {
+            t += dt; if (flashT > 0) flashT -= dt;
+            if (state === "play") update(dt);
+            for (const d of debris) { d.vy += 900 * dt; d.y -= d.vy * dt; }
+            debris = debris.filter((d) => d.y > cam - 900);
+            fx.update(dt); draw();
+        });
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, `hsl(${(hue0 + score * 6 + 180) % 360} 45% 14%)`); g.addColorStop(1, `hsl(${(hue0 + score * 6 + 200) % 360} 45% 26%)`);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            for (const b of stack) box(b);
+            if (cur && state === "play") box(cur);
+            for (const d of debris) box(d);
+            if (flashT > 0) { const b = top(); ctx.globalAlpha = flashT * 2; box(b, "#ffffff"); ctx.globalAlpha = 1; }
+            fx.draw(ctx);
+            Kit.text(ctx, score, W / 2, 80, 56, "#ffffffdd", "center", "'Press Start 2P', monospace", 400);
+            if (combo >= 2 && state === "play") Kit.text(ctx, `Perfect x${combo}`, W / 2, 130, 18, "#ffc94d");
+        }
+        function tap() { if (state === "play") place(); else if (state === "dead" && !$("over").classList.contains("hidden")) start(); }
+        function start() { reset(); state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
+        Kit.onKeys({ Space: "tap", Enter: "tap", ArrowDown: "tap" }, tap);
+        $("startBtn").onclick = (e) => { e.stopPropagation(); start(); }; $("againBtn").onclick = start;
+        reset(); state = "ready"; cur = null; game.start();
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Stack Tower</h2><p>Build the tallest tower you can. A block slides back and forth above your tower: tap to drop it. Any part that hangs over the edge is cut off, so your blocks get smaller with each mistake. Land a block perfectly and it keeps its full size, and three perfect drops in a row make it grow back a little.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click / tap / Space</td><td>Drop the block</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Watch the edge of the block, not the middle.</li><li>The blocks speed up as the tower grows, so find a steady rhythm.</li><li>A small block is harder to place, so aim for perfect drops early.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Stack Tower</h3><p>Every drop in Stack Tower matters twice: the part that hangs over the edge is cut off, and the next block is only as wide as what's left. Small mistakes add up, so the goal early on is perfect drops, not just good ones. While the blocks are big, you have plenty of room, so use that time to find the rhythm.</p><p>Watch the leading edge of the moving block, not its middle, and drop when that edge lines up with the edge of the tower below. Three perfect drops in a row make your block grow back a little, which can rescue a tower that's getting thin. As the tower grows, the blocks slide faster. Don't speed up your thinking; just start your tap slightly earlier.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Focus on lining up edges and build a tower of 15 blocks.</li><li><b>Getting good:</b> Chain perfect drops to grow your block back.</li><li><b>Expert:</b> Keep perfect timing at high speed for towers of 40 blocks or more.</li></ul><h3>Did you know?</h3><p>Stacking games like this became popular on phones in the mid-2010s, because they can be played with just one tap. They're a great example of how a game can be simple to learn but very hard to master.</p><h3>Questions players ask</h3><h4>How do I drop a block?</h4><p>Click, tap or press Space.</p><h4>Can my block get bigger again?</h4><p>Yes. Three perfect drops in a row make it grow back a little.</p><h4>Why does it get harder?</h4><p>Every block slides a little faster than the one before.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SpaceRocks/spacerocks">Space Rocks</a><a href="/TypingRain/typingrain">Typing Rain</a><a href="/FruitSlash/fruitslash">Fruit Slash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

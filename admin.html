@@ -41,6 +41,16 @@
         .btn.danger:hover { border-color: var(--hot); color: var(--hot); }
         .btn:disabled { opacity: .4; cursor: not-allowed; }
 
+        .pill.banned { background: rgba(255,77,141,.15); color: var(--hot); }
+        .jump { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+        .jump a { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); text-decoration: none; font-weight: 600; font-size: 13px; }
+        .jump a:hover { color: var(--text); border-color: var(--accent); }
+        select, .note-input, .announce-form input:not([type=checkbox]) { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--text); font: 14px Inter, sans-serif; outline: none; }
+        .announce-form { display: grid; gap: 10px; max-width: 560px; }
+        .chk { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+        code.code { font: 800 15px monospace; letter-spacing: 2px; color: var(--gold); }
+        .bar { display: inline-block; width: 120px; height: 8px; background: var(--bg-2); border-radius: 4px; vertical-align: middle; margin-right: 8px; overflow: hidden; }
+        .bar span { display: block; height: 100%; background: var(--accent-2); }
         .pill.req { background: rgba(46,230,201,.15); color: var(--accent-2); }
         .section-title { font-size: 22px; font-weight: 800; margin: 36px 0 6px; }
         .section-sub { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
@@ -123,7 +133,11 @@
         </nav>
 
         <main>
-            <h1>Users</h1>
+            <nav class="jump">
+                <a href="#users">👥 Users</a><a href="#codes">🎟️ Premium codes</a><a href="#statsSec">📊 Stats</a>
+                <a href="#announce">📢 Announcement</a><a href="#premiumGames">★ Premium games</a><a href="/leaderboard">🏆 Leaderboards</a>
+            </nav>
+            <h1 id="users">Users</h1>
 
             <section class="stats">
                 <div class="stat"><div class="num" id="sTotal">0</div><div class="lbl">Total users</div></div>
@@ -131,6 +145,9 @@
                 <div class="stat"><div class="num" id="sAdmins">0</div><div class="lbl">Admins</div></div>
                 <div class="stat"><div class="num" id="sNew">0</div><div class="lbl">New this week</div></div>
                 <div class="stat"><div class="num" id="sReq" style="color:var(--accent-2)">0</div><div class="lbl">Waiting for Premium (₪10)</div></div>
+                <div class="stat"><div class="num" id="sToday">0</div><div class="lbl">Played today</div></div>
+                <div class="stat"><div class="num" id="sWeek">0</div><div class="lbl">Played this week</div></div>
+                <div class="stat"><div class="num" id="sBanned" style="color:var(--hot)">0</div><div class="lbl">Banned</div></div>
             </section>
 
             <div class="toolbar">
@@ -141,6 +158,8 @@
                     <option value="free">Free</option>
                     <option value="admin">Admins</option>
                     <option value="requested">Requested Premium</option>
+                    <option value="banned">Banned</option>
+                    <option value="badname">Rude names</option>
                 </select>
                 <button class="btn" id="refresh">↻ Refresh</button>
             </div>
@@ -154,8 +173,60 @@
                 </table>
             </div>
 
-            <h2 class="section-title">★ Premium games</h2>
-            <p class="section-sub">Click a game to switch it between Free and Premium, then save. Free players see a lock screen on Premium games.</p>
+            <h2 class="section-title" id="codes">🎟️ Premium codes</h2>
+            <p class="section-sub">Make a code for each ₪10 payment. Write it on a note or send it, and the player types it on the Premium page. Each code works once.</p>
+            <div class="save-row">
+                <select id="codeCount" aria-label="How many codes">
+                    <option value="1">1 code</option><option value="5">5 codes</option><option value="10">10 codes</option><option value="20">20 codes</option>
+                </select>
+                <input id="codeNote" placeholder="Note (e.g. who paid)" maxlength="40" class="note-input">
+                <button class="btn primary" id="makeCodes">Make codes</button>
+                <button class="btn" id="printCodes">🖨️ Print unused codes</button>
+            </div>
+            <div class="table-wrap" style="margin-top:14px">
+                <table class="codes-table">
+                    <thead><tr><th>Code</th><th>Note</th><th>Made</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="codeRows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+                </table>
+            </div>
+
+            <h2 class="section-title" id="statsSec">📊 Game stats</h2>
+            <p class="section-sub">Total plays and players for every game, from all accounts.</p>
+            <div class="table-wrap"><table>
+                <thead><tr><th>Game</th><th>Plays</th><th>Players</th><th>Top score</th><th>Played today</th></tr></thead>
+                <tbody id="gameStats"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            </table></div>
+
+            <h2 class="section-title" id="studioSec">🧑‍💻 Games waiting for approval</h2>
+            <p class="section-sub">Games players made in the Game Studio. Press Preview to play one safely, then Approve to put it in Made by Players, or Reject. Also check the name and description.</p>
+            <div id="studioQueue" style="display:grid;gap:12px;margin-bottom:28px"><p class="empty">Loading…</p></div>
+
+            <h2 class="section-title" id="commentsSec">💬 Comments</h2>
+            <p class="section-sub">The newest comments from every game. 🚩 means a player reported it. Delete anything rude.</p>
+            <div class="save-row" style="margin-bottom:12px;flex-wrap:wrap;gap:10px">
+                <label class="chk"><input type="checkbox" id="commentsOff"> Turn off comments on the whole site</label>
+                <button class="btn" id="refreshComments">↻ Refresh</button>
+                <button class="btn" id="rebuildStats">⭐ Update homepage ratings</button>
+                <span class="email" id="statsNote"></span>
+            </div>
+            <div class="table-wrap"><table>
+                <thead><tr><th>Game</th><th>Player</th><th>Comment</th><th>When</th><th></th></tr></thead>
+                <tbody id="commentRows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            </table></div>
+
+            <h2 class="section-title" id="announce">📢 Announcement banner</h2>
+            <p class="section-sub">Shows a bar at the top of every page, e.g. "New game: Space Shooter!". Players can close it.</p>
+            <div class="announce-form">
+                <input id="anText" maxlength="120" placeholder="Message, e.g. New game: Space Shooter! 🚀">
+                <input id="anLink" maxlength="120" placeholder="Link (optional), e.g. /SpaceShooter/spaceshooter">
+                <input id="anLinkText" maxlength="30" placeholder="Link text (optional), e.g. Play now →">
+                <label class="chk"><input type="checkbox" id="anOn"> Show the banner</label>
+                <button class="btn primary" id="saveAnnounce">Save banner</button>
+            </div>
+
+            <h2 class="section-title" id="premiumGames">★ Premium games</h2>
+            <p class="section-sub">Click a game to switch it between Free and Premium, then save. Free players see a lock screen on Premium games.
+            New games can also be set to <b>early access</b> (Premium-only for a week) with <code>earlyUntil</code> in <code>games.js</code>.</p>
             <div class="games-pick" id="gamesPick"></div>
             <div class="save-row">
                 <button class="btn primary" id="saveGames">Save premium games</button>
@@ -168,9 +239,10 @@
 
     <script type="module">
         import { auth, db } from "/firebase-config.js";
-        import { GAMES, ready as hubReady, state as hub, savePremiumGames } from "/hub.js";
+        import { GAMES, ready as hubReady, state as hub, savePremiumGames, saveSiteSettings, makeCode } from "/hub.js";
+        import { TARGETS, nameProblem, weekKey, dayKey } from "/progress.js";
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { doc, getDoc, getDocs, collection, updateDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { doc, getDoc, getDocs, setDoc, collection, collectionGroup, updateDoc, deleteDoc, deleteField, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const $ = (id) => document.getElementById(id);
         let me = null;
@@ -202,6 +274,9 @@
                 $("app").classList.remove("hidden");
                 await load();
                 await setupGames();
+                setupAnnouncement(); setupComments(); setupStudio();
+                loadCodes();
+                loadGameStats();
             } catch {
                 $("loading").classList.add("hidden");
                 $("denied").classList.remove("hidden");
@@ -226,6 +301,9 @@
             $("sAdmins").textContent = users.filter(u => u.role === "admin").length;
             $("sReq").textContent = users.filter(u => u.premiumRequested && !u.premium).length;
             $("sNew").textContent = users.filter(u => (toDate(u.createdAt) || 0) > weekAgo).length;
+            $("sToday").textContent = users.filter(u => (toDate(u.lastLogin) || 0) > Date.now() - 864e5).length;
+            $("sWeek").textContent = users.filter(u => (toDate(u.lastLogin) || 0) > weekAgo).length;
+            $("sBanned").textContent = users.filter(u => u.banned).length;
         }
 
         function render() {
@@ -238,13 +316,15 @@
                 if (f === "free") return !u.premium;
                 if (f === "admin") return u.role === "admin";
                 if (f === "requested") return u.premiumRequested && !u.premium;
+                if (f === "banned") return u.banned;
+                if (f === "badname") return !!nameProblem(u.name);
                 return true;
             });
 
             $("rows").innerHTML = list.length ? list.map(u => {
                 const self = u.uid === me.uid;
                 return `<tr>
-                    <td><div class="name">${esc(u.name)}${self ? " (you)" : ""}</div><div class="email">${esc(u.email)}</div><div class="scores" id="sc-${u.uid}"><button class="btn" style="padding:2px 8px;font-size:11px" data-act="scores" data-uid="${u.uid}">Show scores</button></div></td>
+                    <td><div class="name">${esc(u.name)}${self ? " (you)" : ""}${u.banned ? ' <span class="pill banned">⛔ Banned</span>' : ""}${nameProblem(u.name) ? ' <span class="pill banned">Rude name?</span>' : ""}</div><div class="email">${esc(u.email)}</div><div class="scores" id="sc-${u.uid}"><button class="btn" style="padding:2px 8px;font-size:11px" data-act="scores" data-uid="${u.uid}">Show scores</button></div></td>
                     <td><span class="pill ${u.role === "admin" ? "admin" : "user"}">${u.role === "admin" ? "Admin" : "User"}</span></td>
                     <td>${u.premium ? '<span class="pill premium">★ Premium</span>' : u.premiumRequested ? '<span class="pill req">⏳ Requested</span>' : '<span class="email">Free</span>'}</td>
                     <td>${fmt(u.createdAt)}</td>
@@ -252,6 +332,9 @@
                     <td class="actions">
                         <button class="btn" data-act="premium" data-uid="${u.uid}">${u.premium ? "Remove premium" : "Give premium"}</button>
                         <button class="btn" data-act="role" data-uid="${u.uid}" ${self ? "disabled" : ""}>${u.role === "admin" ? "Remove admin" : "Make admin"}</button>
+                        <button class="btn" data-act="rename" data-uid="${u.uid}">Reset name</button>
+                        <button class="btn" data-act="clearlb" data-uid="${u.uid}">Clear from leaderboards</button>
+                        <button class="btn danger" data-act="ban" data-uid="${u.uid}" ${self ? "disabled" : ""}>${u.banned ? "Unban" : "Ban"}</button>
                         <button class="btn danger" data-act="delete" data-uid="${u.uid}" ${self ? "disabled" : ""}>Delete</button>
                     </td>
                 </tr>`;
@@ -261,6 +344,176 @@
         $("search").addEventListener("input", render);
         $("filter").addEventListener("change", render);
         $("refresh").addEventListener("click", async () => { await load(); toast("Refreshed"); });
+
+        // ---- Leaderboard cleanup ----
+        async function clearLeaderboards(uid) {
+            const b = writeBatch(db);
+            for (const id of Object.keys(TARGETS)) {
+                b.delete(doc(db, "leaderboards", id, "all", uid));
+                b.delete(doc(db, "leaderboards", id, "weeks", weekKey(), "scores", uid));
+            }
+            await b.commit();
+        }
+
+        // ---- Premium codes ----
+        let codes = [];
+        async function loadCodes() {
+            const snap = await getDocs(collection(db, "codes"));
+            codes = snap.docs.map(d => ({ code: d.id, ...d.data() }))
+                .sort((a, b) => (toDate(b.createdAt) || 0) - (toDate(a.createdAt) || 0));
+            $("codeRows").innerHTML = codes.length ? codes.map(c => `<tr>
+                <td><code class="code">${esc(c.code)}</code></td>
+                <td>${esc(c.note || "")}</td>
+                <td>${fmt(c.createdAt)}</td>
+                <td>${c.usedBy ? `<span class="pill premium">Used by ${esc(c.usedByName || "a player")}</span> <span class="email">${fmt(c.usedAt)}</span>` : '<span class="pill user">Unused</span>'}</td>
+                <td>${c.usedBy ? "" : `<button class="btn" data-copy="${esc(c.code)}">Copy</button> <button class="btn danger" data-del="${esc(c.code)}">Delete</button>`}</td>
+            </tr>`).join("") : '<tr><td colspan="5" class="empty">No codes yet. Make one when someone pays.</td></tr>';
+        }
+        $("makeCodes").onclick = async () => {
+            const n = +$("codeCount").value, note = $("codeNote").value.trim();
+            $("makeCodes").disabled = true;
+            try {
+                const b = writeBatch(db), made = [];
+                for (let i = 0; i < n; i++) {
+                    const code = makeCode(); made.push(code);
+                    b.set(doc(db, "codes", code), { createdAt: serverTimestamp(), createdBy: me.uid, note, usedBy: null });
+                }
+                await b.commit();
+                $("codeNote").value = "";
+                await loadCodes();
+                try { await navigator.clipboard.writeText(made.join("\n")); toast(`Made ${n} code${n > 1 ? "s" : ""} (copied)`); }
+                catch { toast(`Made ${n} code${n > 1 ? "s" : ""}`); }
+            } catch (err) { toast("Failed: " + (err.code || err.message)); }
+            $("makeCodes").disabled = false;
+        };
+        $("codeRows").onclick = async (e) => {
+            const c = e.target.dataset.copy, d = e.target.dataset.del;
+            if (c) { try { await navigator.clipboard.writeText(c); toast("Copied " + c); } catch { toast(c); } }
+            if (d && confirm(`Delete code ${d}?`)) { await deleteDoc(doc(db, "codes", d)); await loadCodes(); toast("Deleted"); }
+        };
+        $("printCodes").onclick = () => {
+            const unused = codes.filter(c => !c.usedBy);
+            if (!unused.length) return toast("No unused codes to print");
+            const w = open("", "_blank");
+            w.document.write(`<!doctype html><meta charset="utf-8"><title>Premium codes</title>
+                <style>body{font-family:system-ui,sans-serif;margin:24px}.c{display:inline-block;width:240px;margin:8px;padding:16px;border:2px dashed #7c5cff;border-radius:12px;text-align:center}
+                .c b{display:block;font:800 24px monospace;letter-spacing:3px;margin:8px 0}.c small{color:#555}</style>
+                ${unused.map(c => `<div class="c">★ Noam's Game Hub Premium<b>${esc(c.code)}</b><small>Type this code at noamtoder.com/premium</small></div>`).join("")}
+                <script>print()<\/script>`);
+            w.document.close();
+        };
+
+        // ---- Game stats ----
+        async function loadGameStats() {
+            try {
+                const snap = await getDocs(collectionGroup(db, "games"));
+                const by = {}, today = dayKey();
+                snap.forEach(d => {
+                    const g = d.data(), id = d.id;
+                    const s = by[id] = by[id] || { plays: 0, players: 0, top: 0, today: 0 };
+                    s.plays += g.plays || 0; s.players++; s.top = Math.max(s.top, g.best || 0);
+                    if (toDate(g.lastPlayed) && dayKey(toDate(g.lastPlayed)) === today) s.today++;
+                });
+                const rows = Object.keys(GAMES).map(id => ({ id, ...(by[id] || { plays: 0, players: 0, top: 0, today: 0 }) }))
+                    .sort((a, b) => b.plays - a.plays);
+                const max = Math.max(1, ...rows.map(r => r.plays));
+                $("gameStats").innerHTML = rows.map(r => `<tr>
+                    <td class="name">${esc(GAMES[r.id].name)}</td>
+                    <td><div class="bar"><span style="width:${Math.round(r.plays / max * 100)}%"></span></div> ${r.plays.toLocaleString()}</td>
+                    <td>${r.players}</td><td>${r.top ? r.top.toLocaleString() : "—"}</td><td>${r.today}</td></tr>`).join("");
+            } catch (err) {
+                $("gameStats").innerHTML = `<tr><td colspan="5" class="empty">Stats unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</td></tr>`;
+            }
+        }
+
+        // ---- Game Studio approvals ----
+        async function setupStudio() {
+            const fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+            const { db } = await import("/firebase-config.js");
+            const { buildDoc } = await import("/studio-run.js");
+            const box = $("studioQueue");
+            const load = async () => {
+                try {
+                    const snap = await fs.getDocs(fs.query(fs.collection(db, "creations"), fs.where("status", "==", "pending"), fs.limit(50)));
+                    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                    box.innerHTML = rows.length ? rows.map((g) => `<div data-id="${esc(g.id)}" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px">
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:30px">${esc(g.emoji)}</span><div><b>${esc(g.title)}</b><div class="email">by ${esc(g.author)} · ${(g.code || "").length.toLocaleString()} characters</div></div>
+                        <span style="margin-left:auto;display:flex;gap:6px"><button class="btn" data-a="preview">▶ Preview</button><button class="btn" data-a="code">&lt;/&gt; Code</button><button class="btn" data-a="approve" style="background:#2ee6a0;color:#0b0d1a">✅ Approve</button><button class="btn danger" data-a="reject">❌ Reject</button></span></div>
+                        <p style="color:var(--muted);margin:8px 0 0">${esc(g.desc || "")}</p><div class="pv"></div></div>`).join("") : '<p class="empty">Nothing waiting. 🎉</p>';
+                    box._rows = Object.fromEntries(rows.map((r) => [r.id, r]));
+                } catch (err) { box.innerHTML = `<p class="empty">Unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</p>`; }
+            };
+            box.onclick = async (e) => {
+                const b = e.target.closest("[data-a]"); if (!b) return;
+                const card = b.closest("[data-id]"), g = box._rows[card.dataset.id], pv = card.querySelector(".pv");
+                if (b.dataset.a === "preview") { pv.innerHTML = '<iframe sandbox="allow-scripts" style="width:100%;height:460px;border:1px solid var(--line);border-radius:12px;margin-top:10px;background:#fff"></iframe>'; pv.firstChild.srcdoc = buildDoc(g.code); }
+                if (b.dataset.a === "code") { pv.innerHTML = '<pre style="max-height:380px;overflow:auto;background:#0b0d1a;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;font-size:12px;white-space:pre-wrap"></pre>'; pv.firstChild.textContent = g.code; }
+                if (b.dataset.a === "approve" || b.dataset.a === "reject") {
+                    try { await fs.updateDoc(fs.doc(db, "creations", g.id), { status: b.dataset.a === "approve" ? "approved" : "rejected" }); card.remove(); toast(b.dataset.a === "approve" ? "Approved! It's in Made by Players now." : "Rejected."); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+            };
+            load();
+        }
+
+        // ---- Comments ----
+        async function setupComments() {
+            const soc = await import("/social.js");
+            $("commentsOff").checked = !!(hub.site || {}).commentsOff;
+            $("commentsOff").onchange = async (e) => {
+                try { await saveSiteSettings({ commentsOff: e.target.checked }); toast(e.target.checked ? "Comments are off" : "Comments are on"); }
+                catch (err) { e.target.checked = !e.target.checked; toast("Failed: " + (err.code || err.message)); }
+            };
+            $("rebuildStats").onclick = async () => {
+                $("rebuildStats").disabled = true; $("statsNote").textContent = "Counting…";
+                try { const g = await soc.rebuildSummary(); $("statsNote").textContent = `Done: ${Object.values(g).reduce((n, x) => n + x.n, 0)} ratings`; }
+                catch (err) { $("statsNote").textContent = "Failed: " + (err.code || err.message); }
+                $("rebuildStats").disabled = false;
+            };
+            const load = async () => {
+                try {
+                    const [rows, reps] = await Promise.all([soc.latestComments(60), soc.getReports().catch(() => [])]);
+                    const flagged = {}; reps.forEach((r) => (flagged[r.post] = (flagged[r.post] || 0) + 1));
+                    rows.sort((a, b) => (flagged[b.id] || 0) - (flagged[a.id] || 0));
+                    $("commentRows").innerHTML = rows.length ? rows.map((c) => `<tr data-g="${esc(c.game)}" data-id="${esc(c.id)}"${flagged[c.id] ? ' style="background:#ff4d8d18"' : ""}>
+                        <td>${esc(GAMES[c.game]?.name || c.game)}</td>
+                        <td><a href="/player?u=${encodeURIComponent(c.uid)}" style="color:inherit">${esc(c.avatar || "")} ${esc(c.name)}</a></td>
+                        <td style="max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere">${flagged[c.id] ? `<b style="color:var(--hot)">🚩 ${flagged[c.id]}</b> ` : ""}${esc(c.text)}</td>
+                        <td>${esc(soc.timeAgo(c.createdAt))}</td>
+                        <td style="white-space:nowrap">${flagged[c.id] ? '<button class="btn" data-keep>Keep</button> ' : ""}<button class="btn danger" data-del>Delete</button></td></tr>`).join("")
+                        : '<tr><td colspan="5" class="empty">No comments yet.</td></tr>';
+                } catch (err) { $("commentRows").innerHTML = `<tr><td colspan="5" class="empty">Comments unavailable (${esc(err.code || err.message)}). Did you publish the new database rules?</td></tr>`; }
+            };
+            $("refreshComments").onclick = load;
+            $("commentRows").onclick = async (e) => {
+                const tr = e.target.closest("tr"); if (!tr) return;
+                if (e.target.closest("[data-del]")) {
+                    try { await soc.deleteComment(tr.dataset.g, tr.dataset.id); await soc.clearReports(tr.dataset.g, tr.dataset.id); tr.remove(); toast("Comment deleted"); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+                if (e.target.closest("[data-keep]")) {
+                    try { await soc.clearReports(tr.dataset.g, tr.dataset.id); tr.style.background = ""; e.target.remove(); toast("Report cleared"); }
+                    catch (err) { toast("Failed: " + (err.code || err.message)); }
+                }
+            };
+            load();
+        }
+
+        // ---- Announcement ----
+        function setupAnnouncement() {
+            const a = hub.site || {};
+            $("anText").value = a.announcement || ""; $("anLink").value = a.announcementLink || "";
+            $("anLinkText").value = a.announcementLinkText || ""; $("anOn").checked = a.announcementOn !== false && !!a.announcement;
+            $("saveAnnounce").onclick = async () => {
+                $("saveAnnounce").disabled = true;
+                try {
+                    await saveSiteSettings({ announcement: $("anText").value.trim(), announcementLink: $("anLink").value.trim(),
+                        announcementLinkText: $("anLinkText").value.trim(), announcementOn: $("anOn").checked });
+                    toast("Banner saved");
+                } catch (err) { toast("Failed: " + (err.code || err.message)); }
+                $("saveAnnounce").disabled = false;
+            };
+        }
 
         // ---- Premium games picker ----
         let picked;
@@ -308,8 +561,9 @@
                     }).join("");
                     return;
                 } else if (btn.dataset.act === "premium") {
-                    await updateDoc(ref, { premium: !u.premium, premiumRequested: deleteField() });
-                    u.premium = !u.premium; delete u.premiumRequested;
+                    const on = !u.premium;
+                    await updateDoc(ref, { premium: on, premiumRequested: deleteField(), premiumSince: on ? serverTimestamp() : deleteField() });
+                    u.premium = on; delete u.premiumRequested;
                     toast(`${u.name} is now ${u.premium ? "Premium" : "Free"}`);
                 } else if (btn.dataset.act === "role") {
                     const next = u.role === "admin" ? "user" : "admin";
@@ -317,6 +571,23 @@
                     await updateDoc(ref, { role: next });
                     u.role = next;
                     toast(`${u.name} is now ${next === "admin" ? "an admin" : "a regular user"}`);
+                } else if (btn.dataset.act === "rename") {
+                    const next = "Player" + Math.floor(1000 + Math.random() * 9000);
+                    if (!confirm(`Change ${u.name}'s name to ${next}? They can pick a new (friendly) name on their profile.`)) { btn.disabled = false; return; }
+                    await updateDoc(ref, { name: next });
+                    await clearLeaderboards(u.uid);
+                    toast(`${u.name} is now ${next}`); u.name = next;
+                } else if (btn.dataset.act === "clearlb") {
+                    if (!confirm(`Remove all of ${u.name}'s leaderboard scores? (Their own saved scores stay.)`)) { btn.disabled = false; return; }
+                    await clearLeaderboards(u.uid);
+                    toast(`Removed ${u.name} from the leaderboards`);
+                } else if (btn.dataset.act === "ban") {
+                    const on = !u.banned;
+                    if (on && !confirm(`Ban ${u.name}? They can still play, but nothing is saved and they're removed from the leaderboards.`)) { btn.disabled = false; return; }
+                    await updateDoc(ref, { banned: on });
+                    if (on) await clearLeaderboards(u.uid);
+                    u.banned = on;
+                    toast(`${u.name} is ${on ? "banned" : "unbanned"}`);
                 } else if (btn.dataset.act === "delete") {
                     if (!confirm(`Delete ${u.name}'s profile? This can't be undone.`)) { btn.disabled = false; return; }
                     await deleteDoc(ref);

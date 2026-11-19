@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The famous number puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Sudoku · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#grid{display:grid;grid-template-columns:repeat(9,var(--sc));--sc:min(54px,calc((100vw - 56px)/9))}.sc{width:var(--sc);height:var(--sc);border:0;border-right:1px solid #2a3060;border-bottom:1px solid #2a3060;background:#171b36;color:#7c5cff;font:700 calc(var(--sc)*.5) Inter,sans-serif;cursor:pointer;padding:0;display:grid;place-items:center;touch-action:manipulation}.sc.given{color:#eef0ff;font-weight:800}.sc.br{border-right:3px solid #9aa0c8}.sc.bb{border-bottom:3px solid #9aa0c8}.sc.peer{background:#1e2347}.sc.same{background:#2a2f6a}.sc.sel{background:#3a3f9a}.sc.bad{color:#ff4d8d;background:#3a1530}.nt{display:grid;grid-template-columns:repeat(3,1fr);width:100%;height:100%;padding:2px}.nt i{font:600 calc(var(--sc)*.2) Inter,sans-serif;color:#9aa0c8;font-style:normal;display:grid;place-items:center}#pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#pad button{padding:12px 0;border-radius:12px;border:1px solid #2a3060;background:#1e2347;color:#eef0ff;font:800 24px Inter,sans-serif;cursor:pointer;position:relative}#pad button small{position:absolute;right:6px;bottom:3px;font-size:10px;color:#9aa0c8}#pad button.used{opacity:.3}#pad button:hover{border-color:#7c5cff}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Sudoku</span></h1>
+        <div class="stats"><div class="stat"><b id="time">0:00</b><small>Time</small></div><div class="stat"><b id="mistakes">0/3</b><small>Mistakes</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><span class="seg" id="lv"><button data-l="easy">Easy</button><button data-l="medium">Medium</button><button data-l="hard">Hard</button></span>
+            <div class="frame" style="padding:8px"><div id="grid"></div>
+            <div class="overlay hidden" id="over"><div><h2 id="overTitle">Solved!</h2><p id="overText"></p><button class="btn" id="againBtn">↻ New puzzle</button></div></div></div></div>
+            <div class="side" style="width:300px;max-width:100%"><div class="panel"><div id="pad"><button data-n="1">1<small></small></button><button data-n="2">2<small></small></button><button data-n="3">3<small></small></button><button data-n="4">4<small></small></button><button data-n="5">5<small></small></button><button data-n="6">6<small></small></button><button data-n="7">7<small></small></button><button data-n="8">8<small></small></button><button data-n="9">9<small></small></button></div></div>
+            <div class="panel" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="btn ghost" id="noteBtn" style="padding:9px 8px;font-size:14px">✏️ Notes: OFF</button><button class="btn ghost" id="eraseBtn" style="padding:9px 8px;font-size:14px">⌫ Erase</button><button class="btn ghost" id="undoBtn" style="padding:9px 8px;font-size:14px">↶ Undo</button><button class="btn ghost" id="hintBtn" style="padding:9px 8px;font-size:14px">💡 Hint</button><button class="btn" id="newBtn" style="padding:9px 8px;font-size:14px;grid-column:span 2">＋ New puzzle</button></div></div>
+        </div>
+    </div>
+    
+    <p class="hint">Fill every row, column and 3×3 box with the numbers 1 to 9. Use the keyboard numbers and arrow keys, N for notes.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        const { $, beep, tune } = Kit;
+        const BEST = "sudokuBest", LV = { easy: { clues: 40, base: 500, lim: 900, mul: 1 }, medium: { clues: 32, base: 1000, lim: 1500, mul: 1 }, hard: { clues: 26, base: 1800, lim: 2400, mul: 1 } };
+        let lv = "easy", sol, given, cur, notes, sel = -1, noteMode = false, mistakes = 0, time = 0, timer = null, done = false, history = [];
+        try { lv = localStorage.getItem("sudokuLv") || "easy"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        const row = (i) => Math.floor(i / 9), col = (i) => i % 9, box = (i) => Math.floor(row(i) / 3) * 3 + Math.floor(col(i) / 3);
+        const PEERS = Array.from({ length: 81 }, (_, i) => { const s = new Set(); for (let j = 0; j < 81; j++) if (j !== i && (row(j) === row(i) || col(j) === col(i) || box(j) === box(i))) s.add(j); return [...s]; });
+        function ok(g, i, v) { for (const p of PEERS[i]) if (g[p] === v) return false; return true; }
+        function solve(g, count = false, limit = 2) {
+            let n = 0;
+            const rec = () => {
+                let best = -1, bestOpts = null;
+                for (let i = 0; i < 81; i++) if (!g[i]) { const o = []; for (let v = 1; v <= 9; v++) if (ok(g, i, v)) o.push(v); if (!o.length) return false; if (!bestOpts || o.length < bestOpts.length) { best = i; bestOpts = o; if (o.length === 1) break; } }
+                if (best < 0) { n++; return !count || n >= limit; }
+                for (const v of count ? bestOpts : bestOpts.sort(() => Math.random() - 0.5)) { g[best] = v; if (rec()) return true; } g[best] = 0; return false;
+            };
+            rec(); return count ? n : g;
+        }
+        function generate(clues) {
+            const full = solve(Array(81).fill(0));
+            const puzzle = full.slice(), order = [...Array(81).keys()].sort(() => Math.random() - 0.5);
+            let filled = 81;
+            for (const i of order) {
+                if (filled <= clues) break;
+                const keep = puzzle[i]; puzzle[i] = 0;
+                if (solve(puzzle.slice(), true) !== 1) puzzle[i] = keep; else filled--;
+            }
+            return { full, puzzle };
+        }
+        function newGame() {
+            const { full, puzzle } = generate(LV[lv].clues);
+            sol = full; given = puzzle.map((v) => v > 0); cur = puzzle.slice(); notes = Array.from({ length: 81 }, () => new Set());
+            sel = cur.findIndex((v) => !v); mistakes = 0; time = 0; done = false; history = [];
+            clearInterval(timer); timer = setInterval(() => { if (!done) { time++; Kit.stat("time", fmt(time)); } }, 1000);
+            Kit.stat("time", "0:00"); Kit.stat("mistakes", "0/3"); render(); Kit.hide("over");
+        }
+        const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        function render() {
+            const g = $("grid"), sv = sel >= 0 ? cur[sel] : 0;
+            if (!g.children.length) for (let i = 0; i < 81; i++) { const d = document.createElement("button"); d.className = "sc"; d.dataset.i = i; g.appendChild(d); }
+            for (let i = 0; i < 81; i++) {
+                const d = g.children[i], v = cur[i];
+                let cls = "sc";
+                if (given[i]) cls += " given";
+                if ((col(i) + 1) % 3 === 0 && col(i) < 8) cls += " br"; if ((row(i) + 1) % 3 === 0 && row(i) < 8) cls += " bb";
+                if (sel >= 0 && i !== sel && (row(i) === row(sel) || col(i) === col(sel) || box(i) === box(sel))) cls += " peer";
+                if (sv && v === sv) cls += " same";
+                if (i === sel) cls += " sel";
+                if (v && !given[i] && v !== sol[i]) cls += " bad";
+                d.className = cls;
+                if (v) d.textContent = v;
+                else d.innerHTML = notes[i].size ? `<span class="nt">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<i>${notes[i].has(n) ? n : ""}</i>`).join("")}</span>` : "";
+            }
+            document.querySelectorAll("#pad button[data-n]").forEach((b) => { const n = +b.dataset.n, left = 9 - cur.filter((v, i) => v === n && v === sol[i]).length; b.classList.toggle("used", left <= 0); b.querySelector("small").textContent = left > 0 ? left : ""; });
+            $("noteBtn").classList.toggle("active", noteMode); $("noteBtn").textContent = noteMode ? "✏️ Notes: ON" : "✏️ Notes: OFF";
+        }
+        function enter(n) {
+            if (done || sel < 0 || given[sel]) return;
+            history.push({ i: sel, v: cur[sel], n: new Set(notes[sel]) });
+            if (noteMode && n) { if (notes[sel].has(n)) notes[sel].delete(n); else notes[sel].add(n); cur[sel] = 0; beep(800, 0.02, "triangle", 0.02); return render(); }
+            cur[sel] = n; notes[sel].clear();
+            if (n && n !== sol[sel]) {
+                mistakes++; Kit.stat("mistakes", `${mistakes}/3`); beep(160, 0.2, "sawtooth", 0.05);
+                if (mistakes >= 3) { done = true; render(); $("overTitle").textContent = "Too many mistakes"; $("overText").innerHTML = "3 mistakes. Try a new puzzle!"; setTimeout(() => Kit.show("over"), 400); return; }
+            } else if (n) {
+                for (const p of PEERS[sel]) notes[p].delete(n);
+                beep(520 + n * 30, 0.05, "triangle", 0.04);
+                const unit = (f) => [...Array(81).keys()].filter((j) => f(j) === f(sel)).every((j) => cur[j] === sol[j]);
+                if (unit(row) || unit(col) || unit(box)) tune([784, 988], 0.05, "triangle", 0.03);
+            }
+            render();
+            if (cur.every((v, i) => v === sol[i])) win();
+        }
+        function win() {
+            done = true; clearInterval(timer);
+            const L = LV[lv], sc = Math.max(L.base, L.base + (L.lim - time) * L.mul) - mistakes * 100;
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overTitle").textContent = "Solved!"; $("overText").innerHTML = `${lv[0].toUpperCase() + lv.slice(1)} puzzle in ${fmt(time)}<br>${sc.toLocaleString()} points · best ${best.toLocaleString()}`;
+            tune([523, 659, 784, 1047, 1319], 0.1, "triangle", 0.06); setTimeout(() => Kit.show("over"), 500);
+        }
+        $("grid").addEventListener("pointerdown", (e) => { const b = e.target.closest(".sc"); if (!b) return; sel = +b.dataset.i; render(); });
+        document.querySelectorAll("#pad button[data-n]").forEach((b) => b.onclick = () => enter(+b.dataset.n));
+        $("eraseBtn").onclick = () => { if (sel >= 0 && !given[sel]) { notes[sel].clear(); enter(0); } };
+        $("noteBtn").onclick = () => { noteMode = !noteMode; render(); };
+        $("undoBtn").onclick = () => { const h = history.pop(); if (!h || done) return; cur[h.i] = h.v; notes[h.i] = h.n; sel = h.i; render(); };
+        $("hintBtn").onclick = () => {
+            if (done) return; const empty = [...Array(81).keys()].filter((i) => cur[i] !== sol[i]); if (!empty.length) return;
+            const i = sel >= 0 && cur[sel] !== sol[sel] ? sel : Kit.pick(empty); sel = i; const wasNote = noteMode; noteMode = false; time += 30; enter(sol[i]); noteMode = wasNote;
+        };
+        addEventListener("keydown", (e) => {
+            if (e.target.tagName === "INPUT") return;
+            const m = /^(Digit|Numpad)([1-9])$/.exec(e.code); if (m) { enter(+m[2]); e.preventDefault(); return; }
+            if (e.code === "Backspace" || e.code === "Delete" || e.code === "Digit0") { enter(0); return; }
+            if (e.code === "KeyN") { noteMode = !noteMode; render(); return; }
+            const mv = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.code];
+            if (mv && sel >= 0) { const n = sel + mv; if (n >= 0 && n < 81 && (Math.abs(mv) === 9 || row(n) === row(sel))) { sel = n; render(); } e.preventDefault(); }
+        });
+        document.querySelectorAll("#lv button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.l === lv);
+            b.onclick = () => { lv = b.dataset.l; try { localStorage.setItem("sudokuLv", lv); } catch (e) {} document.querySelectorAll("#lv button").forEach((x) => x.classList.toggle("active", x === b)); newGame(); };
+        });
+        $("newBtn").onclick = newGame; $("againBtn").onclick = newGame;
+        newGame();
+        if (window.__test) window.__test.sd = () => ({ sol, cur, given });
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Sudoku</h2><p>The famous number puzzle. Fill the nine by nine grid so that every row, every column and every three by three box holds the numbers one to nine exactly once. Every puzzle is freshly made and has exactly one answer. Use notes to pencil in possible numbers, ask for a hint if you get stuck, and try to finish without three mistakes. Pick easy, medium or hard.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click a square, then a number</td><td>Fill it in</td></tr><tr><td>1 to 9 / arrows</td><td>Use the keyboard</td></tr><tr><td>N</td><td>Notes on or off</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Start with the rows, columns or boxes that are almost full.</li><li>If a number can only go in one square of a box, it must go there.</li><li>Use notes on hard puzzles to keep track of the possibilities.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Sudoku</h3><p>Sudoku never needs guessing. Every puzzle here has exactly one answer, and you can reach it with logic alone. Start with the rows, columns and boxes that are almost full, because they have the fewest possibilities. Then scan one number at a time: pick 1, look at each box, and ask whether there's only one square where a 1 can go. If there is, it must go there.</p><p>On harder puzzles, use notes. Pencil in every possible number for a square, then remove options as you fill in more of the grid. Look for a square with only one note left, or a number that appears in only one square's notes in a row, column or box. When two squares in a row can only be the same two numbers, those numbers can't go anywhere else in that row.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve easy puzzles by finding rows and boxes that are almost full.</li><li><b>Getting good:</b> Scan for each number in turn, and use notes on medium puzzles.</li><li><b>Expert:</b> Solve hard puzzles with notes and pairs, without using a hint.</li></ul><h3>Did you know?</h3><p>The puzzle we call Sudoku first appeared in an American puzzle magazine in 1979, under the name Number Place. It became popular in Japan in the 1980s, where it got the name Sudoku, and then went worldwide in 2004 and 2005 when newspapers started printing it. A Sudoku needs at least 17 starting numbers to have only one solution.</p><h3>Questions players ask</h3><h4>Can I write notes?</h4><p>Yes. Press N or the notes button to pencil in possible numbers.</p><h4>What happens after three mistakes?</h4><p>The game ends, so check carefully before you fill in a square.</p><h4>Is every puzzle solvable?</h4><p>Yes. Every puzzle is freshly made and has exactly one answer.</p><p style="margin-top:16px">📖 <b>Read more:</b> <a href="/articles/how-to-solve-sudoku">How to solve Sudoku: techniques from easy to hard</a></p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Solitaire/solitaire">Solitaire</a><a href="/CastleDefense/castledefense">Castle Defense</a><a href="/FlagQuiz/flagquiz">Flag Quiz</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
