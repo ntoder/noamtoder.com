@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Eight-ball pool on a full table. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Noam Pool · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#menu .seg{display:inline-flex;gap:4px;background:#11142b;border-radius:12px;padding:4px}#menu .seg button{border:0;background:none;color:#cfd2f5;font:700 14px Inter,sans-serif;padding:7px 14px;border-radius:9px;cursor:pointer}#menu .seg button.active{background:#7c5cff;color:#fff}#menu h4{margin:12px 0 6px;font-size:13px;color:#9aa0c8;text-transform:uppercase;letter-spacing:1px}.ctl{display:block;margin-top:12px;font-size:13px;color:#9aa0c8;line-height:1.5;max-width:560px}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Noam <span>Pool</span></h1>
+        <div class="stats"><div class="stat"><b id="turn">-</b><small>Turn</small></div><div class="stat"><b id="mine">Open</b><small>Your balls</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="960" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Noam Pool</h2>
+                <p id="startText"><div id="menu"></div><span class="ctl">Aim with the mouse, then hold the button and pull back for power. On a phone: drag to aim, then pull down the ⚡ bar on the right. Keyboard: arrows aim (Shift for fine), hold Space for power.</span></p>
+                <button class="btn" id="startBtn">▶ Rack 'em up</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Look at where the white ball will go after it hits. Leaving it in a good spot for your next shot is how you clear the table.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Noam Pool — 8-ball pool against the computer or a friend
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "poolBest";
+        const X0 = 95, Y0 = 92, TW = 760, TH = 380, R = 10.5, CX = X0 + TW * 0.25, CY = Y0 + TH / 2;
+        const POCKETS = [[X0, Y0, 1], [X0 + TW / 2, Y0 - 4, 0], [X0 + TW, Y0, 1], [X0, Y0 + TH, 1], [X0 + TW / 2, Y0 + TH + 4, 0], [X0 + TW, Y0 + TH, 1]].map(([x, y, c]) => ({ x, y, r: c ? 21 : 19, corner: !!c }));
+        const COLORS = ["#ffffff", "#f7c21b", "#1f5fd0", "#d2232a", "#5b2a86", "#f07f1e", "#138a3e", "#7a1f1f", "#141414", "#f7c21b", "#1f5fd0", "#d2232a", "#5b2a86", "#f07f1e", "#138a3e", "#7a1f1f"];
+        const LV = { easy: { err: 3.2, think: 1.2, label: "Easy" }, medium: { err: 1.3, think: 0.9, label: "Medium" }, hard: { err: 0.45, think: 0.7, label: "Hard" } };
+        const he = () => document.documentElement.lang === "he";
+        const T = (en, hb) => (he() ? hb : en);
+        const cfg = { mode: "cpu", diff: "medium" };
+        try { Object.assign(cfg, JSON.parse(localStorage.getItem("poolCfg") || "{}")); } catch (e) {}
+        const saveCfg = () => { try { localStorage.setItem("poolCfg", JSON.stringify(cfg)); } catch (e) {} };
+
+        let balls, turn, groups, state = "menu", aim = 0, power = 0, drag = null, moving = false, shot = null, msg = null, inHand = false, kitchen = false;
+        let firstHit = null, potted = [], players, aiT = 0, aiPlan = null, cueAnim = 0, fx = Kit.particles(), hover = { x: CX + 100, y: CY }, winner = null, broke = false;
+        Kit.stat("best", Kit.best(BEST));
+
+        function rack() {
+            balls = [{ n: 0, x: CX, y: CY, vx: 0, vy: 0, in: false }];
+            // 8 in the middle, a solid and a stripe in the back corners
+            const order = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
+            const rest = [2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14].sort(() => Math.random() - 0.5);
+            const slots = [];
+            let k = 0;
+            for (let row = 0; row < 5; row++) for (let i = 0; i <= row; i++) slots.push([row, i]);
+            const fill = new Array(15);
+            fill[0] = 1; fill[4] = 8; fill[10] = 9; fill[14] = 15;
+            const left = order.filter((n) => ![1, 8, 9, 15].includes(n)).sort(() => Math.random() - 0.5);
+            for (let i = 0; i < 15; i++) if (fill[i] == null) fill[i] = left[k++];
+            const ax = X0 + TW * 0.72;
+            slots.forEach(([row, i], idx) => {
+                const x = ax + row * R * 1.75, y = CY + (i - row / 2) * R * 2.02;
+                balls.push({ n: fill[idx], x: x + Kit.rand(-0.1, 0.1), y: y + Kit.rand(-0.1, 0.1), vx: 0, vy: 0, in: false });
+            });
+        }
+        const cue = () => balls[0];
+        const isSolid = (n) => n >= 1 && n <= 7, isStripe = (n) => n >= 9;
+        const groupOf = (n) => (isSolid(n) ? "solids" : isStripe(n) ? "stripes" : null);
+        const left = (g) => balls.filter((b) => !b.in && b.n && groupOf(b.n) === g).length;
+        const legalTarget = (p, n) => {
+            const g = groups[p];
+            if (!g) return n !== 8;
+            if (left(g) === 0) return n === 8;
+            return groupOf(n) === g;
+        };
+
+        function newGame() {
+            rack(); turn = 0; groups = [null, null]; inHand = true; kitchen = true; winner = null; broke = false;
+            players = cfg.mode === "cpu" ? [{ name: T("You", "אתם"), cpu: false }, { name: T("Computer", "המחשב"), cpu: true }] : [{ name: T("Player 1", "שחקן 1"), cpu: false }, { name: T("Player 2", "שחקן 2"), cpu: false }];
+            state = "play"; moving = false; msg = { t: 2.2, text: T("Place the cue ball and break!", "שימו את הלבן ופתחו!") };
+            aim = 0; power = 0; aiPlan = null; aiT = 0;
+            Kit.hide("start"); Kit.hide("over"); stats();
+        }
+        function stats() {
+            Kit.stat("turn", players ? players[turn].name : "-");
+            Kit.stat("mine", groups && groups[0] ? (groups[0] === "solids" ? T("Solids", "מלאים") : T("Stripes", "פסים")) : T("Open", "פתוח"));
+        }
+
+        // ---------- physics ----------
+        function step(dt) {
+            const live = balls.filter((b) => !b.in);
+            for (const b of live) { b.x += b.vx * dt; b.y += b.vy * dt; }
+            // collisions
+            for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+                const a = live[i], b = live[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+                if (d < 2 * R && d > 0) {
+                    const nx = dx / d, ny = dy / d, o = (2 * R - d) / 2;
+                    a.x -= nx * o; a.y -= ny * o; b.x += nx * o; b.y += ny * o;
+                    const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+                    if (rel > 0) {
+                        const imp = rel * 0.97;
+                        a.vx -= imp * nx; a.vy -= imp * ny; b.vx += imp * nx; b.vy += imp * ny;
+                        if (a.n === 0 && firstHit == null) firstHit = b.n; else if (b.n === 0 && firstHit == null) firstHit = a.n;
+                        if (rel > 40) beep(1200 + Math.random() * 300, 0.025, "sine", Math.min(0.08, rel / 6000));
+                    }
+                }
+            }
+            for (const b of live) {
+                // pockets
+                for (const p of POCKETS) if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) { pot(b, p); break; }
+                if (b.in) continue;
+                // cushions (except at pocket mouths)
+                const nearPocket = POCKETS.some((p) => Math.hypot(b.x - p.x, b.y - p.y) < p.r + 13);
+                if (!nearPocket) {
+                    if (b.x < X0 + R) { b.x = X0 + R; b.vx = Math.abs(b.vx) * 0.78; cush(b); }
+                    if (b.x > X0 + TW - R) { b.x = X0 + TW - R; b.vx = -Math.abs(b.vx) * 0.78; cush(b); }
+                    if (b.y < Y0 + R) { b.y = Y0 + R; b.vy = Math.abs(b.vy) * 0.78; cush(b); }
+                    if (b.y > Y0 + TH - R) { b.y = Y0 + TH - R; b.vy = -Math.abs(b.vy) * 0.78; cush(b); }
+                } else {
+                    // inside a pocket mouth: keep it on the table edge area
+                    b.x = Kit.clamp ? Kit.clamp(b.x, X0 - 8, X0 + TW + 8) : Math.max(X0 - 8, Math.min(X0 + TW + 8, b.x));
+                    b.y = Math.max(Y0 - 8, Math.min(Y0 + TH + 8, b.y));
+                }
+                // rolling friction
+                const sp = Math.hypot(b.vx, b.vy);
+                if (sp > 0) {
+                    const ns = Math.max(0, sp - (14 + sp * 0.55) * dt);
+                    b.vx *= ns / sp; b.vy *= ns / sp;
+                    if (ns < 3) { b.vx = b.vy = 0; }
+                }
+            }
+        }
+        function cush(b) { const s = Math.hypot(b.vx, b.vy); if (s > 60) beep(160, 0.03, "triangle", Math.min(0.05, s / 9000)); }
+        function pot(b, p) {
+            b.in = true; b.vx = b.vy = 0; potted.push(b.n);
+            beep(220, 0.12, "sine", 0.08, -120);
+            fx.burst(p.x, p.y, b.n === 0 ? "#ffffff" : COLORS[b.n], 14, 2.5);
+        }
+
+        // ---------- shooting ----------
+        function shoot(angle, pw) {
+            const c = cue(), v = 120 + pw * 1180;
+            c.vx = Math.cos(angle) * v; c.vy = Math.sin(angle) * v;
+            moving = true; firstHit = null; potted = []; inHand = false; kitchen = false; power = 0; cueAnim = 0.12;
+            beep(140, 0.06, "sine", 0.06 + pw * 0.06, -40);
+        }
+        function endShot() {
+            moving = false;
+            const p = turn, o = 1 - turn, mine = groups[p];
+            const scratch = potted.includes(0);
+            const eight = potted.includes(8);
+            let foul = scratch || firstHit == null || !legalTarget(p, firstHit);
+            const firstShot = !broke;
+            if (!broke) { broke = true; if (firstHit != null && !scratch) foul = false; }
+            // the 8 ball on the break goes back on the spot
+            if (eight && potted.length && !groups[0] && balls.filter((b) => b.in && b.n).length <= potted.filter((n) => n).length && firstShot) {
+                const e8 = balls.find((b) => b.n === 8); e8.in = false; e8.x = X0 + TW * 0.72; e8.y = CY; while (overlaps2(e8)) e8.x += 2 * R + 1;
+                potted = potted.filter((n) => n !== 8); say(T("8-ball on the break: it goes back on the spot", "השחור נכנס בפתיחה: הוא חוזר לנקודה"));
+                return endShotRest(p, o, scratch);
+            }
+            // the 8 ball decides the game
+            if (eight) {
+                const cleared = mine && left(mine) === 0 && !potted.filter((n) => n && n !== 8 && groupOf(n) === mine).length;
+                const ok = mine && (left(mine) === 0) && !scratch && firstHit === 8;
+                return gameOver(ok ? p : o, ok ? T("potted the 8-ball!", "הכניס את השחור!") : scratch ? T("scratched on the 8-ball", "הלבן נפל עם השחור") : T("8-ball went in too early", "השחור נכנס מוקדם מדי"));
+            }
+            // assign groups on the first legal pot
+            const pots = potted.filter((n) => n && n !== 8);
+            if (!groups[p] && pots.length && !foul) {
+                const g = groupOf(pots[0]);
+                groups[p] = g; groups[o] = g === "solids" ? "stripes" : "solids";
+                say(`${players[p].name}: ${g === "solids" ? T("Solids", "מלאים") : T("Stripes", "פסים")}`);
+            }
+            if (scratch) { const c = cue(); c.in = false; c.vx = c.vy = 0; }
+            const keep = !foul && pots.some((n) => groups[p] ? groupOf(n) === groups[p] : true);
+            if (foul) {
+                turn = o; inHand = true;
+                say(scratch ? T("Scratch! Ball in hand", "הלבן נפל! כדור ביד") : firstHit == null ? T("Foul: no ball hit. Ball in hand", "עבירה: לא פגעת בכדור. כדור ביד") : T("Foul: wrong ball first. Ball in hand", "עבירה: פגעת קודם בכדור הלא נכון. כדור ביד"));
+                if (scratch) { const c = cue(); c.x = CX; c.y = CY; nudgeFree(c); }
+                beep(150, 0.25, "sawtooth", 0.04);
+            } else if (!keep) turn = o;
+            else if (pots.length) say(T("Nice shot! Go again", "מכה יפה! עוד תור"));
+            aiPlan = null; aiT = 0;
+            stats();
+        }
+        const overlaps2 = (b) => balls.some((o) => o !== b && !o.in && Math.hypot(o.x - b.x, o.y - b.y) < 2 * R + 1);
+        function endShotRest(p, o, scratch) {
+            if (scratch) { const c = cue(); c.in = false; c.vx = c.vy = 0; c.x = CX; c.y = CY; nudgeFree(c); turn = o; inHand = true; }
+            else turn = o;
+            aiPlan = null; aiT = 0; stats();
+        }
+        function nudgeFree(c) {
+            for (let k = 0; k < 200 && overlaps(c.x, c.y); k++) { c.x = CX + Kit.rand(-60, 60); c.y = CY + Kit.rand(-120, 120); }
+        }
+        const overlaps = (x, y) => balls.some((b) => b.n && !b.in && Math.hypot(b.x - x, b.y - y) < 2 * R + 1);
+        function gameOver(w, why) {
+            winner = w; state = "over";
+            const youWin = cfg.mode === "cpu" ? w === 0 : true;
+            let sc = 0;
+            if (cfg.mode === "cpu") {
+                const myLeft = groups[0] ? left(groups[0]) : 7, theirLeft = groups[1] ? left(groups[1]) : 7;
+                sc = w === 0 ? 1000 + theirLeft * 120 + { easy: 0, medium: 300, hard: 700 }[cfg.diff] : (7 - myLeft) * 60;
+                Kit.save(sc);
+            }
+            const best = cfg.mode === "cpu" ? Kit.setBest(BEST, sc) : Kit.best(BEST);
+            $("overText").innerHTML = `<b style="font-size:20px">${cfg.mode === "cpu" ? (w === 0 ? T("🏆 You win!", "🏆 ניצחתם!") : T("😢 The computer wins", "😢 המחשב ניצח")) : `🏆 ${players[w].name} ${T("wins!", "ניצח!")}`}</b><br>${players[w].name} ${why}${cfg.mode === "cpu" ? `<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}` : ""}`;
+            if (youWin) tune([523, 659, 784, 1047], 0.13, "triangle", 0.06); else tune([392, 330, 262], 0.15, "triangle", 0.06);
+            setTimeout(() => Kit.show("over"), 700);
+        }
+        function say(text, t = 2) { msg = { text, t }; }
+
+        // ---------- computer player ----------
+        function pathClear(x1, y1, x2, y2, skip) {
+            const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
+            for (const b of balls) {
+                if (b.in || skip.includes(b)) continue;
+                const t = Math.max(0, Math.min(1, ((b.x - x1) * dx + (b.y - y1) * dy) / l2));
+                if (Math.hypot(x1 + dx * t - b.x, y1 + dy * t - b.y) < 2 * R - 0.5) return false;
+            }
+            return true;
+        }
+        function bestShot(from) {
+            const c = from || cue();
+            let best = null;
+            for (const b of balls) {
+                if (b.in || !b.n || !legalTarget(turn, b.n)) continue;
+                for (const p of POCKETS) {
+                    // aim a little inside the pocket
+                    const px = p.x + (CX * 0 + (X0 + TW / 2 - p.x)) * 0.02, py = p.y + (CY - p.y) * 0.04;
+                    const dpx = px - b.x, dpy = py - b.y, dp = Math.hypot(dpx, dpy);
+                    const gx = b.x - dpx / dp * 2 * R, gy = b.y - dpy / dp * 2 * R;
+                    const dcx = gx - c.x, dcy = gy - c.y, dc = Math.hypot(dcx, dcy);
+                    if (dc < 1) continue;
+                    const cut = Math.acos(Math.max(-1, Math.min(1, (dcx * dpx + dcy * dpy) / (dc * dp))));
+                    if (cut > 1.35) continue;
+                    if (!pathClear(c.x, c.y, gx, gy, [c, b]) || !pathClear(b.x, b.y, px, py, [b, c])) continue;
+                    // side pockets hate steep angles
+                    if (!p.corner && Math.abs(dpy) < dp * 0.45) continue;
+                    const score = cut * 60 + dc * 0.06 + dp * 0.1 + (b.n === 8 ? -20 : 0);
+                    if (!best || score < best.score) best = { score, a: Math.atan2(dcy, dcx), pw: Math.min(1, 0.22 + (dc + dp) / 1100 + cut * 0.18), b, p };
+                }
+            }
+            return best;
+        }
+        function aiThink() {
+            const L = LV[cfg.diff] || LV.medium;
+            if (inHand) {
+                // try spots and keep the one with the easiest shot
+                let bestPos = null, bs = 1e9;
+                const c = cue();
+                for (let k = 0; k < 140; k++) {
+                    const x = kitchen ? Kit.rand(X0 + R + 2, X0 + TW * 0.25) : Kit.rand(X0 + R + 2, X0 + TW - R - 2), y = Kit.rand(Y0 + R + 2, Y0 + TH - R - 2);
+                    if (overlaps(x, y)) continue;
+                    const s = bestShot({ x, y });
+                    const sc = s ? s.score : 500 + Math.random();
+                    if (sc < bs) { bs = sc; bestPos = { x, y }; }
+                }
+                if (bestPos) { c.x = bestPos.x; c.y = bestPos.y; }
+                if (!broke) { c.x = X0 + TW * 0.2; c.y = CY + Kit.rand(-40, 40); }
+                inHand = false;
+            }
+            if (!broke) return { a: Math.atan2(CY - cue().y, X0 + TW * 0.72 - cue().x) + Kit.rand(-0.01, 0.01), pw: 1 };
+            const s = bestShot();
+            if (s) return { a: s.a + (Math.random() - 0.5) * 2 * L.err * Math.PI / 180, pw: s.pw };
+            // no clean pot: hit the nearest legal ball softly
+            const c = cue();
+            const legal = balls.filter((b) => !b.in && b.n && legalTarget(turn, b.n)).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y));
+            const clear = legal.find((b) => pathClear(c.x, c.y, b.x, b.y, [c, b])) || legal[0];
+            if (!clear) return { a: Math.random() * 7, pw: 0.4 };
+            return { a: Math.atan2(clear.y - c.y, clear.x - c.x) + (Math.random() - 0.5) * 0.02, pw: 0.35 + Math.random() * 0.2 };
+        }
+
+        // ---------- aiming helpers ----------
+        function traceAim(a) {
+            // first ball the cue ball would hit
+            const c = cue(), dx = Math.cos(a), dy = Math.sin(a);
+            let best = null, bt = 1e9;
+            for (const b of balls) {
+                if (b.in || b === c) continue;
+                const fx2 = b.x - c.x, fy2 = b.y - c.y, t = fx2 * dx + fy2 * dy;
+                if (t <= 0) continue;
+                const d2 = fx2 * fx2 + fy2 * fy2 - t * t, r2 = 4 * R * R;
+                if (d2 > r2) continue;
+                const th = t - Math.sqrt(r2 - d2);
+                if (th < bt) { bt = th; best = b; }
+            }
+            // rails
+            let tw = 1e9;
+            if (dx > 0) tw = Math.min(tw, (X0 + TW - R - c.x) / dx); if (dx < 0) tw = Math.min(tw, (X0 + R - c.x) / dx);
+            if (dy > 0) tw = Math.min(tw, (Y0 + TH - R - c.y) / dy); if (dy < 0) tw = Math.min(tw, (Y0 + R - c.y) / dy);
+            if (best && bt < tw) return { x: c.x + dx * bt, y: c.y + dy * bt, ball: best };
+            return { x: c.x + dx * tw, y: c.y + dy * tw, ball: null };
+        }
+
+        // ---------- update ----------
+        const game = Kit.loop((dt) => {
+            if (msg && (msg.t -= dt) <= 0) msg = null;
+            if (cueAnim > 0) cueAnim -= dt;
+            fx.update(dt);
+            if (state === "play" || (state === "over" && moving)) {
+                if (moving) {
+                    const n = 10;
+                    for (let i = 0; i < n; i++) step(dt / n);
+                    if (balls.every((b) => b.in || (b.vx === 0 && b.vy === 0))) { if (state === "play") endShot(); else moving = false; }
+                } else if (players[turn].cpu && state === "play") {
+                    aiT += dt;
+                    const L = LV[cfg.diff] || LV.medium;
+                    if (!aiPlan && aiT > 0.35) { aiPlan = aiThink(); aim = aiPlan.a; }
+                    if (aiPlan) {
+                        const t = aiT - 0.35;
+                        power = Math.min(aiPlan.pw, t / L.think * aiPlan.pw);
+                        if (t > L.think + 0.25) { const p = aiPlan; aiPlan = null; shoot(p.a, p.pw); }
+                    }
+                } else {
+                    // keyboard aiming
+                    const k = Kit.keys;
+                    if (k.has("left")) aim -= dt * (k.has("fine") ? 0.12 : 1.2);
+                    if (k.has("right")) aim += dt * (k.has("fine") ? 0.12 : 1.2);
+                    if (k.has("power") && !inHand) power = Math.min(1, power + dt * 0.8);
+                    if (inHand && (k.has("left") || k.has("right") || k.has("up") || k.has("down"))) {
+                        const c = cue(), sp = 160 * dt;
+                        const nx = c.x + ((k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0)) * sp, ny = c.y + ((k.has("down") ? 1 : 0) - (k.has("up") ? 1 : 0)) * sp;
+                        placeAt(nx, ny);
+                    }
+                }
+            }
+            draw();
+        });
+        function placeAt(x, y) {
+            const c = cue();
+            x = Math.max(X0 + R + 1, Math.min((kitchen ? X0 + TW * 0.25 : X0 + TW - R - 1), x));
+            y = Math.max(Y0 + R + 1, Math.min(Y0 + TH - R - 1, y));
+            if (!overlaps(x, y)) { c.x = x; c.y = y; }
+        }
+
+        // ---------- drawing ----------
+        function drawTable() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            // wooden frame
+            const g = ctx.createLinearGradient(0, Y0 - 40, 0, Y0 + TH + 40); g.addColorStop(0, "#6b3b1c"); g.addColorStop(1, "#3d200e");
+            ctx.fillStyle = g; Kit.rr(ctx, X0 - 38, Y0 - 38, TW + 76, TH + 76, 22); ctx.fill();
+            ctx.fillStyle = "#0f6b3a"; Kit.rr(ctx, X0 - 16, Y0 - 16, TW + 32, TH + 32, 8); ctx.fill();
+            const fg = ctx.createRadialGradient(X0 + TW / 2, CY, 40, X0 + TW / 2, CY, TW * 0.6); fg.addColorStop(0, "#1c9a55"); fg.addColorStop(1, "#11793f");
+            ctx.fillStyle = fg; ctx.fillRect(X0, Y0, TW, TH);
+            // diamonds
+            ctx.fillStyle = "#e9d9b5";
+            for (let i = 1; i < 8; i++) if (i !== 4) { const x = X0 + TW * i / 8; ctx.beginPath(); ctx.arc(x, Y0 - 27, 2.5, 0, 7); ctx.arc(x, Y0 + TH + 27, 2.5, 0, 7); ctx.fill(); }
+            for (let i = 1; i < 4; i++) { const y = Y0 + TH * i / 4; ctx.beginPath(); ctx.arc(X0 - 27, y, 2.5, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(X0 + TW + 27, y, 2.5, 0, 7); ctx.fill(); }
+            // head string + spot
+            ctx.strokeStyle = "#ffffff22"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X0 + TW * 0.25, Y0); ctx.lineTo(X0 + TW * 0.25, Y0 + TH); ctx.stroke();
+            ctx.fillStyle = "#ffffff33"; ctx.beginPath(); ctx.arc(X0 + TW * 0.72, CY, 2.5, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffffff14"; ctx.font = "800 46px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("NOAM", X0 + TW / 2, CY);
+            for (const p of POCKETS) { ctx.fillStyle = "#050505"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 1, 0, 7); ctx.fill(); }
+        }
+        function drawBall(b, x = b.x, y = b.y, r = R) {
+            ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.arc(x + 2, y + 3, r, 0, 7); ctx.fill();
+            const col = COLORS[b.n];
+            if (b.n >= 9) {
+                ctx.fillStyle = "#f6f2e7"; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+                ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip(); ctx.fillStyle = col; ctx.fillRect(x - r, y - r * 0.55, r * 2, r * 1.1); ctx.restore();
+            } else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+            if (b.n) {
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, r * 0.48, 0, 7); ctx.fill();
+                ctx.fillStyle = "#111"; ctx.font = `800 ${Math.round(r * 0.75)}px Inter, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.n, x, y + 0.5);
+            }
+            const sh = ctx.createRadialGradient(x - r * 0.4, y - r * 0.45, 0, x, y, r); sh.addColorStop(0, "#ffffffaa"); sh.addColorStop(0.35, "#ffffff00"); sh.addColorStop(1, "#00000040");
+            ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+        }
+        function drawHUD() {
+            const pan = (i, x, align) => {
+                const p = players[i], g = groups[i], on = turn === i && state === "play";
+                ctx.fillStyle = on ? "#2a2f6a" : "#151833"; Kit.rr(ctx, x, 6, 300, 46, 12); ctx.fill();
+                if (on) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 2; Kit.rr(ctx, x, 6, 300, 46, 12); ctx.stroke(); }
+                Kit.text(ctx, (p.cpu ? "🤖 " : "🧑 ") + p.name, x + 14, 20, 14, "#fff", "left");
+                if (g) {
+                    const set = balls.filter((b) => b.n && groupOf(b.n) === g).sort((a, b) => a.n - b.n);
+                    set.forEach((b, k) => { if (b.in) { ctx.fillStyle = "#2a3060"; ctx.beginPath(); ctx.arc(x + 22 + k * 22, 38, 6.5, 0, 7); ctx.fill(); } else drawBall(b, x + 22 + k * 22, 38, 7); });
+                    if (left(g) === 0) drawBall({ n: 8 }, x + 22 + 7 * 22 + 10, 38, 7);
+                } else Kit.text(ctx, T("Open table", "שולחן פתוח"), x + 14, 38, 12, "#9aa0c8", "left");
+            };
+            pan(0, 20, "left"); pan(1, W - 320, "right");
+            if (msg) {
+                ctx.fillStyle = "#0b0d1ae0"; ctx.font = "800 16px Inter, sans-serif"; const t = Kit.tr ? Kit.tr(msg.text) : msg.text; const w = ctx.measureText(t).width + 40;
+                Kit.rr(ctx, W / 2 - w / 2, H - 44, w, 34, 10); ctx.fill(); Kit.text(ctx, msg.text, W / 2, H - 27, 16, "#ffc94d", "center");
+            }
+        }
+        function drawAim() {
+            if (moving || state !== "play") return;
+            const c = cue();
+            const human = !players[turn].cpu;
+            if (inHand && human) {
+                ctx.strokeStyle = "#ffffff88"; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(c.x, c.y, R + 6, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+                if (kitchen) { ctx.fillStyle = "#ffffff0c"; ctx.fillRect(X0, Y0, TW * 0.25, TH); }
+                Kit.text(ctx, isTouch ? T("Drag the cue ball, then tap ✓", "גררו את הלבן ולחצו ✓") : T("Click to place the cue ball", "לחצו כדי לשים את הלבן"), c.x, c.y - 26, 12, "#fff", "center");
+                if (isTouch) drawPlaceBtn();
+                return;
+            }
+            const tr = traceAim(aim);
+            if (human || cfg.diff === "easy") {
+                ctx.strokeStyle = "#ffffffaa"; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+                ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(tr.x, tr.y); ctx.stroke(); ctx.setLineDash([]);
+                ctx.strokeStyle = "#ffffffcc"; ctx.beginPath(); ctx.arc(tr.x, tr.y, R, 0, 7); ctx.stroke();
+                if (tr.ball) {
+                    const nx = tr.ball.x - tr.x, ny = tr.ball.y - tr.y, d = Math.hypot(nx, ny) || 1;
+                    const legal = legalTarget(turn, tr.ball.n);
+                    ctx.strokeStyle = legal ? "#2ee6a0" : "#ff4d8d"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(tr.ball.x, tr.ball.y); ctx.lineTo(tr.ball.x + nx / d * 70, tr.ball.y + ny / d * 70); ctx.stroke();
+                    if (!legal) { ctx.beginPath(); ctx.moveTo(tr.x - 6, tr.y - 6); ctx.lineTo(tr.x + 6, tr.y + 6); ctx.moveTo(tr.x + 6, tr.y - 6); ctx.lineTo(tr.x - 6, tr.y + 6); ctx.stroke(); }
+                }
+            }
+            // cue stick
+            const back = 18 + power * 90 + (cueAnim > 0 ? -cueAnim * 200 : 0), dx = Math.cos(aim), dy = Math.sin(aim);
+            const sx = c.x - dx * (R + back), sy = c.y - dy * (R + back), ex = sx - dx * 330, ey = sy - dy * 330;
+            const cg = ctx.createLinearGradient(sx, sy, ex, ey); cg.addColorStop(0, "#f1e3c0"); cg.addColorStop(0.03, "#3c7bd8"); cg.addColorStop(0.06, "#e8cf99"); cg.addColorStop(0.7, "#a8692e"); cg.addColorStop(1, "#2a1606");
+            ctx.strokeStyle = cg; ctx.lineCap = "round"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.lineCap = "butt";
+            // power bar
+            if (human) {
+                const bx = W - 34, by = Y0, bh = TH;
+                ctx.fillStyle = "#151833"; Kit.rr(ctx, bx, by, 18, bh, 9); ctx.fill();
+                const pg = ctx.createLinearGradient(0, by + bh, 0, by); pg.addColorStop(0, "#2ee6a0"); pg.addColorStop(0.6, "#ffc94d"); pg.addColorStop(1, "#ff4d8d");
+                ctx.fillStyle = pg; Kit.rr(ctx, bx + 2, by + 2 + (bh - 4) * (1 - power), 14, (bh - 4) * power, 7); ctx.fill();
+                Kit.text(ctx, "⚡", bx + 9, by - 14, 15, "#fff", "center");
+            }
+        }
+        function drawPlaceBtn() { ctx.fillStyle = "#2ee6a0"; Kit.rr(ctx, W - 92, H - 50, 76, 38, 12); ctx.fill(); Kit.text(ctx, "✓", W - 54, H - 31, 22, "#0b0d1a", "center"); }
+        function draw() {
+            drawTable();
+            if (balls) {
+                balls.filter((b) => !b.in).forEach((b) => drawBall(b));
+                if (players) { drawAim(); drawHUD(); }
+            }
+            fx.draw(ctx);
+        }
+
+        // ---------- input ----------
+        const isTouch = matchMedia("(hover: none)").matches;
+        const onTable = (pt) => pt.x > X0 - 30 && pt.x < X0 + TW + 30 && pt.y > Y0 - 30 && pt.y < Y0 + TH + 30;
+        const myTurn = () => state === "play" && !moving && players && !players[turn].cpu;
+        let touchPower = null;
+        cv.addEventListener("pointermove", (e) => {
+            const pt = Kit.point(cv, e); hover = pt;
+            if (!myTurn()) return;
+            if (inHand) { if (e.pointerType === "mouse" || e.buttons) placeAt(pt.x, pt.y); return; }
+            if (touchPower) { power = Math.max(0, Math.min(1, (pt.y - touchPower.y0) / (TH * 0.8))); return; }
+            if (drag) { // pulling back sets power
+                const dx = pt.x - drag.x, dy = pt.y - drag.y, along = -(dx * Math.cos(aim) + dy * Math.sin(aim));
+                power = Math.max(0, Math.min(1, along / 220)); return;
+            }
+            if (e.pointerType === "mouse" || e.buttons) aim = Math.atan2(pt.y - cue().y, pt.x - cue().x);
+        });
+        cv.addEventListener("pointerdown", (e) => {
+            const pt = Kit.point(cv, e);
+            if (!myTurn()) return;
+            cv.setPointerCapture(e.pointerId);
+            if (inHand) {
+                if (isTouch && pt.x > W - 92 && pt.y > H - 50) { inHand = false; return; }
+                placeAt(pt.x, pt.y); if (e.pointerType === "mouse") inHand = false; return;
+            }
+            if (pt.x > W - 50) { touchPower = { y0: Y0 }; power = Math.max(0, Math.min(1, (pt.y - Y0) / (TH * 0.8))); return; }
+            if (e.pointerType === "mouse") { aim = Math.atan2(pt.y - cue().y, pt.x - cue().x); drag = { x: pt.x, y: pt.y }; power = 0; }
+            else aim = Math.atan2(pt.y - cue().y, pt.x - cue().x);
+        });
+        const up = () => {
+            if (!myTurn()) { drag = null; touchPower = null; return; }
+            if ((drag || touchPower) && power > 0.03) shoot(aim, power);
+            else if (drag || touchPower) power = 0;
+            drag = null; touchPower = null;
+        };
+        cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", () => { drag = null; touchPower = null; power = 0; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "+left", ArrowRight: "+right", ArrowUp: "+up", ArrowDown: "+down", KeyA: "+left", KeyD: "+right", ShiftLeft: "fine", ShiftRight: "fine", Space: "power", Enter: "enter" },
+            (a) => { if (a === "enter" && state !== "play") newGame(); if (a === "power" && myTurn() && inHand) inHand = false; },
+            (a) => { if (a === "power" && myTurn() && !inHand && power > 0.03) shoot(aim, power); });
+
+        // ---------- menu ----------
+        function menuUI() {
+            const seg = (key, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${key}" data-v="${v}" class="${cfg[key] === v ? "active" : ""}">${l}</button>`).join("")}</div>`;
+            $("menu").innerHTML = `${seg("mode", [["cpu", "🤖 vs Computer"], ["two", "👥 2 players"]])}${cfg.mode === "cpu" ? `<h4>Difficulty</h4>${seg("diff", [["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]])}` : ""}`;
+            $("menu").querySelectorAll("[data-set]").forEach((b) => (b.onclick = () => { cfg[b.dataset.set] = b.dataset.v; saveCfg(); menuUI(); }));
+        }
+        menuUI();
+        $("startBtn").onclick = newGame;
+        $("againBtn").onclick = newGame;
+        const mb = document.createElement("button"); mb.className = "btn ghost"; mb.textContent = T("☰ Menu", "☰ תפריט"); mb.style.marginLeft = "8px";
+        $("againBtn").after(mb); mb.onclick = () => { Kit.hide("over"); state = "menu"; menuUI(); Kit.show("start"); };
+        rack();
+        game.start();
+        if (window.__test) window.__test.pool = {
+            get s() { return { state, turn, groups, balls, moving, inHand, winner, players, power, aim }; },
+            newGame, shoot, bestShot, cfg, aiThink, setTurn(t) { turn = t; },
+            run(n) { for (let i = 0; i < n; i++) { const m = 10; for (let k = 0; k < m; k++) step(1 / 60 / m); if (balls.every((b) => b.in || (b.vx === 0 && b.vy === 0))) { if (moving && state === "play") endShot(); moving = false; return i; } } return n; }
+        };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Noam Pool</h2><p>Eight-ball pool on a full table. Break the rack, claim solids or stripes, pot all seven of your balls and then sink the black 8-ball to win. Play against the computer on easy, medium or hard, or pass the mouse to a friend for a two-player game. A guide line shows where the white ball will hit and which way the object ball will go, and fouls give your opponent the ball in hand.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse</td><td>Aim, then hold the button and pull back for power</td></tr><tr><td>Phone</td><td>Drag to aim, pull down the ⚡ bar to shoot</td></tr><tr><td>Arrow keys</td><td>Aim (hold Shift to aim slowly)</td></tr><tr><td>Hold Space</td><td>Power, let go to shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The first ball you hit must be one of yours. Hitting the wrong ball first is a foul.</li><li>Gentle shots are easier to control than hard ones.</li><li>A green line means you're aiming at your own ball. Red means it's a foul.</li><li>Don't pot the 8-ball until all your other balls are down, or you lose!</li><li>With the ball in hand, put the white ball where you have an easy shot.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Noam Pool</h3><p>Eight-ball is a game of planning. Before every shot, look for the easiest ball to pot, but also think about where the white ball will stop. A shot that pots a ball and leaves the white ball stuck behind the 8-ball can cost you the game, so softer, controlled shots usually beat big hits.</p><p>Use the guide line. The dotted line shows where the white ball travels, the circle shows where it touches the first ball, and the short coloured line shows the direction that ball will roll. If the short line points at a pocket, you're lined up. If it's red, you're about to hit the wrong ball and give away a foul.</p><p>When there's no easy pot, play safe: hit one of your balls gently so the white ball ends up somewhere awkward for your opponent. And remember the ball-in-hand rule: if the other player fouls, you can put the white ball anywhere, so pick a spot with a straight shot.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play Easy. The computer misses a lot, and you can learn how the guide line works.</li><li><b>Getting good:</b> Move up to Medium. Start thinking one shot ahead and play safe when there's no clean pot.</li><li><b>Expert:</b> On Hard the computer rarely misses. Plan your whole run of balls before you start, and leave the 8-ball near a pocket.</li></ul><h3>Did you know?</h3><p>Modern pool tables come from billiards, which started as an outdoor lawn game a bit like croquet. When it moved indoors onto tables, the green cloth was chosen to look like grass.</p><h3>Questions players ask</h3><h4>What happens if I pot the white ball?</h4><p>That's a scratch, which is a foul. Your opponent gets the ball in hand and can put the white ball anywhere on the table.</p><h4>How are solids and stripes decided?</h4><p>The table is open until someone pots a ball after the break. That player takes that group, and the other player gets the other group.</p><h4>When can I pot the 8-ball?</h4><p>Only after all seven of your balls are down. Pot it earlier, or scratch while potting it, and you lose.</p><h4>Can I play with a friend?</h4><p>Yes. Choose 2 players on the start screen and take turns on the same computer or phone.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

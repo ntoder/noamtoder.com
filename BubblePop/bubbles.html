@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic bubble shooter. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Bubble Pop · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Bubble <span>Pop</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="540" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Bubble Pop</h2>
+                <p id="startText">Aim with the mouse (or drag on a phone) and let go to shoot.<br>Match 3 or more bubbles of the same color to pop them. Bubbles that are left hanging fall for bonus points.<br>Bounce shots off the walls. Miss too often and the ceiling drops. 💣 bombs blast everything nearby and ★ rainbow bubbles match any color.<br><small>Keyboard: ⬅ ➡ aim · Space shoot · ⬇ swap bubble</small></p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Aim for the bubbles holding up a big cluster. When they pop, everything hanging below falls and you score double.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Bubble Pop — aim, bounce, match 3 or more
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "bubblesBest";
+        const BR = 18, COLS = 15, ROWH = BR * Math.sqrt(3), TOPY = BR + 6, LAUNCH = { x: W / 2, y: H - 70 }, DEAD = H - 150, SPEED = 980;
+        const PAL = ["#ff4d6d", "#ffc94d", "#2ee6a0", "#4da3ff", "#b07cff", "#ff8a3d", "#ffffff"];
+        const he = () => document.documentElement.lang === "he";
+        const T = (en, hb) => (he() ? hb : en);
+        let floats = [], grid, offset, shot, cur, next, aim = -Math.PI / 2, score, level, shotsLeft, state = "ready", fx = Kit.particles(), falling = [], pops = [], combo = 0, msg = null, hold = null, mouse = null, shake = 0, specialIn;
+        Kit.stat("best", Kit.best(BEST));
+
+        // grid helpers: row r, col c. Odd rows (counting with offset) shift right by half a bubble
+        const rowShift = (r) => ((r + offset) % 2 ? BR : 0);
+        const colsIn = (r) => ((r + offset) % 2 ? COLS - 1 : COLS);
+        const cellXY = (r, c) => ({ x: BR + c * BR * 2 + rowShift(r), y: TOPY + r * ROWH });
+        function nbrs(r, c) {
+            const odd = (r + offset) % 2;
+            const d = odd ? [[0, -1], [0, 1], [-1, 0], [-1, 1], [1, 0], [1, 1]] : [[0, -1], [0, 1], [-1, -1], [-1, 0], [1, -1], [1, 0]];
+            return d.map(([dr, dc]) => [r + dr, c + dc]).filter(([rr, cc]) => rr >= 0 && rr < grid.length && cc >= 0 && cc < colsIn(rr));
+        }
+        const get = (r, c) => (grid[r] ? grid[r][c] : null);
+        function colorsInPlay() { const s = new Set(); grid.forEach((row) => row.forEach((b) => b && b.k === "c" && s.add(b.c))); return [...s]; }
+        function nColors() { return Math.min(6, 3 + Math.floor((level - 1) / 2)); }
+        function randomBubble(fromBoard) {
+            specialIn--;
+            if (specialIn <= 0) { specialIn = Kit.randi(14, 22); return { k: Math.random() < 0.5 ? "bomb" : "rainbow", c: 6 }; }
+            const live = fromBoard ? colorsInPlay() : [];
+            const pool = live.length ? live : Array.from({ length: nColors() }, (_, i) => i);
+            return { k: "c", c: Kit.pick(pool) };
+        }
+        function newLevel() {
+            offset = 0; grid = [];
+            const rows = Math.min(9, 4 + level);
+            for (let r = 0; r < rows; r++) { const row = []; for (let c = 0; c < colsIn(r); c++) row.push({ k: "c", c: Kit.randi(0, nColors() - 1) }); grid.push(row); }
+            for (let r = rows; r < 22; r++) grid.push(new Array(colsIn(r)).fill(null));
+            shotsLeft = Math.max(4, 7 - Math.floor(level / 2));
+            cur = randomBubble(true); next = randomBubble(true);
+            msg = { text: `${T("Level", "שלב")} ${level}`, t: 1.4 };
+            Kit.stat("level", level);
+        }
+        function start() {
+            score = 0; level = 1; specialIn = Kit.randi(14, 22); falling = []; pops = []; shot = null; combo = 0;
+            newLevel(); state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+        }
+        function pushRow() {
+            // the whole ceiling drops by one row
+            offset = (offset + 1) % 2;
+            const row = []; const n = colsIn(0);
+            for (let c = 0; c < n; c++) row.push({ k: "c", c: Kit.pick(colorsInPlay().length ? colorsInPlay() : [0, 1, 2]) });
+            grid.unshift(row); grid.pop();
+            // re-fit rows whose length changed
+            for (let r = 0; r < grid.length; r++) { const n2 = colsIn(r); while (grid[r].length > n2) grid[r].pop(); while (grid[r].length < n2) grid[r].push(null); }
+            shake = 0.25; beep(90, 0.15, "sawtooth", 0.04);
+            checkDead();
+        }
+        function checkDead() {
+            for (let r = 0; r < grid.length; r++) if (grid[r].some(Boolean) && cellXY(r, 0).y + BR > DEAD) return gameOver();
+        }
+
+        // ---------- shooting ----------
+        function fire() {
+            if (state !== "play" || shot) return;
+            const a = Math.max(-Math.PI + 0.12, Math.min(-0.12, aim));
+            shot = { x: LAUNCH.x, y: LAUNCH.y, vx: Math.cos(a) * SPEED, vy: Math.sin(a) * SPEED, b: cur };
+            cur = next; next = randomBubble(true);
+            beep(520, 0.06, "triangle", 0.05, 200);
+        }
+        function stepShot(dt) {
+            const n = 6;
+            for (let i = 0; i < n && shot; i++) {
+                shot.x += shot.vx * dt / n; shot.y += shot.vy * dt / n;
+                if (shot.x < BR) { shot.x = BR; shot.vx = Math.abs(shot.vx); beep(300, 0.02, "sine", 0.02); }
+                if (shot.x > W - BR) { shot.x = W - BR; shot.vx = -Math.abs(shot.vx); beep(300, 0.02, "sine", 0.02); }
+                if (shot.y < TOPY) return land();
+                for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[r].length; c++) {
+                    if (!grid[r][c]) continue;
+                    const p = cellXY(r, c);
+                    if (Math.hypot(p.x - shot.x, p.y - shot.y) < BR * 1.75) return land();
+                }
+            }
+        }
+        function land() {
+            // closest empty cell that touches something (or the ceiling)
+            let best = null, bd = 1e9;
+            for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[r].length; c++) {
+                if (grid[r][c]) continue;
+                const p = cellXY(r, c), d = Math.hypot(p.x - shot.x, p.y - shot.y);
+                if (d > BR * 2.6) continue;
+                if (r !== 0 && !nbrs(r, c).some(([rr, cc]) => get(rr, cc))) continue;
+                if (d < bd) { bd = d; best = [r, c]; }
+            }
+            const b = shot.b; shot = null;
+            if (!best) { checkDead(); return; }
+            const [r, c] = best;
+            grid[r][c] = { ...b };
+            beep(200, 0.04, "sine", 0.04);
+            resolve(r, c);
+        }
+        function resolve(r, c) {
+            const b = grid[r][c];
+            let popped = [];
+            if (b.k === "bomb") {
+                const p0 = cellXY(r, c);
+                for (let rr = 0; rr < grid.length; rr++) for (let cc = 0; cc < grid[rr].length; cc++) if (grid[rr][cc] && Math.hypot(cellXY(rr, cc).x - p0.x, cellXY(rr, cc).y - p0.y) < BR * 4.3) popped.push([rr, cc]);
+                shake = 0.4; beep(80, 0.35, "sawtooth", 0.07, -40);
+            } else {
+                // rainbow takes the colour of its most common neighbour
+                if (b.k === "rainbow") {
+                    const cnt = {}; nbrs(r, c).forEach(([rr, cc]) => { const o = get(rr, cc); if (o && o.k === "c") cnt[o.c] = (cnt[o.c] || 0) + 1; });
+                    const pick = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0];
+                    b.k = "c"; b.c = pick == null ? 0 : +pick;
+                }
+                const seen = new Set([r + "," + c]), stack = [[r, c]];
+                while (stack.length) {
+                    const [rr, cc] = stack.pop(); popped.push([rr, cc]);
+                    for (const [nr, nc] of nbrs(rr, cc)) { const k = nr + "," + nc, o = get(nr, nc); if (!seen.has(k) && o && o.k === "c" && o.c === b.c) { seen.add(k); stack.push([nr, nc]); } }
+                }
+                if (popped.length < 3) popped = [];
+            }
+            if (popped.length) {
+                combo++;
+                popped.forEach(([rr, cc], i) => { const o = grid[rr][cc]; const p = cellXY(rr, cc); pops.push({ x: p.x, y: p.y, c: o.c, t: i * 0.03 }); grid[rr][cc] = null; });
+                const dropped = dropFloating();
+                const pts = popped.length * 10 * Math.min(combo, 5) + dropped * 25 * Math.min(combo, 5);
+                add(pts, cellXY(r, c));
+                tune([660, 880, 1100].slice(0, Math.min(3, combo)), 0.05, "triangle", 0.05);
+                if (dropped) msg = { text: `${dropped} ${T("dropped!", "נפלו!")} +${dropped * 25 * Math.min(combo, 5)}`, t: 1.2 };
+            } else {
+                combo = 0;
+                shotsLeft--;
+                if (shotsLeft <= 0) { pushRow(); shotsLeft = Math.max(4, 7 - Math.floor(level / 2)); }
+            }
+            checkDead();
+            if (state === "play" && !grid.some((row) => row.some(Boolean))) {
+                add(500 + level * 100, { x: W / 2, y: H / 2 });
+                level++; tune([523, 659, 784, 1047], 0.1, "square", 0.05);
+                setTimeout(() => { if (state === "play") newLevel(); }, 900);
+            }
+            // keep the next bubbles to colours that still exist
+            const live = colorsInPlay();
+            if (live.length) { if (cur.k === "c" && !live.includes(cur.c)) cur.c = Kit.pick(live); if (next.k === "c" && !live.includes(next.c)) next.c = Kit.pick(live); }
+        }
+        function dropFloating() {
+            const keep = new Set(), stack = [];
+            for (let c = 0; c < grid[0].length; c++) if (grid[0][c]) { keep.add("0," + c); stack.push([0, c]); }
+            while (stack.length) { const [r, c] = stack.pop(); for (const [nr, nc] of nbrs(r, c)) { const k = nr + "," + nc; if (!keep.has(k) && get(nr, nc)) { keep.add(k); stack.push([nr, nc]); } } }
+            let n = 0;
+            for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[r].length; c++) if (grid[r][c] && !keep.has(r + "," + c)) {
+                const p = cellXY(r, c); falling.push({ x: p.x, y: p.y, vx: Kit.rand(-60, 60), vy: Kit.rand(-120, 0), b: grid[r][c] }); grid[r][c] = null; n++;
+            }
+            return n;
+        }
+        function add(pts, p) {
+            score += pts; Kit.stat("score", score);
+            floats.push({ x: p.x, y: p.y, t: 1, text: "+" + pts });
+            fx.burst(p.x, p.y, "#ffc94d", 10, 2);
+        }
+        function gameOver() {
+            if (state !== "play") return;
+            state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${T("Score", "ניקוד")}: <b>${score}</b> · ${T("Level", "שלב")} ${level}<br>${T("best", "שיא")} ${best}`;
+            tune([392, 330, 262], 0.15, "triangle", 0.06);
+            setTimeout(() => Kit.show("over"), 500);
+        }
+
+        // ---------- drawing ----------
+        function bubble(x, y, b, r = BR) {
+            if (b.k === "bomb") {
+                ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 7); ctx.fill();
+                ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 4, y - r + 3); ctx.quadraticCurveTo(x + 10, y - r - 4, x + 14, y - r); ctx.stroke();
+                ctx.fillStyle = "#ff8a3d"; ctx.beginPath(); ctx.arc(x + 14, y - r, 3 + Math.sin(performance.now() / 80), 0, 7); ctx.fill();
+                Kit.text(ctx, "💣", x, y + 1, r * 0.9, "#fff", "center");
+                return;
+            }
+            let col = PAL[b.c];
+            if (b.k === "rainbow") { const g = ctx.createConicGradient ? ctx.createConicGradient(performance.now() / 600, x, y) : null; if (g) { PAL.slice(0, 6).forEach((cc, i) => g.addColorStop(i / 6, cc)); g.addColorStop(1, PAL[0]); col = g; } }
+            ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 7); ctx.fill();
+            const sh = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, 1, x, y, r); sh.addColorStop(0, "#ffffffcc"); sh.addColorStop(0.3, "#ffffff22"); sh.addColorStop(1, "#00000033");
+            ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, 7); ctx.fill();
+            if (b.k === "rainbow") Kit.text(ctx, "★", x, y + 1, r * 0.9, "#fff", "center");
+        }
+        function aimPath() {
+            const a = Math.max(-Math.PI + 0.12, Math.min(-0.12, aim));
+            let x = LAUNCH.x, y = LAUNCH.y, vx = Math.cos(a), vy = Math.sin(a);
+            const pts = [[x, y]];
+            for (let i = 0; i < 700; i++) {
+                x += vx * 4; y += vy * 4;
+                if (x < BR) { x = BR; vx = -vx; pts.push([x, y]); }
+                if (x > W - BR) { x = W - BR; vx = -vx; pts.push([x, y]); }
+                if (y < TOPY) break;
+                let hit = false;
+                for (let r = 0; r < grid.length && !hit; r++) for (let c = 0; c < grid[r].length; c++) if (grid[r][c]) { const p = cellXY(r, c); if (Math.hypot(p.x - x, p.y - y) < BR * 1.75) { hit = true; break; } }
+                if (hit) break;
+            }
+            pts.push([x, y]);
+            return pts;
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a1440"); g.addColorStop(1, "#0b0d1a");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-4, 4) * shake, Kit.rand(-4, 4) * shake);
+            if (grid) {
+                // danger line
+                ctx.strokeStyle = "#ff4d6d55"; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.moveTo(0, DEAD); ctx.lineTo(W, DEAD); ctx.stroke(); ctx.setLineDash([]);
+                for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[r].length; c++) if (grid[r][c]) { const p = cellXY(r, c); bubble(p.x, p.y, grid[r][c]); }
+                for (const f of falling) bubble(f.x, f.y, f.b);
+                for (const p of pops) if (p.t <= 0) { ctx.globalAlpha = Math.max(0, 1 + p.t * 4); ctx.strokeStyle = PAL[p.c] || "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, BR * (1 - p.t * 3), 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+                if (state === "play" && !shot) {
+                    const pts = aimPath();
+                    ctx.fillStyle = "#ffffffaa";
+                    for (let i = 0; i < pts.length - 1; i++) {
+                        const [x1, y1] = pts[i], [x2, y2] = pts[i + 1], d = Math.hypot(x2 - x1, y2 - y1);
+                        for (let s = 0; s < d; s += 16) { const t = s / d; ctx.beginPath(); ctx.arc(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, 2.2, 0, 7); ctx.fill(); }
+                    }
+                }
+                if (shot) bubble(shot.x, shot.y, shot.b);
+                // launcher
+                ctx.fillStyle = "#151833"; Kit.rr(ctx, 0, H - 120, W, 120, 0); ctx.fill();
+                ctx.save(); ctx.translate(LAUNCH.x, LAUNCH.y); ctx.rotate(Math.max(-Math.PI + 0.12, Math.min(-0.12, aim)) + Math.PI / 2);
+                ctx.fillStyle = "#7c5cff"; Kit.rr(ctx, -9, -52, 18, 44, 6); ctx.fill(); ctx.restore();
+                ctx.fillStyle = "#2a2f6a"; ctx.beginPath(); ctx.arc(LAUNCH.x, LAUNCH.y, BR + 9, 0, 7); ctx.fill();
+                if (cur) bubble(LAUNCH.x, LAUNCH.y, cur);
+                if (next) { Kit.text(ctx, T("Next", "הבא"), LAUNCH.x - 120, H - 92, 12, "#9aa0c8", "center"); bubble(LAUNCH.x - 120, H - 62, next, BR * 0.8); }
+                Kit.text(ctx, `${T("Shots until the ceiling drops", "יריות עד שהתקרה יורדת")}: ${shotsLeft}`, LAUNCH.x + 150, H - 74, 12, "#9aa0c8", "center");
+                for (let i = 0; i < Math.max(4, 7 - Math.floor(level / 2)); i++) { ctx.fillStyle = i < shotsLeft ? "#ffc94d" : "#2a3060"; ctx.beginPath(); ctx.arc(LAUNCH.x + 110 + i * 14, H - 52, 5, 0, 7); ctx.fill(); }
+                if (isTouch) { ctx.fillStyle = "#2a2f6a"; Kit.rr(ctx, 14, H - 54, 64, 40, 10); ctx.fill(); Kit.text(ctx, "⇄", 46, H - 34, 20, "#fff", "center"); }
+            }
+            ctx.restore();
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.max(0, f.t); Kit.text(ctx, f.text, f.x, f.y - (1 - f.t) * 40, 18, "#ffc94d", "center"); ctx.globalAlpha = 1; }
+            if (msg) { ctx.globalAlpha = Math.min(1, msg.t * 2); Kit.text(ctx, msg.text, W / 2, H / 2, 26, "#ffc94d", "center", "'Press Start 2P', monospace", 400); ctx.globalAlpha = 1; }
+        }
+        const game = Kit.loop((dt) => {
+            if (shake > 0) shake -= dt;
+            if (msg && (msg.t -= dt) <= 0) msg = null;
+            if (state === "play") {
+                if (shot) stepShot(dt);
+                if (Kit.keys.has("left")) aim -= dt * 1.6;
+                if (Kit.keys.has("right")) aim += dt * 1.6;
+                aim = Math.max(-Math.PI + 0.12, Math.min(-0.12, aim));
+            }
+            for (const f of falling) { f.vy += 1400 * dt; f.x += f.vx * dt; f.y += f.vy * dt; }
+            falling = falling.filter((f) => f.y < H + 40);
+            for (const p of pops) p.t -= dt;
+            pops = pops.filter((p) => p.t > -0.3);
+            fx.update(dt);
+            for (const f of floats) f.t -= dt; floats = floats.filter((f) => f.t > 0);
+            draw();
+        });
+
+        // ---------- input ----------
+        const isTouch = matchMedia("(hover: none)").matches;
+        function swap() { if (state !== "play" || shot) return; [cur, next] = [next, cur]; beep(700, 0.04, "sine", 0.03); }
+        cv.addEventListener("pointermove", (e) => { const p = Kit.point(cv, e); if (e.pointerType === "mouse" || hold) aim = Math.atan2(Math.min(p.y, LAUNCH.y - 10) - LAUNCH.y, p.x - LAUNCH.x); });
+        cv.addEventListener("pointerdown", (e) => {
+            const p = Kit.point(cv, e);
+            if (state !== "play") return;
+            if (p.y > H - 60 && p.x < 90) return swap();
+            if (Math.hypot(p.x - LAUNCH.x + 120, p.y - (H - 62)) < BR + 6) return swap();
+            hold = true; cv.setPointerCapture(e.pointerId);
+            aim = Math.atan2(Math.min(p.y, LAUNCH.y - 10) - LAUNCH.y, p.x - LAUNCH.x);
+        });
+        cv.addEventListener("pointerup", () => { if (hold) { hold = null; fire(); } });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Space: "fire", ArrowUp: "fire", KeyS: "swap", ArrowDown: "swap", Enter: "enter" }, (a) => {
+            if (a === "enter" && state !== "play") return start();
+            if (a === "fire") fire(); if (a === "swap") swap();
+        });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        game.start();
+        if (window.__test) window.__test.bubbles = { get s() { return { state, score, level, grid, shot, cur, next, shotsLeft }; }, fire, setAim(a) { aim = a; }, start, step(n) { for (let i = 0; i < n; i++) if (shot) stepShot(1 / 60); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Bubble Pop</h2><p>A classic bubble shooter. Aim the launcher, bounce shots off the walls, and match three or more bubbles of the same color to pop them. Any bubbles left hanging with nothing holding them up fall off for bonus points. Every few misses the whole ceiling drops a row, so plan your shots before the bubbles reach the line. Clear the board to move to the next level, where more colors join in.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse</td><td>Aim, click to shoot</td></tr><tr><td>Phone</td><td>Drag to aim, let go to shoot</td></tr><tr><td>⬅ ➡</td><td>Aim</td></tr><tr><td>Space</td><td>Shoot</td></tr><tr><td>⬇ or tap the next bubble</td><td>Swap your bubble</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Aim at the bubbles holding up a cluster. Everything below them falls for bonus points.</li><li>Bounce off the walls to reach bubbles behind others.</li><li>Pops in a row build a combo, which multiplies your points.</li><li>Save a bomb or rainbow bubble for when the bubbles get close to the line.</li><li>Swap to the next bubble if it fits better.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Bubble Pop</h3><p>The biggest scores in Bubble Pop don't come from popping, they come from dropping. When you pop a group that's holding other bubbles up, everything hanging underneath falls and is worth more than a pop. Before each shot, look for a small group near the top that connects to a big cluster below it.</p><p>Use the walls. The dotted aim line shows one or two bounces, which lets you reach gaps the launcher can't hit straight. A bank shot that slides into a narrow gap is often the only way to reach a buried colour.</p><p>Keep an eye on the yellow dots next to the launcher: each miss uses one, and when they run out the ceiling drops a row. If a shot won't pop anything, place the bubble where it builds a group for later instead of throwing it away. Swap to your next bubble (Down arrow, or tap it) when it fits better.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Early levels use only three or four colours. Practise bouncing shots off the walls.</li><li><b>Getting good:</b> From level 3, more colours join in. Look for shots that drop whole clusters.</li><li><b>Expert:</b> Later levels start with more rows and fewer shots before the ceiling drops. Save bombs and rainbow bubbles for emergencies.</li></ul><h3>Did you know?</h3><p>Bubble-shooting puzzle games became popular in arcades in the mid-1990s, and the idea of bouncing shots off the side walls has been part of the genre ever since.</p><h3>Questions players ask</h3><h4>Why did the ceiling move down?</h4><p>Every shot that doesn't pop anything uses up one of the yellow dots. When they're all gone, the ceiling drops a row.</p><h4>What do the special bubbles do?</h4><p>A bomb blasts every bubble around where it lands. A rainbow bubble matches any colour.</p><h4>How do I lose?</h4><p>If the bubbles cross the dashed line near the bottom, the game ends.</p><h4>Can I change which bubble I shoot?</h4><p>Yes. Press the Down arrow or tap the 'Next' bubble to swap them.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

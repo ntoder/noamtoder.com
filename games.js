@@ -56,6 +56,9 @@ export const GAMES = {
     fishing:      { name: "Fishing Frenzy", path: "/Fishing/fishing",          img: "/thumbs/fishing.png",      tags: ["arcade"],           desc: "Cast your line and catch the rarest fish.", isNew: true },
     maze:         { name: "Maze Escape",   path: "/Maze/maze",                 img: "/thumbs/maze.png",         tags: ["puzzle", "brain"],  desc: "Find the exit of a brand new maze every time.", isNew: true },
     football:     { name: "Noam Football", path: "/Football/football",     img: "/thumbs/football.png",     tags: ["sports"],           desc: "11-a-side matches, a knockout cup and penalties.", isNew: true },
+    pool:         { name: "Noam Pool", path: "/Pool/pool",             img: "/thumbs/pool.png",         tags: ["sports", "strategy"], desc: "8-ball pool vs the computer or a friend.", isNew: true },
+    bubblepop:    { name: "Bubble Pop", path: "/BubblePop/bubbles",   img: "/thumbs/bubbles.png",      tags: ["puzzle", "arcade"],   desc: "Aim, bounce and pop 3 or more bubbles.", isNew: true },
+    blockfit:     { name: "Block Fit", path: "/BlockFit/blockfit",    img: "/thumbs/blockfit.png",     tags: ["puzzle"],             desc: "Drag blocks, clear rows and columns.", isNew: true },
 };
 
 // Games that only count plays (no score)
