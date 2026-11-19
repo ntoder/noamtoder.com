@@ -7,7 +7,7 @@ const HOME = "https://noamtoder.com/";
 const SITE_HOSTS = ["noamtoder.com", "www.noamtoder.com"];
 // Pages that must open inside the app so signing in works (Google / Firebase popups)
 const AUTH_HOSTS = ["gamehub-fb2ed.firebaseapp.com", "accounts.google.com", "apis.google.com"];
-const RELEASES_API = "https://api.github.com/repos/ntoder/gamehub/releases/latest";
+const RELEASES_API = "https://api.github.com/repos/ntoder/noamtoder.com/releases/latest";
 const DOWNLOAD_PAGE = "https://noamtoder.com/app";
 
 app.setName("Noam's Game Hub");
