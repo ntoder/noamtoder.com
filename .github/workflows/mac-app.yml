@@ -39,11 +39,15 @@ jobs:
             hdiutil create -volname "Noam's Game Hub" -srcfolder "dmg-$arch" -ov -format UDZO "NoamsGameHub-mac-$arch.dmg"
           done
           ls -la *.zip *.dmg
+      - name: Read version
+        id: ver
+        run: echo "v=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('app-v{0}', github.run_number) }}
-          name: "Noam's Game Hub for Mac ${{ github.ref_name }}"
+          tag_name: app-v${{ steps.ver.outputs.v }}
+          target_commitish: ${{ github.sha }}
+          name: "Noam's Game Hub for Mac ${{ steps.ver.outputs.v }}"
           make_latest: true
           body: |
             Noam's Game Hub as a Mac app. Download page: https://noamtoder.com/app

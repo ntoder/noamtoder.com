@@ -5,8 +5,9 @@ offline screen, stays signed in).
 
 ## Releasing a new version
 1. Change `"version"` in `package.json` (e.g. 1.0.1).
-2. Commit, then push a tag that matches: `git tag app-v1.0.1 && git push origin app-v1.0.1`.
-3. GitHub Actions builds it on a Mac and publishes a release with:
+2. Commit and push.
+3. On GitHub: **Actions → Build Mac app → Run workflow** (or push a tag like `app-v1.0.1`).
+4. GitHub Actions builds it on a Mac and publishes a release with:
    - `NoamsGameHub-mac-arm64.dmg` / `.zip` (Apple Silicon — M1, M2, M3, M4…)
    - `NoamsGameHub-mac-x64.dmg` / `.zip` (older Intel Macs)
 
