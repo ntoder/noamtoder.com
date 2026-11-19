@@ -54,7 +54,8 @@ export const GAMES = {
     pixelpaint:   { name: "Pixel Paint",   path: "/PixelPaint/pixelpaint",     img: "/thumbs/pixelpaint.png",   tags: ["creative"],         desc: "Draw pixel art and save your picture.", isNew: true },
     tankbattle:   { name: "Tank Battle",   path: "/TankBattle/tankbattle",     img: "/thumbs/tankbattle.png",   tags: ["arcade"],           desc: "Defend your base from waves of enemy tanks.", isNew: true },
     fishing:      { name: "Fishing Frenzy", path: "/Fishing/fishing",          img: "/thumbs/fishing.png",      tags: ["arcade"],           desc: "Cast your line and catch the rarest fish.", isNew: true },
-    maze:         { name: "Maze Escape",   path: "/Maze/maze",                 img: "/thumbs/maze.png",         tags: ["puzzle", "brain"],  desc: "Find the exit of a brand new maze every time.", isNew: true }
+    maze:         { name: "Maze Escape",   path: "/Maze/maze",                 img: "/thumbs/maze.png",         tags: ["puzzle", "brain"],  desc: "Find the exit of a brand new maze every time.", isNew: true },
+    football:     { name: "Noam Football", path: "/Football/football",     img: "/thumbs/football.png",     tags: ["sports"],           desc: "11-a-side matches, a knockout cup and penalties.", isNew: true },
 };
 
 // Games that only count plays (no score)

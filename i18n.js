@@ -26,7 +26,7 @@ const NAMES = {
     "Motor Racing": "מרוץ אופנועים", "Soccer": "כדורגל",
     "Penalty Shootout": "דו־קרב פנדלים", "Keepy Uppy": "ג'אגלינג", "Mini Golf": "מיני גולף", "Bowling": "באולינג", "Tennis": "טניס",
     "Air Hockey": "הוקי אוויר", "Hoop Shot": "קליעה לסל", "Gem Swap": "החלפת יהלומים", "Sky Climber": "מטפס השמיים", "Fruit Slash": "חיתוך פירות",
-    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
+    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Noam Football": "הכדורגל של נועם", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
     "Castle Defense": "הגנת הטירה", "Word Guess": "נחשו את המילה", "Word Search": "תפזורת", "Flag Quiz": "חידון דגלים", "Rhythm Tap": "קצב",
     "Idle Bakery": "המאפייה", "Pixel Paint": "ציור פיקסלים", "Tank Battle": "קרב טנקים", "Fishing Frenzy": "טירוף דיג", "Maze Escape": "בריחה מהמבוך"
 };
