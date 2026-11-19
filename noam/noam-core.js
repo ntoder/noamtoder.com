@@ -73,19 +73,27 @@
   }
 
   // ---------------------------------------------------------------- merging other computers' data (matches the app)
+  // same rules as the app (src/sync.js): match by id or folder + address, newest edit wins, the same link in two
+  // folders stays two bookmarks, deletions carry the bookmark's id
   function mergeBookmarks(remote) {
     let changed = false;
-    const tomb = new Map((S.bookmarkTombstones || []).map((t) => [t.url, t.t]));
-    for (const t of remote.bookmarkTombstones || []) if ((tomb.get(t.url) || 0) < t.t) { tomb.set(t.url, t.t); changed = true; }
-    const byUrl = new Map(S.bookmarks.map((b) => [b.url, b]));
+    const tkey = (t) => (t.id ? 'id:' + t.id : 'url:' + t.url);
+    const tomb = new Map((S.bookmarkTombstones || []).map((t) => [tkey(t), t]));
+    for (const t of remote.bookmarkTombstones || []) { const k = tkey(t); if (!tomb.has(k) || tomb.get(k).t < t.t) { tomb.set(k, t); changed = true; } }
+    const fu = (b) => (b.folder || '') + '\n' + b.url; const when = (b) => b.updated || b.added || 0;
+    const all = S.bookmarks.map((b) => ({ ...b }));
+    const byId = new Map(all.filter((b) => b.id).map((b) => [b.id, b])); const byFu = new Map(all.map((b) => [fu(b), b]));
     for (const rb of remote.bookmarks || []) {
-      const lb = byUrl.get(rb.url);
-      if (!lb) { byUrl.set(rb.url, { ...rb }); changed = true; }
-      else if ((rb.updated || rb.added || 0) > (lb.updated || lb.added || 0)) { Object.assign(lb, { title: rb.title, folder: rb.folder, updated: rb.updated }); changed = true; }
+      const lb = (rb.id && byId.get(rb.id)) || byFu.get(fu(rb));
+      if (!lb) { const n = { ...rb }; all.push(n); if (n.id) byId.set(n.id, n); byFu.set(fu(n), n); changed = true; continue; }
+      if (when(rb) > when(lb) && (rb.title !== lb.title || (rb.folder || '') !== (lb.folder || '') || rb.url !== lb.url)) { byFu.delete(fu(lb)); Object.assign(lb, { title: rb.title, folder: rb.folder || '', url: rb.url, updated: rb.updated }); byFu.set(fu(lb), lb); changed = true; }
     }
-    const merged = [...byUrl.values()].filter((b) => !(tomb.get(b.url) > (b.updated || b.added || 0)));
+    const dead = (b) => { const a = b.id && tomb.get('id:' + b.id), u = tomb.get('url:' + b.url); return Math.max(a ? a.t : 0, u ? u.t : 0) > when(b); };
+    const seen = new Set(); const merged = all.filter((b) => { if (dead(b)) return false; const k = b.id || fu(b); if (seen.has(k)) return false; seen.add(k); return true; });
     if (merged.length !== S.bookmarks.length) changed = true;
-    if (changed) { S.bookmarks = merged; S.bookmarkTombstones = [...tomb].map(([url, t]) => ({ url, t })).slice(-2000); }
+    if (changed) { S.bookmarks = merged; S.bookmarkTombstones = [...tomb.values()].sort((a, b) => a.t - b.t).slice(-2000); }
+    // keep the newest bar/folder order so it passes on to your other computers
+    const L = remote.bookmarkLayout; if (L && L.t > ((S.bookmarkLayout || {}).t || 0)) { S.bookmarkLayout = L; changed = true; }
     return changed;
   }
   function mergeExtras(remote) {
@@ -145,7 +153,7 @@
   const snapshot = () => ({
     device: { id: S.deviceId, name: browserName(), platform: 'web' }, written: Date.now(),
     settingsUpdated: 0, settings: {}, // the web never changes your browser settings
-    bookmarks: S.bookmarks, bookmarkTombstones: S.bookmarkTombstones, extras: S.extras, chat: chatSnapshot() || undefined,
+    bookmarks: S.bookmarks, bookmarkTombstones: S.bookmarkTombstones, bookmarkLayout: S.bookmarkLayout || undefined, extras: S.extras, chat: chatSnapshot() || undefined,
   });
 
   // ---------------------------------------------------------------- syncing
@@ -283,13 +291,12 @@
       if (S.bookmarks.some((b) => b.url === url)) throw new Error('That page is already in your bookmarks.');
       let favicon; try { favicon = 'https://www.google.com/s2/favicons?sz=64&domain=' + new URL(url).hostname; } catch {}
       S.bookmarks.push({ id: uid(), url, title: String(title || url).slice(0, 300), favicon, added: now(), folder: folder || '' });
-      S.bookmarkTombstones = (S.bookmarkTombstones || []).filter((t) => t.url !== url);
       persist(); touch(); emit('data', { bookmarks: true });
     },
     removeBookmark(id) {
       const b = S.bookmarks.find((x) => x.id === id); if (!b) return;
       S.bookmarks = S.bookmarks.filter((x) => x.id !== id);
-      if (!S.bookmarks.some((x) => x.url === b.url)) S.bookmarkTombstones = [...(S.bookmarkTombstones || []).filter((t) => t.url !== b.url), { url: b.url, t: now() }];
+      S.bookmarkTombstones = [...(S.bookmarkTombstones || []), { url: b.url, id: b.id, t: now() }].slice(-2000);
       persist(); touch(); emit('data', { bookmarks: true });
     },
     todos: () => (S ? S.extras.todos : []),
