@@ -330,6 +330,71 @@ const TEXT = {
 };
 
 // ---------- Game info sections (about / controls / tips) ----------
+
+// ---- Mac app page (/app) ----
+Object.assign(BLOCKS, {
+ "Game Hub for Mac": "המשחקים של נועם <span>למק</span>",
+ "Noam's Game Hub for Mac": "המשחקים של נועם – אפליקציה למק",
+ "All the games in their own app, with a Dock icon. No browser tabs, no searching for the website. Open it and play.": "כל המשחקים באפליקציה משלהם, עם אייקון ב־Dock. בלי לשוניות בדפדפן ובלי לחפש את האתר. פותחים ומשחקים.",
+ "What you get": "מה מקבלים",
+ "Download": "הורדה",
+ "How to install": "איך מתקינים",
+ "No download? Use Safari": "בלי הורדה? דרך Safari",
+ "Questions": "שאלות",
+ "Not sure which one? Click the Apple menu → About This Mac. If it says Chip: Apple M…, get the first one. If it says Processor: Intel, get the second one.": "לא בטוחים איזה? לחצו על <b>תפריט Apple ← אודות המק הזה</b> (About This Mac). אם כתוב <b>Chip: Apple M…</b>, הורידו את הראשון. אם כתוב <b>Processor: Intel</b>, הורידו את השני.",
+ "Open the file you downloaded.": "פתחו את הקובץ שהורדתם.",
+ "Drag Noam's Game Hub onto the Applications folder.": "גררו את <b>Noam's Game Hub</b> לתיקייה <b>Applications</b> (יישומים).",
+ "Open Terminal (press Command-Space and type Terminal).": "פתחו את Terminal (לחצו Command-רווח והקלידו <b>Terminal</b>).",
+ "Paste xattr -cr \"/Applications/Noam's Game Hub.app\" and press Enter.": "הדביקו <code>xattr -cr \"/Applications/Noam's Game Hub.app\"</code> ולחצו Enter.",
+ "Open the Game Hub from Applications or Launchpad. You only do this once.": "פתחו את האפליקציה מ־Applications או מ־Launchpad. עושים את זה רק פעם אחת.",
+ "Open the app. When the Mac says it can't check it, click Done.": "פתחו את האפליקציה. כשהמק אומר שהוא לא יכול לבדוק אותה, לחצו <b>סיום</b> (Done).",
+ "Go to System Settings → Privacy & Security, scroll down and click Open Anyway.": "היכנסו ל<b>הגדרות המערכת ← פרטיות ואבטחה</b>, גללו למטה ולחצו <b>פתח בכל זאת</b> (Open Anyway).",
+ "The Mac shows this warning for any app that hasn't paid Apple for a signing certificate. It doesn't mean something is wrong.": "המק מציג את האזהרה הזאת לכל אפליקציה שלא שילמה לאפל על תעודת חתימה. זה לא אומר שמשהו לא בסדר.",
+ "On macOS Sonoma or newer, open noamtoder.com in Safari, then click File → Add to Dock. You get a Game Hub icon in your Dock with no download at all.": "ב־macOS Sonoma ומעלה, פתחו את <a class=\"inl\" href=\"/\">noamtoder.com</a> ב־Safari ולחצו <b>קובץ ← הוסף ל־Dock</b> (File → Add to Dock). מקבלים אייקון של המשחקים ב־Dock בלי להוריד כלום.",
+ "Is the app free?": "האפליקציה בחינם?",
+ "Yes. The app is free, and so are the games. Premium works in the app the same as on the website.": "כן. האפליקציה בחינם, וגם המשחקים. פרימיום עובד באפליקציה בדיוק כמו באתר.",
+ "Do I need the internet?": "צריך אינטרנט?",
+ "Yes. The app loads the games from noamtoder.com, so new games show up right away.": "כן. האפליקציה טוענת את המשחקים מ־noamtoder.com, ולכן משחקים חדשים מופיעים מיד.",
+ "Is there a Windows or iPhone app?": "יש אפליקציה לווינדוס או לאייפון?",
+ "Not yet. On an iPhone or iPad, open the site in Safari, tap Share, then Add to Home Screen.": "עדיין לא. באייפון או באייפד, פתחו את האתר ב־Safari, לחצו על שיתוף ואז <b>הוסף למסך הבית</b>.",
+ "Who makes it?": "מי עשה את זה?",
+ "Noam, who makes all the games on Noam's Game Hub. Questions or ideas: noam@noamtoder.com.": "נועם, שעושה את כל המשחקים ב<a class=\"inl\" href=\"/\">המשחקים של נועם</a>. שאלות או רעיונות: <a class=\"inl\" href=\"mailto:noam@noamtoder.com\">noam@noamtoder.com</a>."
+});
+Object.assign(TEXT, {
+ "🍎 Mac app": "🍎 אפליקציה למק",
+ "Mac app": "אפליקציה למק",
+ "Download": "הורדה",
+ "Is the app free?": "האפליקציה בחינם?",
+ "Do I need the internet?": "צריך אינטרנט?",
+ "Is there a Windows or iPhone app?": "יש אפליקציה לווינדוס או לאייפון?",
+ "Who makes it?": "מי עשה את זה?",
+ "← Game Hub": "→ המשחקים",
+ "✅ You're already using the Mac app. Updates show up by themselves.": "✅ אתם כבר באפליקציה למק. עדכונים מגיעים לבד.",
+ "⬇ Download for Mac": "⬇ הורדה למק",
+ "Free · Apple chip (M1, M2, M3, M4…)": "בחינם · שבב Apple ‏(M1, M2, M3, M4…)",
+ "Free · Intel Mac": "בחינם · מק עם Intel",
+ "Older Intel Mac? Get this one →": "מק ישן עם Intel? הורידו את זה ←",
+ "Mac with Apple chip? Get this one →": "מק עם שבב Apple? הורידו את זה ←",
+ "Always the newest version": "תמיד הגרסה הכי חדשה",
+ "🎮 Every game": "🎮 כל המשחקים",
+ "All the games, Arcade World, the Level Maker, the Game Studio and your Hub pet, the same as on the website.": "כל המשחקים, עולם הארקייד, יוצר השלבים, סטודיו המשחקים וחיית המחמד שלכם, בדיוק כמו באתר.",
+ "🚀 Opens in one click": "🚀 נפתח בלחיצה אחת",
+ "The Game Hub sits in your Dock and Launchpad like any other app.": "המשחקים יושבים ב־Dock וב־Launchpad כמו כל אפליקציה אחרת.",
+ "🏆 Your account": "🏆 החשבון שלכם",
+ "Sign in once and stay signed in. Your scores, trophies and pet are the same everywhere.": "מתחברים פעם אחת ונשארים מחוברים. הניקוד, הגביעים וחיית המחמד זהים בכל מקום.",
+ "🖥️ Full screen": "🖥️ מסך מלא",
+ "Press Control-Command-F to play full screen with nothing in the way.": "לחצו Control-Command-F כדי לשחק במסך מלא בלי שום הפרעה.",
+ "✨ Always up to date": "✨ תמיד מעודכן",
+ "New games show up in the app the moment they're on the website.": "משחקים חדשים מופיעים באפליקציה ברגע שהם עולים לאתר.",
+ "🪶 No extras": "🪶 בלי תוספות",
+ "No tracking added by the app. Links to other websites open in your normal browser.": "האפליקציה לא מוסיפה שום מעקב. קישורים לאתרים אחרים נפתחים בדפדפן הרגיל.",
+ "🍎 Mac with Apple chip (M1, M2, M3, M4…)": "🍎 מק עם שבב Apple ‏(M1, M2, M3, M4…)",
+ "🍎 Mac with Intel chip": "🍎 מק עם שבב Intel",
+ "1. Put it in Applications": "1. העבירו ל־Applications",
+ "2. Open it the first time": "2. פתיחה בפעם הראשונה",
+ "Or without Terminal": "או בלי Terminal",
+ "Privacy": "פרטיות"
+});
 const INFO = {
     "Noametry is the original game of the hub. Your square slides along a never-ending track full of spikes and blocks, and one well-timed jump is the difference between a new record and starting over. The track speeds up as your score climbs, so every run feels a little more intense than the last.":
         "נועמטרי הוא המשחק המקורי של האתר. הריבוע שלכם מחליק על מסלול אינסופי מלא קוצים ובלוקים, וקפיצה אחת בזמן הנכון היא ההבדל בין שיא חדש להתחלה מחדש. המסלול מאיץ ככל שהניקוד עולה, כך שכל ריצה מרגישה קצת יותר מותחת מהקודמת.",

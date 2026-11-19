@@ -573,6 +573,20 @@ async function showGameExtras() {
 
 // the Hub pet waves from the corner of the homepage
 if (location.pathname === "/" || location.pathname === "/index.html") domReady.then(() => import("./pet.js").then((m) => m.mountBuddy()).catch(() => {}));
+// Mac visitors (not already in the app): a small "get the Mac app" note on the homepage
+if ((location.pathname === "/" || location.pathname === "/index.html") && /Macintosh/.test(navigator.userAgent) && !/NoamGameHubApp/.test(navigator.userAgent) && navigator.maxTouchPoints < 2) {
+  domReady.then(() => {
+    try { if (localStorage.getItem("gh_macapp_hide") || !localStorage.getItem("gh_cookies")) return; } catch (e) { return; }
+    const he = document.documentElement.lang === "he";
+    const bar = document.createElement("div");
+    bar.className = "gh-macapp";
+    bar.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:900;display:flex;gap:10px;align-items:center;background:#1b1f3b;border:1px solid #3a3f73;color:#fff;border-radius:14px;padding:10px 12px 10px 14px;box-shadow:0 10px 30px #0008;font:600 14px/1.3 inherit;max-width:calc(100vw - 32px)";
+    bar.innerHTML = `<span style="font-size:22px">🍎</span><a href="/app" style="color:#fff;text-decoration:none">${he ? "יש עכשיו אפליקציה למק! <u>להורדה</u>" : "The Game Hub is now a Mac app! <u>Get it</u>"}</a><button aria-label="Close" style="background:none;border:0;color:#aab;font-size:18px;cursor:pointer;padding:0 4px">✕</button>`;
+    bar.querySelector("button").onclick = () => { bar.remove(); try { localStorage.setItem("gh_macapp_hide", "1"); } catch (e) {} };
+    bar.querySelector("a").addEventListener("click", () => { try { localStorage.setItem("gh_macapp_hide", "1"); } catch (e) {} });
+    setTimeout(() => document.body.appendChild(bar), 2500);
+  });
+}
 
 // ---------- Cookie notice ----------
 // Visitors in Europe/UK/Switzerland get Google's own consent message (set up in AdSense), so this
