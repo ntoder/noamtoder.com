@@ -47,8 +47,8 @@
             const tick = (t) => {
                 if (!on) return;
                 const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t;
-                step(dt, t);
                 id = requestAnimationFrame(tick);
+                try { step(dt, t); } catch (e) { if (!tick.err) { tick.err = 1; console.error("[game] " + (e && e.stack || e)); } }
             };
             return {
                 start() { if (on) return; on = true; last = 0; id = requestAnimationFrame(tick); },

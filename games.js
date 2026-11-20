@@ -67,6 +67,10 @@ export const GAMES = {
     reversi: { name: "Reversi", path: "/Reversi/reversi", img: "/thumbs/reversi.png", tags: ["puzzle", "brain"], desc: "Flip your opponent's discs and own the board.", isNew: true },
     dotsboxes: { name: "Dots and Boxes", path: "/DotsBoxes/dotsboxes", img: "/thumbs/dotsboxes.png", tags: ["puzzle", "brain"], desc: "Draw lines, close boxes and outsmart the computer.", isNew: true },
     fiveinarow: { name: "Five in a Row", path: "/FiveInARow/fiveinarow", img: "/thumbs/fiveinarow.png", tags: ["puzzle", "brain"], desc: "Line up five stones before the computer does.", isNew: true },
+    lightsout: { name: "Lights Out", path: "/LightsOut/lightsout", img: "/thumbs/lightsout.png", tags: ["puzzle", "brain"], desc: "Tap a light to flip it and its neighbors. Turn them all off!", isNew: true },
+    mancala: { name: "Mancala", path: "/Mancala/mancala", img: "/thumbs/mancala.png", tags: ["puzzle", "brain", "strategy"], desc: "Sow stones, capture, and fill your store.", isNew: true },
+    hanoi: { name: "Tower of Hanoi", path: "/Hanoi/hanoi", img: "/thumbs/hanoi.png", tags: ["puzzle", "brain"], desc: "Move the tower one disc at a time.", isNew: true },
+    slidepuzzle: { name: "Slide Puzzle", path: "/SlidePuzzle/slidepuzzle", img: "/thumbs/slidepuzzle.png", tags: ["puzzle", "brain"], desc: "Slide the numbered tiles back into order.", isNew: true },
 };
 
 // Games that only count plays (no score)

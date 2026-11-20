@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The famous sliding tile puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Slide Puzzle · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#menu{display:inline-flex;gap:4px;background:#11142b;border-radius:12px;padding:4px;margin-top:12px}#menu button{border:0;background:none;color:#cfd2f5;font:700 14px Inter,sans-serif;padding:7px 14px;border-radius:9px;cursor:pointer}#menu button.active{background:#7c5cff;color:#fff}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Slide <span>Puzzle</span></h1>
+        <div class="stats"><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="time">0:00</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Slide Puzzle</h2>
+                <p id="startText">The classic 15 puzzle! Slide the tiles into the empty space until the numbers are back in order, with the gap in the bottom right corner.<br>Pick a size:<div class="seg" id="menu"></div></p>
+                <button class="btn" id="startBtn">▶ Shuffle</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Puzzle Solved</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Solve the top row first, then the left column. The puzzle gets smaller every time you finish a line.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Slide Puzzle — slide the tiles back into order
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "slidepuzzleBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let n = 3, tiles, moves = 0, time = 0, state = "ready", anim = {}, size = 3, won = 0, pic = 0;
+        try { size = +localStorage.getItem("slideSize") || 3; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        const PICS = [["#ff4d6d", "#ffc94d"], ["#4da3ff", "#2ee6a0"], ["#b07cff", "#ff8a3d"], ["#2ee6c9", "#7c5cff"]];
+        function start() {
+            n = size; tiles = [...Array(n * n).keys()].map((k) => (k + 1) % (n * n));
+            // shuffle by random legal moves so it's always solvable
+            let e = n * n - 1, last = -1;
+            for (let k = 0; k < n * n * 40; k++) { const nb = neighbors(e).filter((x) => x !== last); const m = Kit.pick(nb); [tiles[e], tiles[m]] = [tiles[m], tiles[e]]; last = e; e = m; }
+            if (solved()) return start();
+            moves = 0; time = 0; won = 0; pic = Kit.randi(0, PICS.length - 1); state = "play"; Kit.stat("moves", 0); Kit.stat("time", "0:00"); Kit.hide("start"); Kit.hide("over");
+        }
+        function neighbors(i) { const r = Math.floor(i / n), c = i % n, out = []; if (r > 0) out.push(i - n); if (r < n - 1) out.push(i + n); if (c > 0) out.push(i - 1); if (c < n - 1) out.push(i + 1); return out; }
+        const solved = () => tiles.every((t, i) => t === (i + 1) % (n * n));
+        const S = () => 480 / n, OX = () => (W - 480) / 2, OY = 120;
+        function slide(i) {
+            if (state !== "play" || won) return;
+            const e = tiles.indexOf(0);
+            // allow sliding a whole row/column toward the gap
+            const r = Math.floor(i / n), c = i % n, er = Math.floor(e / n), ec = e % n;
+            if (r !== er && c !== ec) return;
+            const step = r === er ? (c < ec ? -1 : 1) : (r < er ? -n : n);
+            let cur = e;
+            while (cur !== i) { const nx = cur + step; anim[tiles[nx]] = { from: nx, t: 0 }; tiles[cur] = tiles[nx]; tiles[nx] = 0; cur = nx; moves++; }
+            Kit.stat("moves", moves); beep(500, 0.03, "sine", 0.03);
+            if (solved()) {
+                won = 1; const sc = Math.max(50, Math.round((n === 3 ? 600 : n === 4 ? 1500 : 3000) - moves * 3 - time * 2));
+                Kit.save(sc); const best = Kit.setBest(BEST, sc);
+                tune([523, 659, 784, 1047], 0.1, "square", 0.05);
+                setTimeout(() => { state = "over"; $("overText").innerHTML = `${T("Solved!", "נפתר!")} ${moves} ${T("moves", "מהלכים")} · ${fmt(time)}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 900);
+            }
+        }
+        const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!tiles) return;
+            Kit.text(ctx, T("Put the numbers back in order", "סדרו את המספרים בחזרה לפי הסדר"), W / 2, 50, 20, "#fff", "center");
+            Kit.text(ctx, T("Tip: tap any tile in the gap's row or column to slide them all", "טיפ: הקשה על אריח בשורה או בעמודה של החור מזיזה את כולם"), W / 2, 84, 13, "#9aa0c8", "center");
+            ctx.fillStyle = "#151833"; Kit.rr(ctx, OX() - 10, OY - 10, 500, 500, 16); ctx.fill();
+            const s = S(), [c1, c2] = PICS[pic];
+            tiles.forEach((t, i) => {
+                if (!t) return;
+                let x = OX() + (i % n) * s, y = OY + Math.floor(i / n) * s;
+                const a = anim[t]; if (a) { const fx = OX() + (a.from % n) * s, fy = OY + Math.floor(a.from / n) * s, k = Math.min(1, a.t); x = fx + (x - fx) * k; y = fy + (y - fy) * k; }
+                const home = t - 1, hr = Math.floor(home / n), hc = home % n;
+                const g = ctx.createLinearGradient(OX(), OY, OX() + 480, OY + 480); g.addColorStop(0, c1); g.addColorStop(1, c2);
+                ctx.save(); Kit.rr(ctx, x + 3, y + 3, s - 6, s - 6, 12); ctx.clip();
+                ctx.fillStyle = g; ctx.fillRect(x - hc * s, y - hr * s, 480, 480);
+                ctx.fillStyle = "#ffffff22"; ctx.fillRect(x, y, s, s * 0.35); ctx.restore();
+                const ok = t === (i + 1) % (n * n);
+                Kit.text(ctx, String(t), x + s / 2, y + s / 2, s * 0.38, ok ? "#ffffff" : "#0b0d1a", "center", "'Press Start 2P', monospace", 400);
+            });
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e), s = S(), c = Math.floor((p.x - OX()) / s), r = Math.floor((p.y - OY) / s); if (tiles && r >= 0 && r < n && c >= 0 && c < n) slide(r * n + c); });
+        Kit.onKeys({ ArrowUp: "u", ArrowDown: "d", ArrowLeft: "l", ArrowRight: "r", Enter: "enter" }, (a) => {
+            if (a === "enter" && state !== "play") return start();
+            if (state !== "play") return; const e = tiles.indexOf(0), r = Math.floor(e / n), c = e % n;
+            // arrow moves the tile next to the gap into it
+            if (a === "u" && r < n - 1) slide(e + n); if (a === "d" && r > 0) slide(e - n); if (a === "l" && c < n - 1) slide(e + 1); if (a === "r" && c > 0) slide(e - 1);
+        });
+        function menuUI() { const m = $("menu"); m.innerHTML = [3, 4, 5].map((k) => `<button data-n="${k}" class="${k === size ? "active" : ""}">${k}×${k}</button>`).join(""); m.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { size = +b.dataset.n; try { localStorage.setItem("slideSize", size); } catch (e) {} menuUI(); })); }
+        menuUI();
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { Kit.hide("over"); Kit.show("start"); };
+        Kit.loop((dt) => { for (const k in anim) { anim[k].t += dt * 9; if (anim[k].t >= 1) delete anim[k]; } if (state === "play" && !won) { time += dt; Kit.stat("time", fmt(time)); } draw(); }).start();
+        if (window.__test) window.__test.slide = { get s() { return { tiles, state }; }, slide, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Slide Puzzle</h2><p>The famous sliding tile puzzle. The numbered tiles are mixed up in a frame with one empty space, and you slide them around until they're back in order. Choose a 3 by 3 board for a quick game or 4 by 4 and 5 by 5 for a real challenge. Fewer moves and a faster time earn more points.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap a tile</td><td>Slide it (and any tiles between it and the gap)</td></tr><tr><td>Arrow keys</td><td>Slide a tile into the gap</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Finish the top row, then the left column, then repeat on the smaller puzzle.</li><li>The last two tiles of a row are placed together.</li><li>Tap a tile in the gap's row or column to move several at once.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Slide Puzzle</h3><p>The trick to sliding puzzles is to solve them in layers. First put the whole top row in place, then the left column. What's left is a smaller puzzle, which you solve the same way, until only a 2 by 2 corner remains.</p><p>The hardest part is the end of each row. You can't just slide the last tile in, because that would knock the others out. Instead, line up the last two tiles of the row underneath their spots, then rotate them both into place together.</p><p>Don't panic if you seem to undo your progress for a moment. Moving a finished tile out of the way and back is often the only way forward.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve the 3 by 3 puzzle.</li><li><b>Getting good:</b> Solve 4 by 4, the classic 15 puzzle.</li><li><b>Expert:</b> Beat 5 by 5 in under 300 moves.</li></ul><h3>Did you know?</h3><p>The 15 puzzle caused a worldwide craze in 1880. A famous prize was offered for solving an impossible version where two tiles were swapped, which can never be fixed by sliding.</p><h3>Questions players ask</h3><h4>Can every puzzle be solved?</h4><p>Yes, the tiles are shuffled by real slides, so it can always be undone.</p><h4>How is my score worked out?</h4><p>Bigger boards are worth more, minus points for every move and second.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

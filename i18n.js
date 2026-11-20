@@ -26,7 +26,7 @@ const NAMES = {
     "Motor Racing": "מרוץ אופנועים", "Soccer": "כדורגל",
     "Penalty Shootout": "דו־קרב פנדלים", "Keepy Uppy": "ג'אגלינג", "Mini Golf": "מיני גולף", "Bowling": "באולינג", "Tennis": "טניס",
     "Air Hockey": "הוקי אוויר", "Hoop Shot": "קליעה לסל", "Gem Swap": "החלפת יהלומים", "Sky Climber": "מטפס השמיים", "Fruit Slash": "חיתוך פירות",
-    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Noam Football": "הכדורגל של נועם", "Noam Pool": "הביליארד של נועם", "Bubble Pop": "פיצוץ בועות", "Block Fit": "בלוק פיט", "Fruit Merge": "מיזוג פירות", "Snake Arena": "זירת הנחשים", "Road Hopper": "קפצן הכביש", "Hill Rider": "רוכב הגבעות", /*ngn:fiveinarow*/"Five in a Row": "חמש ברצף", /*ngn:dotsboxes*/"Dots and Boxes": "נקודות וריבועים", /*ngn:reversi*/"Reversi": "רברסי", /*ngn:ballsort*/"Ball Sort": "מיון כדורים", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
+    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Noam Football": "הכדורגל של נועם", "Noam Pool": "הביליארד של נועם", "Bubble Pop": "פיצוץ בועות", "Block Fit": "בלוק פיט", "Fruit Merge": "מיזוג פירות", "Snake Arena": "זירת הנחשים", "Road Hopper": "קפצן הכביש", "Hill Rider": "רוכב הגבעות", /*ngn:slidepuzzle*/"Slide Puzzle": "פאזל הזזה", /*ngn:hanoi*/"Tower of Hanoi": "מגדלי האנוי", /*ngn:mancala*/"Mancala": "מנקלה", /*ngn:lightsout*/"Lights Out": "כיבוי אורות", /*ngn:fiveinarow*/"Five in a Row": "חמש ברצף", /*ngn:dotsboxes*/"Dots and Boxes": "נקודות וריבועים", /*ngn:reversi*/"Reversi": "רברסי", /*ngn:ballsort*/"Ball Sort": "מיון כדורים", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
     "Castle Defense": "הגנת הטירה", "Word Guess": "נחשו את המילה", "Word Search": "תפזורת", "Flag Quiz": "חידון דגלים", "Rhythm Tap": "קצב",
     "Idle Bakery": "המאפייה", "Pixel Paint": "ציור פיקסלים", "Tank Battle": "קרב טנקים", "Fishing Frenzy": "טירוף דיג", "Maze Escape": "בריחה מהמבוך"
 };
@@ -396,6 +396,10 @@ Object.assign(TEXT, {
  "Privacy": "פרטיות"
 });
 // ---- ng names ----
+/*ng:slidepuzzle*/Object.assign(TEXT, {"Slide Puzzle": "פאזל הזזה", "Slide the numbered tiles back into order.": "הזיזו את האריחים הממוספרים בחזרה למקום."});
+/*ng:hanoi*/Object.assign(TEXT, {"Tower of Hanoi": "מגדלי האנוי", "Move the tower one disc at a time.": "העבירו את המגדל דיסקית אחת בכל פעם."});
+/*ng:mancala*/Object.assign(TEXT, {"Mancala": "מנקלה", "Sow stones, capture, and fill your store.": "פזרו אבנים, לכדו ומלאו את המחסן שלכם."});
+/*ng:lightsout*/Object.assign(TEXT, {"Lights Out": "כיבוי אורות", "Tap a light to flip it and its neighbors. Turn them all off!": "הקישו על אור כדי להחליף אותו ואת שכניו. כבו את כולם!"});
 /*ng:fiveinarow*/Object.assign(TEXT, {"Five in a Row": "חמש ברצף", "Line up five stones before the computer does.": "סדרו חמש אבנים בשורה לפני המחשב."});
 /*ng:dotsboxes*/Object.assign(TEXT, {"Dots and Boxes": "נקודות וריבועים", "Draw lines, close boxes and outsmart the computer.": "ציירו קווים, סגרו ריבועים ותערימו על המחשב."});
 /*ng:reversi*/Object.assign(TEXT, {"Reversi": "רברסי", "Flip your opponent's discs and own the board.": "הפכו את הדסקיות של היריב ושלטו בלוח."});
