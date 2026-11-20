@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic eye-test puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Spot the Difference · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Spot the <span>Difference</span></h1>
+        <div class="stats"><div class="stat"><b id="round">1</b><small>Round</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Spot the Difference</h2>
+                <p id="startText">The two pictures look the same, but 5 things are different on the right side. Tap a difference on either picture to circle it.<br>Things might be missing, swapped, flipped, bigger, moved or a different colour. Wrong taps cost 3 seconds!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Scan the pictures in strips, top to bottom, comparing one small area at a time.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Spot the Difference — two painted scenes, find the 5 differences before time runs out
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "spotdiffBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const PW = 400, PH = 340, LX = 20, RX = W - 20 - PW, PY = 70;
+        const EMO = ["🌳", "🏠", "🚗", "🐶", "🐱", "🌻", "🎈", "⛵", "🐦", "🍎", "⭐", "🚲", "🐢", "🍄", "🦋", "☁️", "🐟", "🪁", "🧸", "🎁"];
+        let items, diffs, found, round, score, time, misses, state = "ready", marks = [], bg, wrongs = [];
+        Kit.stat("best", Kit.best(BEST));
+        function makeScene() {
+            bg = { sky: `hsl(${Kit.randi(180, 220)},70%,${Kit.randi(70, 85)}%)`, ground: `hsl(${Kit.randi(90, 130)},45%,${Kit.randi(45, 60)}%)`, sun: Math.random() < 0.6 };
+            items = []; const n = 14 + Math.min(8, round * 2);
+            for (let i = 0; i < n; i++) { let x, y, ok, tries = 0; do { x = Kit.rand(30, PW - 30); y = Kit.rand(40, PH - 30); ok = items.every((o) => Math.hypot(o.x - x, o.y - y) > 44); } while (!ok && ++tries < 50); items.push({ x, y, e: Kit.pick(EMO), s: Kit.randi(26, 40), r: Kit.rand(-0.3, 0.3), flip: false, hide: false, hue: 0 }); }
+            // differences
+            const kinds = ["swap", "hide", "flip", "big", "move", "tint"]; diffs = [];
+            const pool = [...items.keys()].sort(() => Math.random() - 0.5).slice(0, 5);
+            for (const i of pool) { const o = items[i], k = Kit.pick(kinds), b = { ...o }; if (k === "swap") { let e; do e = Kit.pick(EMO); while (e === o.e); b.e = e; } if (k === "hide") b.hide = true; if (k === "flip") b.flip = true; if (k === "big") b.s = o.s * 1.45; if (k === "move") b.y = o.y + (o.y > PH / 2 ? -22 : 22); if (k === "tint") b.hue = Kit.pick([90, 180, 270]); diffs.push({ i, b, x: o.x, y: o.y, r: Math.max(26, o.s * 0.9) }); }
+            found = new Set(); misses = 0; marks = []; wrongs = [];
+        }
+        function start() { round = 1; score = 0; state = "play"; time = 60; makeScene(); Kit.stat("round", 1); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function paintPanel(ox, right) {
+            ctx.save(); ctx.beginPath(); ctx.rect(ox, PY, PW, PH); ctx.clip();
+            ctx.fillStyle = bg.sky; ctx.fillRect(ox, PY, PW, PH); ctx.fillStyle = bg.ground; ctx.fillRect(ox, PY + PH * 0.55, PW, PH * 0.45);
+            if (bg.sun) { ctx.fillStyle = "#ffe14d"; ctx.beginPath(); ctx.arc(ox + PW - 50, PY + 45, 24, 0, 7); ctx.fill(); }
+            items.forEach((o, i) => { const d = right && diffs.find((q) => q.i === i), it = d ? d.b : o; if (it.hide) return; ctx.save(); ctx.translate(ox + it.x, PY + it.y); ctx.rotate(it.r); if (it.flip) ctx.scale(-1, 1); if (it.hue) ctx.filter = `hue-rotate(${it.hue}deg)`; ctx.font = `${it.s}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(it.e, 0, 0); ctx.restore(); });
+            ctx.restore(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(ox, PY, PW, PH);
+        }
+        function click(px, py) {
+            if (state !== "play") return; let x, y;
+            if (px >= LX && px <= LX + PW && py >= PY && py <= PY + PH) { x = px - LX; y = py - PY; } else if (px >= RX && px <= RX + PW && py >= PY && py <= PY + PH) { x = px - RX; y = py - PY; } else return;
+            const d = diffs.find((q, k) => !found.has(k) && Math.hypot(q.x - x, q.y - y) < q.r + 6 || (!found.has(k) && q.b.y !== q.y && Math.hypot(q.x - x, q.b.y - y) < q.r + 6));
+            if (d) { const k = diffs.indexOf(d); found.add(k); score += 100 + Math.round(time); Kit.stat("score", score); tune([784, 1047], 0.06, "square", 0.04); marks.push(d); if (found.size === diffs.length) { score += Math.round(time) * 5; Kit.stat("score", score); tune([523, 659, 784, 1047], 0.08, "square", 0.05); setTimeout(() => { if (state !== "play") return; round++; time = Math.max(30, 60 - round * 4); Kit.stat("round", round); makeScene(); }, 1400); } }
+            else { misses++; time = Math.max(0, time - 3); wrongs.push({ x, y, t: 0.8 }); beep(140, 0.15, "sawtooth", 0.04); }
+        }
+        function end() { state = "over"; Kit.save(Math.floor(score / 10)); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Time's up!", "הזמן נגמר!")}<br>${T("Round", "סיבוב")} ${round} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#1e2240"; ctx.fillRect(0, 0, W, H);
+            if (!items) return;
+            paintPanel(LX, false); paintPanel(RX, true);
+            for (const m of marks) for (const ox of [LX, RX]) { ctx.strokeStyle = "#ff3b4d"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(ox + m.x, PY + (m.b.y + m.y) / 2, m.r + Math.abs(m.b.y - m.y) / 2, 0, 7); ctx.stroke(); }
+            for (const w of wrongs) if (w.t > 0) for (const ox of [LX, RX]) Kit.text(ctx, "✗", ox + w.x, PY + w.y + 10, 30, `rgba(255,59,77,${w.t})`, "center");
+            Kit.text(ctx, `${T("Found", "נמצאו")} ${found.size}/5`, W / 2, 40, 22, "#ffc94d", "center");
+            ctx.fillStyle = "#ffffff22"; ctx.fillRect(LX, PY + PH + 20, W - 40, 12); ctx.fillStyle = time > 10 ? "#2ee6a0" : "#ff4d6d"; ctx.fillRect(LX, PY + PH + 20, ((W - 40) * time) / 60, 12);
+            Kit.text(ctx, `${Math.ceil(time)}s`, W - 20, 40, 18, "#fff", "right");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); click(p.x, p.y); });
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play" && found.size < 5) { time -= dt; if (time <= 0) end(); } wrongs.forEach((w) => (w.t -= dt)); draw(); }).start();
+        if (window.__test) window.__test.spot = { get s() { return { state, found: found && found.size, round }; }, start, cheat: () => diffs.forEach((d) => click(LX + d.x, PY + d.y)) };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Spot the Difference</h2><p>A classic eye-test puzzle. Two picture panels sit side by side, painted fresh every round. They look the same, but five things in the right picture are different: something is missing, swapped for something else, flipped, bigger, moved, or a different colour. Find all five to move to the next round, where the pictures get busier and the clock gets shorter. Every second left over becomes bonus points.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap or click</td><td>Mark a difference</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Compare one small area at a time.</li><li>Look for things that face the other way.</li><li>Guessing costs 3 seconds, so be sure.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Spot the Difference</h3><p>Spot the Difference is easier with a system. Instead of looking at the whole picture, compare small strips: the top row of both pictures, then the next, and so on. Your eyes notice changes much better in a small area.</p><p>Learn the six kinds of change: something missing, something swapped for a different object, something flipped to face the other way, something bigger, something moved up or down, and something in a different colour. When you know what to look for, they jump out.</p><p>Wrong taps cost three seconds, so don't tap randomly. And because leftover time becomes bonus points, finishing quickly really pays off.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear round 1.</li><li><b>Getting good:</b> Clear round 3.</li><li><b>Expert:</b> Score 4,000 points.</li></ul><h3>Did you know?</h3><p>Spot-the-difference puzzles work because of something called change blindness: our brains are surprisingly bad at noticing changes unless we're looking right at them.</p><h3>Questions players ask</h3><h4>Which side are the differences on?</h4><p>Tap either picture: the differences are between the two.</p><h4>What does a wrong tap do?</h4><p>It costs 3 seconds from the clock.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/TileMatch/tilematch">Tile Match</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
