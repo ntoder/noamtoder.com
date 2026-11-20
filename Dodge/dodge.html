@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A pure survival game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Dodge! · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Dod<span>ge!</span></h1>
+        <div class="stats"><div class="stat"><b id="time">0s</b><small>Time</small></div><div class="stat"><b id="best">-</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Dodge!</h2>
+                <p id="startText">Move the green dot with the arrow keys / WASD, or hold and drag. Don't get hit!<br>Pink lines flash before a laser fires. Press Space (or double-tap) to dash through danger. ⭐ blasts nearby balls away and 🛡️ gives a shield.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button><button data-k="dash">⚡</button></div>
+    <p class="hint">Stay away from the walls. Balls bounce off them, so the middle gives you the most room.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Dodge! — survive as long as you can while balls, lasers and homing stars fill the arena
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dodgeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let me, foes, lasers, coins, t, spawnT, laserT, shield, score, state = "ready", fx = Kit.particles(), target = null, dashT = 0, dashCd = 0;
+        Kit.stat("best", Kit.best(BEST) ? Kit.best(BEST) + "s" : "-");
+        function start() { me = { x: W / 2, y: H / 2 }; foes = []; lasers = []; coins = []; t = 0; spawnT = 0; laserT = 6; shield = 0; score = 0; dashT = 0; dashCd = 0; state = "play"; Kit.stat("time", "0s"); Kit.hide("start"); Kit.hide("over"); }
+        function spawn() {
+            const side = Kit.randi(0, 3), x = [0, W, Kit.rand(0, W), Kit.rand(0, W)][side], y = [Kit.rand(0, H), Kit.rand(0, H), 0, H][side];
+            const kind = t > 25 && Math.random() < 0.18 ? "seeker" : t > 12 && Math.random() < 0.25 ? "big" : "ball";
+            const a = Math.atan2(me.y - y + Kit.rand(-120, 120), me.x - x + Kit.rand(-120, 120)), sp = (kind === "big" ? 110 : 170) + t * 2.2;
+            foes.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: kind === "big" ? 26 : kind === "seeker" ? 10 : 11, kind, life: kind === "seeker" ? 7 : 99, bounces: kind === "ball" ? 2 : 1 });
+        }
+        function dash() { if (state !== "play" || dashCd > 0) return; dashT = 0.18; dashCd = 1.5; beep(700, 0.06, "sine", 0.03, 400); }
+        function update(dt) {
+            t += dt; Kit.stat("time", Math.floor(t) + "s");
+            const k = Kit.keys; let mx = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0), my = (k.has("down") ? 1 : 0) - (k.has("up") ? 1 : 0);
+            if (!mx && !my && target) { mx = target.x - me.x; my = target.y - me.y; if (Math.hypot(mx, my) < 4) mx = my = 0; }
+            const l = Math.hypot(mx, my); const sp = dashT > 0 ? 900 : 260; if (l) { me.x += (mx / l) * Math.min(sp * dt, target && !k.size ? l : 1e9); me.y += (my / l) * Math.min(sp * dt, target && !k.size ? l : 1e9); }
+            me.x = Math.max(10, Math.min(W - 10, me.x)); me.y = Math.max(10, Math.min(H - 10, me.y)); dashT -= dt; dashCd -= dt; if (shield > 0) shield -= dt;
+            spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = Math.max(0.18, 0.9 - t * 0.012); }
+            laserT -= dt; if (laserT <= 0 && t > 8) { laserT = Math.max(2.5, 7 - t * 0.05); const hor = Math.random() < 0.5; lasers.push({ hor, p: hor ? Kit.rand(40, H - 40) : Kit.rand(40, W - 40), t: 1.3, fire: 0 }); beep(900, 0.08, "square", 0.02); }
+            if (Math.random() < dt * 0.25 && coins.length < 2) coins.push({ x: Kit.rand(40, W - 40), y: Kit.rand(40, H - 40), k: Math.random() < 0.3 ? "shield" : "star", t: 6 });
+            for (const f of foes) {
+                if (f.kind === "seeker") { const a = Math.atan2(me.y - f.y, me.x - f.x), s = 150 + t; f.vx += (Math.cos(a) * s - f.vx) * dt * 1.5; f.vy += (Math.sin(a) * s - f.vy) * dt * 1.5; f.life -= dt; }
+                f.x += f.vx * dt; f.y += f.vy * dt;
+                if ((f.x < f.r && f.vx < 0) || (f.x > W - f.r && f.vx > 0)) { if (f.bounces-- > 0) f.vx *= -1; else f.dead = f.x < -40 || f.x > W + 40; }
+                if ((f.y < f.r && f.vy < 0) || (f.y > H - f.r && f.vy > 0)) { if (f.bounces-- > 0) f.vy *= -1; else f.dead = f.y < -40 || f.y > H + 40; }
+                if (f.x < -60 || f.x > W + 60 || f.y < -60 || f.y > H + 60 || f.life <= 0) f.dead = true;
+                if (!f.dead && Math.hypot(f.x - me.x, f.y - me.y) < f.r + 8 && dashT <= 0) { if (shield > 0) { f.dead = true; shield = 0; fx.burst(f.x, f.y, "#5cc8ff", 20, 3); beep(400, 0.1, "square", 0.04); } else return die(); }
+            }
+            foes = foes.filter((f) => !f.dead);
+            for (const L of lasers) { L.t -= dt; if (L.t <= 0 && !L.fire) { L.fire = 0.35; beep(120, 0.3, "sawtooth", 0.05); } if (L.fire > 0) { L.fire -= dt; const d = L.hor ? Math.abs(me.y - L.p) : Math.abs(me.x - L.p); if (d < 16 && dashT <= 0) { if (shield > 0) shield = 0; else return die(); } if (L.fire <= 0) L.done = true; } }
+            lasers = lasers.filter((L) => !L.done);
+            for (const c of coins) { c.t -= dt; if (Math.hypot(c.x - me.x, c.y - me.y) < 20) { c.t = 0; if (c.k === "shield") { shield = 6; tune([660, 990], 0.05, "triangle", 0.04); } else { score += 5; tune([1175, 1568], 0.04, "square", 0.03); for (const f of foes) if (Math.hypot(f.x - me.x, f.y - me.y) < 160) { f.dead = true; fx.burst(f.x, f.y, "#ffc94d", 8, 2); } } } }
+            coins = coins.filter((c) => c.t > 0);
+        }
+        function die() { state = "over"; fx.burst(me.x, me.y, "#2ee6a0", 40, 5); beep(80, 0.6, "sawtooth", 0.07); const s = Math.floor(t); Kit.save(s * 3 + score); const prev = +Kit.best(BEST) || 0; const best = Math.max(prev, s); localStorage.setItem(BEST, best); Kit.stat("best", best + "s"); setTimeout(() => { $("overText").innerHTML = `${T("You survived", "שרדתם")} <b>${s}s</b><br>${T("Best", "שיא")}: ${best}s`; Kit.show("over"); }, 700); }
+        function draw() {
+            ctx.fillStyle = "#0e0f22"; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#ffffff0a"; for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            if (!me) return;
+            for (const L of lasers) { ctx.fillStyle = L.fire > 0 ? "#ff3b7a" : `rgba(255,59,122,${0.15 + 0.15 * Math.sin(L.t * 30)})`; const w = L.fire > 0 ? 24 : 4; if (L.hor) ctx.fillRect(0, L.p - w / 2, W, w); else ctx.fillRect(L.p - w / 2, 0, w, H); }
+            for (const c of coins) { if (c.t < 1.5 && Math.floor(c.t * 8) % 2) continue; Kit.text(ctx, c.k === "shield" ? "🛡️" : "⭐", c.x, c.y + 9, 24, "#fff", "center"); }
+            for (const f of foes) { ctx.fillStyle = f.kind === "seeker" ? "#ff9a3c" : f.kind === "big" ? "#a64dff" : "#ff4d6d"; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill(); ctx.shadowBlur = 0; }
+            if (state === "play") { ctx.fillStyle = dashT > 0 ? "#fff" : "#2ee6a0"; ctx.shadowColor = "#2ee6a0"; ctx.shadowBlur = 16; ctx.beginPath(); ctx.arc(me.x, me.y, 9, 0, 7); ctx.fill(); ctx.shadowBlur = 0; if (shield > 0) { ctx.strokeStyle = "#5cc8ff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(me.x, me.y, 18, 0, 7); ctx.stroke(); } }
+            fx.draw(ctx);
+            Kit.text(ctx, `${Math.floor(t)}s`, W / 2, 40, 28, "#fff", "center", "'Press Start 2P', monospace", 400);
+            ctx.fillStyle = "#ffffff22"; ctx.fillRect(20, H - 24, 80, 8); ctx.fillStyle = "#5cc8ff"; ctx.fillRect(20, H - 24, 80 * Math.min(1, 1 - Math.max(0, dashCd) / 1.5), 8); Kit.text(ctx, T("Dash", "זינוק"), 110, H - 17, 12, "#ffffff99", "left");
+        }
+        cv.addEventListener("pointerdown", (e) => { target = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (target) target = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => (target = null)); cv.addEventListener("dblclick", dash);
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Space: "dash", ShiftLeft: "dash", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "dash") dash(); });
+        Kit.touchButtons((k) => k === "dash" && dash());
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.04)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.dodge = { get s() { return { state, t }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Dodge!</h2><p>A pure survival game. You're a little glowing dot in an arena, and everything else wants to hit you. Pink balls fly in and bounce off the walls, big purple balls are slow but huge, orange stars hunt you down, and laser lines flash a warning before they blast across the screen. Dash to zip through gaps, grab stars to clear the area around you, and pick up shields. The longer you last, the faster it gets.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrows / WASD or drag</td><td>Move</td></tr><tr><td>Space / Shift or double-tap</td><td>Dash</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Dashing makes you invincible for a split second.</li><li>Orange stars follow you, so lead them into other balls' paths... or just outrun them.</li><li>When a laser line flashes, get off it fast.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Dodge!</h3><p>Dodge! is about space and calm. Panicking makes you run into things. Keep to the open middle of the arena, make small movements, and watch the edges for new balls flying in.</p><p>Your dash is a get-out-of-jail card: for a split second nothing can hit you. It recharges in 1.5 seconds, so use it when you're about to be hit, not just to move faster.</p><p>Lasers always flash a warning line first. As soon as you see one, step off it. Stars clear every ball close to you, so grab them when it's crowded. Shields absorb one hit.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Survive 30 seconds.</li><li><b>Getting good:</b> Survive 60 seconds.</li><li><b>Expert:</b> Survive 90 seconds.</li></ul><h3>Did you know?</h3><p>Games where you dodge huge numbers of bullets are called 'bullet hell' games. Some have thousands of bullets on screen at once.</p><h3>Questions players ask</h3><h4>How do I dash?</h4><p>Press Space or Shift, or double-tap the screen. It recharges in 1.5 seconds.</p><h4>Does it end?</h4><p>No. It keeps getting harder until you're hit.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/HelixDrop/helixdrop">Helix Drop</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -121,6 +121,7 @@ export const GAMES = {
     spotthedifference: { name: "Spot the Difference", path: "/SpotTheDifference/spotdiff", img: "/thumbs/spotthedifference.png", tags: ["puzzle", "brain"], desc: "Two pictures, five differences. Can you find them all in time?", isNew: true },
     ninemensmorris: { name: "Nine Men's Morris", path: "/NineMensMorris/morris", img: "/thumbs/ninemensmorris.png", tags: ["board", "strategy", "2p"], desc: "An ancient strategy game: line up three to capture your rival's pieces.", isNew: true },
     slimevolley: { name: "Slime Volley", path: "/SlimeVolley/slimevolley", img: "/thumbs/slimevolley.png", tags: ["sports", "2p"], desc: "Bounce the ball over the net with your slime. First to 7 wins!", isNew: true },
+    dodge: { name: "Dodge!", path: "/Dodge/dodge", img: "/thumbs/dodge.png", tags: ["arcade"], desc: "Dodge balls, lasers and homing stars. How long can you survive?", isNew: true },
 };
 
 // Games that only count plays (no score)
