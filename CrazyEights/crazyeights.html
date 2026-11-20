@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic card game for the whole family. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Crazy Eights · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Crazy <span>Eights</span></h1>
+        <div class="stats"><div class="stat"><b id="wins">0</b><small>Wins</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="820" height="600"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Crazy Eights</h2>
+                <p id="startText"><span class="seg" id="opp"><button data-n="1">vs 1 🤖</button><button data-n="2" class="on">vs 2 🤖</button><button data-n="3">vs 3 🤖</button></span>Play a card that matches the top card's suit (♠♥♦♣) or number. Glowing cards can be played.<br>8s are wild: play one any time and choose the new suit! Can't play? Tap the deck to draw. First to get rid of all their cards wins.</p>
+                <button class="btn" id="startBtn">▶ Deal</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Deal again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Save your 8s for when you're stuck. They're the only cards you can always play.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Crazy Eights — match suit or rank, 8s are wild. You vs 1-3 computer players. First to empty their hand wins
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "crazyeightsBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SUITS = ["♠", "♥", "♦", "♣"], RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+        const CW = 70, CH = 100;
+        let deck, pile, hands, turn, suit, state = "ready", nOpp = 2, msg = "", choosing = false, wins = 0, busy = false, hover = -1;
+        Kit.stat("wins", 0); Kit.stat("best", Kit.best(BEST));
+        document.querySelectorAll("#opp button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#opp button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); nOpp = +b.dataset.n; }));
+        function newDeck() { const d = []; for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ s, r }); for (let i = d.length - 1; i > 0; i--) { const j = Kit.randi(0, i); [d[i], d[j]] = [d[j], d[i]]; } return d; }
+        function draw1() { if (!deck.length) { const top = pile.pop(); deck = pile; pile = [top]; for (let i = deck.length - 1; i > 0; i--) { const j = Kit.randi(0, i); [deck[i], deck[j]] = [deck[j], deck[i]]; } } return deck.pop(); }
+        function start() {
+            deck = newDeck(); hands = Array.from({ length: nOpp + 1 }, () => []); for (let k = 0; k < 7; k++) for (const h of hands) h.push(deck.pop());
+            let top; do { top = deck.pop(); if (top.r === 7) deck.unshift(top); } while (top.r === 7); pile = [top]; suit = top.s;
+            turn = 0; choosing = false; busy = false; state = "play"; msg = T("Your turn! Match the suit or number. 8s are wild.", "תורכם! התאימו צורה או מספר. 8 הוא ג'וקר."); sortHand(); Kit.hide("start"); Kit.hide("over");
+        }
+        const sortHand = () => hands[0].sort((a, b) => a.s - b.s || a.r - b.r);
+        const top = () => pile[pile.length - 1];
+        const canPlay = (c) => c.r === 7 || c.s === suit || c.r === top().r;
+        const NAME = (i) => i === 0 ? T("You", "אתם") : `${T("CPU", "מחשב")} ${i}`;
+        function play(i, idx, chosen) {
+            const c = hands[i].splice(idx, 1)[0]; pile.push(c); suit = c.s; beep(500, 0.05, "triangle", 0.04);
+            if (c.r === 7) { if (chosen === undefined) { if (i === 0) { choosing = true; return; } const cnt = [0, 0, 0, 0]; hands[i].forEach((h) => cnt[h.s]++); chosen = cnt.indexOf(Math.max(...cnt)); } suit = chosen; msg = `${NAME(i)} ${T("played an 8 and chose", "שיחק 8 ובחר")} ${SUITS[suit]}`; tune([660, 880], 0.06, "square", 0.04); }
+            else msg = `${NAME(i)} ${T("played", "שיחק")} ${RANKS[c.r]}${SUITS[c.s]}`;
+            if (!hands[i].length) return finish(i);
+            next();
+        }
+        function finish(i) {
+            state = "over"; if (i === 0) { wins++; Kit.stat("wins", wins); Kit.setBest(BEST, wins); Kit.save(100); tune([523, 659, 784, 1047, 1319], 0.08, "square", 0.05); } else beep(150, 0.5, "sawtooth", 0.05);
+            setTimeout(() => { $("overText").innerHTML = i === 0 ? T("🎉 You played all your cards first. You win!", "🎉 שיחקתם את כל הקלפים ראשונים. ניצחתם!") : `${NAME(i)} ${T("ran out of cards first.", "סיים את הקלפים ראשון.")}`; Kit.show("over"); }, 700);
+        }
+        function next() { turn = (turn + 1) % hands.length; if (turn !== 0) { busy = true; setTimeout(cpu, 900); } else { busy = false; if (!hands[0].some(canPlay)) msg += " · " + T("No match: tap the deck to draw.", "אין התאמה: הקישו על החפיסה כדי למשוך."); } }
+        function cpu() {
+            if (state !== "play") return; const h = hands[turn];
+            let idx = h.findIndex((c) => canPlay(c) && c.r !== 7); if (idx < 0) idx = h.findIndex(canPlay);
+            if (idx >= 0) return play(turn, idx);
+            for (let k = 0; k < 3; k++) { const c = draw1(); h.push(c); if (canPlay(c)) return play(turn, h.length - 1); }
+            msg = `${NAME(turn)} ${T("drew and passed.", "משך ודילג.")}`; next();
+        }
+        function drawMine() {
+            if (state !== "play" || turn !== 0 || busy || choosing) return;
+            if (hands[0].some(canPlay)) { msg = T("You have a card you can play!", "יש לכם קלף שאפשר לשחק!"); return; }
+            const c = draw1(); hands[0].push(c); sortHand(); beep(300, 0.04, "sine", 0.03);
+            if (!hands[0].some(canPlay)) { if (hands[0].length > 0 && drawMine.count === undefined) {} drawMine.n = (drawMine.n || 0) + 1; if (drawMine.n >= 3) { drawMine.n = 0; msg = T("You drew 3 cards. Turn passes.", "משכתם 3 קלפים. התור עובר."); next(); } }
+            else drawMine.n = 0;
+        }
+        function handPos(i, n) { const span = Math.min(W - 80, n * (CW + 6)), step = n > 1 ? (span - CW) / (n - 1) : 0; return [W / 2 - span / 2 + i * step, H - CH - 30]; }
+        function card(c, x, y, up = true, glow = false, lift = 0) {
+            y -= lift; ctx.fillStyle = "#0004"; Kit.rr(ctx, x + 2, y + 4, CW, CH, 8); ctx.fill();
+            if (!up) { ctx.fillStyle = "#a63a5a"; Kit.rr(ctx, x, y, CW, CH, 8); ctx.fill(); ctx.strokeStyle = "#fff6"; ctx.lineWidth = 2; Kit.rr(ctx, x + 6, y + 6, CW - 12, CH - 12, 5); ctx.stroke(); return; }
+            ctx.fillStyle = "#fff"; Kit.rr(ctx, x, y, CW, CH, 8); ctx.fill(); if (glow) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.stroke(); }
+            const red = c.s === 1 || c.s === 2, col = red ? "#d62b3a" : "#1a1a2a";
+            Kit.text(ctx, RANKS[c.r], x + 14, y + 22, 17, col, "center"); Kit.text(ctx, SUITS[c.s], x + 14, y + 40, 15, col, "center");
+            Kit.text(ctx, c.r === 7 ? "★" : SUITS[c.s], x + CW / 2 + 4, y + CH / 2 + 14, 34, c.r === 7 ? "#a64dff" : col, "center");
+        }
+        function draw() {
+            const g = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, W * 0.7); g.addColorStop(0, "#2a7a5a"); g.addColorStop(1, "#0f3a2a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!hands) return;
+            // opponents
+            for (let i = 1; i < hands.length; i++) { const cx = (W * i) / hands.length, n = hands[i].length; for (let k = 0; k < Math.min(n, 10); k++) card(null, cx - 40 + k * 8 - Math.min(n, 10) * 4, 30, false); Kit.text(ctx, `${NAME(i)}: ${n}`, cx, 160, 15, turn === i ? "#ffc94d" : "#fff", "center"); }
+            // deck & pile
+            card(null, W / 2 - CW - 20, H / 2 - CH / 2 - 20, false); Kit.text(ctx, T("Draw", "משיכה"), W / 2 - CW / 2 - 20, H / 2 + CH / 2 - 2, 13, "#fff", "center");
+            card(top(), W / 2 + 20, H / 2 - CH / 2 - 20);
+            ctx.fillStyle = ["#1a1a2a", "#d62b3a", "#d62b3a", "#1a1a2a"][suit]; ctx.beginPath(); ctx.arc(W / 2 + CW + 60, H / 2 - 20, 22, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); Kit.text(ctx, SUITS[suit], W / 2 + CW + 60, H / 2 - 10, 26, suit === 1 || suit === 2 ? "#d62b3a" : "#1a1a2a", "center");
+            // my hand
+            hands[0].forEach((c, i) => { const [x, y] = handPos(i, hands[0].length); const ok = turn === 0 && !busy && canPlay(c); card(c, x, y, true, ok, ok ? (hover === i ? 22 : 10) : 0); });
+            Kit.text(ctx, msg, W / 2, H - CH - 50, 16, "#fff", "center");
+            if (choosing) { ctx.fillStyle = "#000a"; ctx.fillRect(0, 0, W, H); Kit.text(ctx, T("Choose a suit", "בחרו צורה"), W / 2, H / 2 - 70, 24, "#fff", "center"); SUITS.forEach((s, i) => { const x = W / 2 - 170 + i * 90; ctx.fillStyle = "#fff"; Kit.rr(ctx, x, H / 2 - 40, 70, 80, 12); ctx.fill(); Kit.text(ctx, s, x + 35, H / 2 + 14, 40, i === 1 || i === 2 ? "#d62b3a" : "#1a1a2a", "center"); }); }
+        }
+        cv.addEventListener("pointermove", (e) => { if (!hands) return; const p = Kit.point(cv, e); hover = -1; for (let i = hands[0].length - 1; i >= 0; i--) { const [x, y] = handPos(i, hands[0].length); if (p.x > x && p.x < x + CW && p.y > y - 24 && p.y < y + CH) { hover = i; break; } } });
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play") return; const p = Kit.point(cv, e);
+            if (choosing) { SUITS.forEach((s, i) => { const x = W / 2 - 170 + i * 90; if (p.x > x && p.x < x + 70 && Math.abs(p.y - H / 2) < 40) { choosing = false; suit = i; msg = `${T("You chose", "בחרתם")} ${SUITS[i]}`; if (!hands[0].length) return finish(0); next(); } }); return; }
+            if (turn !== 0 || busy) return;
+            if (p.x > W / 2 - CW - 20 && p.x < W / 2 - 20 && Math.abs(p.y - (H / 2 - 20)) < CH / 2) return drawMine();
+            for (let i = hands[0].length - 1; i >= 0; i--) { const [x, y] = handPos(i, hands[0].length); if (p.x > x && p.x < x + CW && p.y > y - 24 && p.y < y + CH) { if (canPlay(hands[0][i])) { drawMine.n = 0; play(0, i); } else { msg = T("That card doesn't match.", "הקלף הזה לא מתאים."); beep(150, 0.08, "square", 0.03); } return; } }
+        });
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.c8 = { get s() { return { state, turn, n: hands && hands.map((h) => h.length) }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Crazy Eights</h2><p>A classic card game for the whole family. Everyone starts with seven cards. On your turn, play a card that matches the top of the pile by suit or by number. Eights are wild: you can play one on anything and pick the suit the next player must follow. If you can't play, draw from the deck. The first player to get rid of every card wins the round. Play against one, two or three computer opponents.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a glowing card</td><td>Play it</td></tr><tr><td>Tap the deck</td><td>Draw a card</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hold on to your 8s for emergencies.</li><li>When you play an 8, pick the suit you have the most of.</li><li>Watch how many cards your opponents have left.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Crazy Eights</h3><p>Crazy Eights is a race to empty your hand. Each turn, play a card that matches the top card's suit or number. Matching by number is a great way to switch to a suit you have more of.</p><p>Eights are your most powerful cards because you can play them on anything. Don't waste them early. Keep them for when you'd otherwise have to draw, or to finish the game.</p><p>When you play an 8, choose the suit you hold the most of. That gives you the best chance of playing again next turn. Also watch your opponents: if one of them has only one or two cards left, try to switch the suit away from what they last played.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a game against 1 computer player.</li><li><b>Getting good:</b> Win against 3 computer players.</li><li><b>Expert:</b> Win 5 games.</li></ul><h3>Did you know?</h3><p>Crazy Eights became popular in the 1930s and later inspired many famous shop-bought card games that use special wild cards.</p><h3>Questions players ask</h3><h4>What are 8s for?</h4><p>An 8 can be played on any card, and you get to choose the next suit.</p><h4>What if I can't play?</h4><p>Tap the deck to draw. After three draws without a match, your turn passes.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Darts/darts">Darts</a><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

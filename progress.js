@@ -49,6 +49,8 @@ export const TARGETS = {
     snakearena:   { easy: 800,  hard: 3000,  unit: "points" },
     roadhopper:   { easy: 30,   hard: 120,   unit: "hops" },
     hillrider:    { easy: 300,  hard: 1500,  unit: "m" },
+    burgerchef: { easy: 100, hard: 300, unit: "dollars" },
+    crazyeights: { easy: 1, hard: 5, unit: "wins" },
     paintterritory: { easy: 20, hard: 45, unit: "% of the map" },
     celleater: { easy: 300, hard: 1200, unit: "mass" },
     fireworks: { easy: 20, hard: 100, unit: "fireworks" },

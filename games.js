@@ -101,6 +101,8 @@ export const GAMES = {
     fireworks: { name: "Fireworks", path: "/Fireworks/fireworks", img: "/thumbs/fireworks.png", tags: ["creative", "relaxing"], desc: "A relaxing fireworks toy. Tap the sky to light it up!", isNew: true },
     celleater: { name: "Cell Eater", path: "/CellEater/celleater", img: "/thumbs/celleater.png", tags: ["arcade"], desc: "Eat dots and smaller cells to grow. Run from the big ones!", isNew: true },
     paintterritory: { name: "Paint Territory", path: "/PaintTerritory/paintland", img: "/thumbs/paintterritory.png", tags: ["arcade", "strategy"], desc: "Draw loops to claim land. Cut other players' trails, but protect your own!", isNew: true },
+    crazyeights: { name: "Crazy Eights", path: "/CrazyEights/crazyeights", img: "/thumbs/crazyeights.png", tags: ["board"], desc: "Match the suit or number, play wild 8s and empty your hand first.", isNew: true },
+    burgerchef: { name: "Burger Chef", path: "/BurgerChef/burgerchef", img: "/thumbs/burgerchef.png", tags: ["arcade", "brain"], desc: "Stack each burger exactly the way the customer ordered it. Fast!", isNew: true },
 };
 
 // Games that only count plays (no score)
