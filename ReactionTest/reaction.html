@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple test of how quickly you react. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Reaction Test · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Reaction <span>Test</span></h1>
+        <div class="stats"><div class="stat"><b id="try">1/5</b><small>Try</small></div><div class="stat"><b id="best">-</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Reaction Test</h2>
+                <p id="startText">The screen turns red. Wait… wait… then tap, click or press Space the moment it turns <b style='color:#1fbf5c'>green</b>.<br>Five tries, and we'll show your average time in milliseconds. Tap too early and that try starts again!</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Results</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Don't guess! The wait is random. Relax your finger just above the screen and react to the colour change.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Reaction Test — wait for green, then tap as fast as you can. 5 tries, average time
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "reactionBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let phase = "idle", times = [], goAt = 0, waitT = 0, last = null, state = "ready", early = false;
+        Kit.stat("best", Kit.best(BEST) ? Kit.best(BEST) + " ms" : "-");
+        function start() { times = []; state = "play"; Kit.hide("start"); Kit.hide("over"); arm(); }
+        function arm() { phase = "wait"; waitT = Kit.rand(1.2, 4); early = false; Kit.stat("try", `${times.length + 1}/5`); }
+        function tap() {
+            if (state !== "play") return;
+            if (phase === "wait") { phase = "early"; beep(150, 0.25, "sawtooth", 0.05); setTimeout(() => state === "play" && arm(), 1100); return; }
+            if (phase === "go") {
+                const ms = Math.round(performance.now() - goAt); times.push(ms); last = ms; phase = "show"; beep(880, 0.08, "square", 0.04);
+                if (times.length >= 5) setTimeout(finish, 900); else setTimeout(() => state === "play" && arm(), 1000);
+            }
+        }
+        function rank(ms) { return ms < 200 ? T("Lightning! ⚡", "ברק! ⚡") : ms < 250 ? T("Super fast! 🐆", "מהיר מאוד! 🐆") : ms < 300 ? T("Fast 🐇", "מהיר 🐇") : ms < 400 ? T("OK 🐕", "בסדר 🐕") : T("Sleepy 🐢", "ישנוני 🐢"); }
+        function finish() {
+            state = "over"; const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+            const prev = Kit.best(BEST); const best = !prev || avg < prev ? avg : prev; localStorage.setItem(BEST, best); Kit.stat("best", best + " ms"); Kit.save(Math.max(0, 600 - avg));
+            $("overText").innerHTML = `${T("Your average", "הממוצע שלכם")}: <b>${avg} ms</b> · ${rank(avg)}<br>${times.join(" · ")} ms<br>${T("Best average", "ממוצע שיא")}: ${best} ms`;
+            Kit.show("over");
+        }
+        function draw() {
+            const col = phase === "wait" ? "#d62b3a" : phase === "go" ? "#1fbf5c" : phase === "early" ? "#ff9a3c" : "#2a74ff";
+            ctx.fillStyle = state === "play" ? col : "#1b1f3b"; ctx.fillRect(0, 0, W, H);
+            if (state !== "play") return;
+            const big = (s, y = H / 2) => Kit.text(ctx, s, W / 2, y, 40, "#fff", "center");
+            if (phase === "wait") { big(T("Wait for green…", "חכו לירוק…")); Kit.text(ctx, "● ● ●", W / 2, H / 2 + 60, 30, "#ffffff88", "center"); }
+            if (phase === "go") big(T("TAP NOW!", "עכשיו!"));
+            if (phase === "early") { big(T("Too early!", "מוקדם מדי!")); Kit.text(ctx, T("Wait for green.", "חכו לירוק."), W / 2, H / 2 + 50, 22, "#fff", "center"); }
+            if (phase === "show") { big(`${last} ms`); Kit.text(ctx, rank(last), W / 2, H / 2 + 50, 24, "#fff", "center"); }
+            for (let i = 0; i < 5; i++) { ctx.fillStyle = i < times.length ? "#fff" : "#ffffff44"; ctx.beginPath(); ctx.arc(W / 2 - 60 + i * 30, H - 50, 8, 0, 7); ctx.fill(); }
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "t", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "t") tap(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play" && phase === "wait") { waitT -= dt; if (waitT <= 0) { phase = "go"; goAt = performance.now(); } } draw(); }).start();
+        if (window.__test) window.__test.react = { get s() { return { state, phase, times }; }, start, tap };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Reaction Test</h2><p>A simple test of how quickly you react. The screen turns red, then after a random wait it flashes green. Tap as soon as you see green. Your time is measured in milliseconds (thousandths of a second). After five tries you get your average and a rating from sleepy turtle to lightning bolt.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap, click or Space</td><td>React</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Most people score between 200 and 300 ms.</li><li>A keyboard is often a bit faster than a touchscreen.</li><li>Try it with friends and compare averages!</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Reaction Test</h3><p>Reaction Test has one rule: react, don't predict. The wait before green is random, between about one and four seconds, so trying to guess the timing usually gets you a 'Too early!'. Keep your eyes on the middle of the screen and let your finger move when the colour changes.</p><p>Get comfortable. Rest your finger lightly on the Space bar or just above the screen. Being tense actually slows you down a little.</p><p>Your average is a better measure than one lucky try. Play a few rounds and watch your best average improve. You'll usually be faster when you're awake and focused, and slower when you're tired.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Average under 350 ms.</li><li><b>Getting good:</b> Average under 270 ms.</li><li><b>Expert:</b> Get a try under 200 ms.</li></ul><h3>Did you know?</h3><p>A message from your eye to your finger travels through nerves at up to about 100 metres per second. Most of the reaction time is actually your brain deciding to move.</p><h3>Questions players ask</h3><h4>What's a millisecond?</h4><p>One thousandth of a second. 250 ms is a quarter of a second.</p><h4>What's a good score?</h4><p>Under 250 ms is very fast. Most people are around 250 to 300 ms.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Reversi/reversi">Reversi</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

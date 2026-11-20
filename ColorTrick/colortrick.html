@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A brain teaser based on a famous psychology experiment. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Color Trick · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Color <span>Trick</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Color Trick</h2>
+                <p id="startText">Read what the TOP word <b>means</b>. Then look at what <b>colour ink</b> the BOTTOM word is printed in.<br>Do they match? Answer YES (➡) or NO (⬅) as fast as you can. You have 60 seconds, and a wrong answer costs 3 seconds!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Ignore what the bottom word says. Only its colour matters. Squinting at it can help!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Color Trick — Stroop test: does the WORD's ink colour match the meaning? 60 seconds
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "colortrickBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = [["RED", "אדום", "#ff3b4d"], ["BLUE", "כחול", "#2a74ff"], ["GREEN", "ירוק", "#1fbf5c"], ["YELLOW", "צהוב", "#ffc800"], ["PURPLE", "סגול", "#a64dff"], ["ORANGE", "כתום", "#ff8a1f"]];
+        let q, score, streak, time, state = "ready", flash = null, total;
+        Kit.stat("best", Kit.best(BEST));
+        function nq() {
+            const n = Math.min(COLS.length, 3 + Math.floor(score / 6));
+            const top = Kit.randi(0, n - 1), match = Math.random() < 0.5;
+            let ink = match ? top : Kit.randi(0, n - 1); if (!match && ink === top) ink = (top + 1) % n;
+            // top word: meaning; bottom word: its ink colour is the thing to compare
+            let bw = Kit.randi(0, n - 1);
+            q = { meaning: top, topInk: Kit.randi(0, n - 1), bottomWord: bw, bottomInk: ink, match: ink === top };
+        }
+        function start() { score = 0; streak = 0; time = 60; total = 0; state = "play"; nq(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function answer(yes) {
+            if (state !== "play") return; total++;
+            if (yes === q.match) { streak++; score += 1 + Math.floor(streak / 5); Kit.stat("score", score); flash = { ok: true, t: 0.25 }; beep(660 + Math.min(streak, 10) * 30, 0.06, "triangle", 0.04); }
+            else { streak = 0; time = Math.max(0, time - 3); flash = { ok: false, t: 0.35 }; beep(140, 0.2, "sawtooth", 0.05); }
+            nq();
+        }
+        function end() { state = "over"; Kit.save(score * 20); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Time's up!", "הזמן נגמר!")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        const he = () => document.documentElement.lang === "he";
+        function word(i) { return he() ? COLS[i][1] : COLS[i][0]; }
+        function draw() {
+            ctx.fillStyle = flash && flash.t > 0 ? (flash.ok ? "#14321f" : "#3a1418") : "#f6f3ec"; ctx.fillRect(0, 0, W, H);
+            if (!q || state !== "play") return;
+            const fg = flash && flash.t > 0 ? "#fff" : "#2a2a3a";
+            Kit.text(ctx, T("Does the MEANING of the top word…", "האם המשמעות של המילה העליונה…"), W / 2, 60, 18, fg, "center");
+            ctx.fillStyle = "#fff"; Kit.rr(ctx, 60, 80, W - 120, 120, 16); ctx.fill();
+            Kit.text(ctx, word(q.meaning), W / 2, 160, 56, COLS[q.topInk][2], "center", "Inter, Rubik, sans-serif", 900);
+            Kit.text(ctx, T("…match the INK COLOUR of the bottom word?", "…מתאימה לצבע של המילה התחתונה?"), W / 2, 240, 18, fg, "center");
+            ctx.fillStyle = "#fff"; Kit.rr(ctx, 60, 260, W - 120, 120, 16); ctx.fill();
+            Kit.text(ctx, word(q.bottomWord), W / 2, 340, 56, COLS[q.bottomInk][2], "center", "Inter, Rubik, sans-serif", 900);
+            // buttons
+            ctx.fillStyle = "#ff4d6d"; Kit.rr(ctx, 60, H - 130, W / 2 - 80, 90, 18); ctx.fill(); Kit.text(ctx, T("✗ NO", "✗ לא"), W / 4 + 10, H - 72, 30, "#fff", "center");
+            ctx.fillStyle = "#1fbf5c"; Kit.rr(ctx, W / 2 + 20, H - 130, W / 2 - 80, 90, 18); ctx.fill(); Kit.text(ctx, T("✓ YES", "✓ כן"), (W * 3) / 4 - 10, H - 72, 30, "#fff", "center");
+            // timer bar
+            ctx.fillStyle = "#0002"; ctx.fillRect(0, 0, W, 10); ctx.fillStyle = time > 10 ? "#2a74ff" : "#ff3b4d"; ctx.fillRect(0, 0, (W * time) / 60, 10);
+            Kit.text(ctx, `${Math.ceil(time)}s`, W - 30, 36, 16, fg, "right");
+            if (streak >= 5) Kit.text(ctx, `🔥 ${streak}`, 30, 36, 16, "#ff8a1f", "left");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (p.y > H - 140) answer(p.x > W / 2); });
+        Kit.onKeys({ ArrowLeft: "no", ArrowRight: "yes", KeyN: "no", KeyY: "yes", KeyF: "no", KeyJ: "yes", Enter: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); } else answer(a === "yes"); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") { time -= dt; if (time <= 0) end(); } if (flash) flash.t -= dt; draw(); }).start();
+        if (window.__test) window.__test.stroop = { get s() { return { state, score, q }; }, start, answer };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Color Trick</h2><p>A brain teaser based on a famous psychology experiment. Two coloured words appear. The question is whether the meaning of the top word matches the ink colour of the bottom word. It sounds easy, but your brain reads words automatically, and that gets in the way when the bottom word says one colour but is printed in another. Answer as many as you can in 60 seconds. More colours appear as your score goes up.</p></section>
+        <section><h3>How to play</h3><table><tr><td>➡ or J or Y</td><td>Yes, they match</td></tr><tr><td>⬅ or F or N</td><td>No, they don't</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The colour of the top word doesn't matter at all.</li><li>What the bottom word says doesn't matter either.</li><li>Every 5 right in a row gives bonus points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Color Trick</h3><p>Color Trick only cares about two things: what the top word means and what colour the bottom word is printed in. The top word's ink and the bottom word's text are distractions. Train yourself to read the top word and only look at the colour of the bottom one.</p><p>A useful trick is to say the top word in your head, then glance at the bottom word without reading it, as if it were just a blob of colour. Some players unfocus their eyes slightly on the bottom word.</p><p>Speed matters, but wrong answers cost 3 seconds, which is more than you'd lose by thinking for a moment. Find a steady rhythm. As your score rises, more colours join, so the game gets harder just as you get faster.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 15.</li><li><b>Getting good:</b> Score 30 with no mistakes.</li><li><b>Expert:</b> Score 50.</li></ul><h3>Did you know?</h3><p>This puzzle is based on the Stroop effect, discovered by psychologist John Ridley Stroop in 1935. Naming the ink colour of a word that spells a different colour takes most people noticeably longer.</p><h3>Questions players ask</h3><h4>Which word's colour do I look at?</h4><p>Only the bottom word's ink colour. For the top word, only its meaning counts.</p><h4>Why is it so hard?</h4><p>Reading is automatic for your brain, so the word's meaning gets in the way of noticing its colour.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Darts/darts">Darts</a><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/HelixDrop/helixdrop">Helix Drop</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

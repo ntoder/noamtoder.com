@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic card guessing game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Higher or Lower · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Higher <span>or Lower</span></h1>
+        <div class="stats"><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="580" height="600"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Higher or Lower</h2>
+                <p id="startText">Look at your card. Will the next one be HIGHER or LOWER? Ace is the lowest, King the highest.<br>Every right guess in a row is worth more: 10, 20, 30… A wrong guess loses a life and resets your streak. You have 3 lives.</p>
+                <button class="btn" id="startBtn">▶ Deal</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Think about what's left. On a 7 it's a coin flip, but on a 2 or a Queen the right choice is obvious.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Higher or Lower — guess if the next card is higher or lower; build a streak, cash in points
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "higherlowerBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SUITS = ["♠", "♥", "♦", "♣"], RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+        let deck, cur, next, streak, score, lives, state = "ready", anim = null, history = [];
+        Kit.stat("best", Kit.best(BEST));
+        function shuffle() { deck = []; for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) deck.push({ r, s }); for (let i = deck.length - 1; i > 0; i--) { const j = Kit.randi(0, i); [deck[i], deck[j]] = [deck[j], deck[i]]; } }
+        function draw1() { if (!deck.length) shuffle(); return deck.pop(); }
+        function start() { shuffle(); cur = draw1(); streak = 0; score = 0; lives = 3; history = []; state = "play"; anim = null; Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️"); Kit.hide("start"); Kit.hide("over"); }
+        function guess(hi) {
+            if (state !== "play" || anim) return;
+            next = draw1(); const right = next.r === cur.r ? true : hi ? next.r > cur.r : next.r < cur.r;
+            anim = { t: 0, right };
+            beep(400, 0.05, "triangle", 0.03);
+        }
+        function resolve() {
+            const { right } = anim;
+            if (right) { streak++; const gain = streak * 10; score += gain; Kit.stat("score", score); tune([523 + streak * 20, 784 + streak * 20], 0.06, "square", 0.04); }
+            else { streak = 0; lives--; Kit.stat("lives", "❤️".repeat(lives) + "🖤".repeat(3 - lives)); beep(140, 0.3, "sawtooth", 0.05); }
+            history.push({ c: cur, ok: right }); if (history.length > 7) history.shift();
+            cur = next; next = null; anim = null;
+            if (lives <= 0) { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Out of lives!", "נגמרו החיים!")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 500); }
+        }
+        function card(c, x, y, w, h, faceUp = true, scale = 1) {
+            ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.scale(scale, 1);
+            ctx.fillStyle = "#0004"; Kit.rr(ctx, -w / 2 + 4, -h / 2 + 6, w, h, 14); ctx.fill();
+            if (!faceUp) { ctx.fillStyle = "#2a74ff"; Kit.rr(ctx, -w / 2, -h / 2, w, h, 14); ctx.fill(); ctx.strokeStyle = "#fff8"; ctx.lineWidth = 3; Kit.rr(ctx, -w / 2 + 10, -h / 2 + 10, w - 20, h - 20, 8); ctx.stroke(); ctx.fillStyle = "#ffffff33"; for (let i = -3; i <= 3; i++) for (let j = -4; j <= 4; j++) { ctx.beginPath(); ctx.arc(i * 18, j * 20, 4, 0, 7); ctx.fill(); } ctx.restore(); return; }
+            ctx.fillStyle = "#fff"; Kit.rr(ctx, -w / 2, -h / 2, w, h, 14); ctx.fill();
+            const red = c.s === 1 || c.s === 2, col = red ? "#d62b3a" : "#1a1a2a";
+            Kit.text(ctx, RANKS[c.r], -w / 2 + 22, -h / 2 + 36, w * 0.17, col, "center"); Kit.text(ctx, SUITS[c.s], -w / 2 + 22, -h / 2 + 62, w * 0.14, col, "center");
+            Kit.text(ctx, SUITS[c.s], 0, h * 0.12, w * 0.5, col, "center");
+            ctx.rotate(Math.PI); Kit.text(ctx, RANKS[c.r], -w / 2 + 22, -h / 2 + 36, w * 0.17, col, "center");
+            ctx.restore();
+        }
+        function draw() {
+            const g = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, W); g.addColorStop(0, "#1f7a4a"); g.addColorStop(1, "#0d3a22"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!cur) return;
+            const cw = 170, ch = 240, y = 110;
+            card(cur, W / 2 - cw - 20, y, cw, ch);
+            if (anim) { const s = Math.abs(Math.cos(Math.min(1, anim.t) * Math.PI)); card(next, W / 2 + 20, y, cw, ch, anim.t > 0.5, Math.max(0.02, s)); if (anim.t > 0.6) Kit.text(ctx, anim.right ? "✓" : "✗", W / 2 + 20 + cw / 2, y - 20, 40, anim.right ? "#2ee6a0" : "#ff4d6d", "center"); }
+            else card(null, W / 2 + 20, y, cw, ch, false);
+            // buttons
+            const by = y + ch + 40;
+            ctx.fillStyle = "#ffc94d"; Kit.rr(ctx, 50, by, W / 2 - 70, 80, 16); ctx.fill(); Kit.text(ctx, T("⬆ HIGHER", "⬆ גבוה יותר"), W / 4 + 10, by + 50, 26, "#3a2a00", "center");
+            ctx.fillStyle = "#5cc8ff"; Kit.rr(ctx, W / 2 + 20, by, W / 2 - 70, 80, 16); ctx.fill(); Kit.text(ctx, T("⬇ LOWER", "⬇ נמוך יותר"), (W * 3) / 4 - 10, by + 50, 26, "#00243a", "center");
+            Kit.text(ctx, `${T("Streak", "רצף")}: ${streak}  ·  ${T("next win", "ניצחון הבא")} +${(streak + 1) * 10}`, W / 2, 60, 20, "#fff", "center");
+            Kit.text(ctx, T("Ace is low, King is high. Same card = you win!", "אס נמוך, מלך גבוה. אותו קלף = ניצחון!"), W / 2, H - 24, 14, "#ffffffaa", "center");
+            history.forEach((h, i) => { const x = 40 + i * 50, yy = H - 80; ctx.fillStyle = h.ok ? "#2ee6a0" : "#ff4d6d"; Kit.rr(ctx, x, yy, 40, 30, 6); ctx.fill(); Kit.text(ctx, RANKS[h.c.r] + SUITS[h.c.s], x + 20, yy + 21, 14, "#10142a", "center"); });
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (p.y > 360 && p.y < 480) guess(p.x < W / 2); });
+        Kit.onKeys({ ArrowUp: "hi", ArrowDown: "lo", KeyH: "hi", KeyL: "lo", Enter: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); } else guess(a === "hi"); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (anim) { anim.t += dt * 1.6; if (anim.t >= 1.5) resolve(); } draw(); }).start();
+        if (window.__test) window.__test.hl = { get s() { return { state, score, lives }; }, start, guess };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Higher or Lower</h2><p>A classic card guessing game. One card is face up. Guess whether the next card from the deck will be higher or lower. If you're right, your streak grows and each win is worth more than the last. If you're wrong, you lose a life and the streak starts over. A card with the same value counts as a win. The deck is a normal 52-card deck, so if you remember which cards have gone, you can play the odds.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ or H</td><td>Higher</td></tr><tr><td>⬇ or L</td><td>Lower</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Middle cards (6, 7, 8) are the riskiest.</li><li>Matching values count as a win.</li><li>The recent cards row helps you remember what's already been played.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Higher or Lower</h3><p>Higher or Lower is a game of probability. With an Ace showing, almost every card is higher. With a King, almost every card is lower. These are easy points. The hard ones are in the middle: on a 7, there are about as many higher cards as lower ones.</p><p>The deck doesn't refill until it runs out, so cards that have been played can't come up again. If you've already seen lots of high cards, the next card is more likely to be low. The row of recent cards at the bottom helps you keep track.</p><p>Your streak multiplies your points, so one wrong guess on a 7 can cost you a big streak. There's no way to skip a card, so go with the side that has more cards left, even if it's only slightly more.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win 5 in a row.</li><li><b>Getting good:</b> Score 300 points.</li><li><b>Expert:</b> Win 10 in a row.</li></ul><h3>Did you know?</h3><p>There are 52 cards in a normal deck. If a 7 is showing, 24 of the other 51 are higher, 24 are lower, and 3 are also sevens.</p><h3>Questions players ask</h3><h4>Is Ace high or low?</h4><p>Low. Ace is 1 and King is the highest.</p><h4>What if the next card is the same?</h4><p>A card with the same value counts as a win.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/LightBikes/lightbikes">Light Bikes</a><a href="/MemoryGrid/memorygrid">Memory Grid</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

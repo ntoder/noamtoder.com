@@ -87,6 +87,10 @@ export const GAMES = {
     moonlander: { name: "Moon Lander", path: "/MoonLander/moonlander", img: "/thumbs/moonlander.png", tags: ["arcade", "physics"], desc: "Fire your engine carefully and land softly on the Moon.", isNew: true },
     darts: { name: "Darts", path: "/Darts/darts", img: "/thumbs/darts.png", tags: ["sports"], desc: "Play 301: count down to zero and finish on a double.", isNew: true },
     plinko: { name: "Plinko", path: "/Plinko/plinko", img: "/thumbs/plinko.png", tags: ["arcade", "physics"], desc: "Drop balls through the pegs and hope for the 100 slot.", isNew: true },
+    colortrick: { name: "Color Trick", path: "/ColorTrick/colortrick", img: "/thumbs/colortrick.png", tags: ["brain"], desc: "Does the word match the colour? Your brain will try to trick you!", isNew: true },
+    reactiontest: { name: "Reaction Test", path: "/ReactionTest/reaction", img: "/thumbs/reactiontest.png", tags: ["brain"], desc: "How fast are you? Tap the moment the screen turns green.", isNew: true },
+    higherlower: { name: "Higher or Lower", path: "/HigherLower/higherlower", img: "/thumbs/higherlower.png", tags: ["cards"], desc: "Will the next card be higher or lower? Build a winning streak!", isNew: true },
+    memorygrid: { name: "Memory Grid", path: "/MemoryGrid/memorygrid", img: "/thumbs/memorygrid.png", tags: ["brain"], desc: "Some squares light up. Remember them and tap them all!", isNew: true },
 };
 
 // Games that only count plays (no score)
