@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A brain-twisting puzzle about doing two things at once. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Mirror Twins · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Mirror <span>Twins</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Mirror Twins</h2>
+                <p id="startText">Both twins move at the same time. Up and down move them the same way, but left and right are <b>mirrored</b>: when the blue twin goes left, the orange twin goes right!<br>Walls stop a twin, but the other can still move. Get both twins onto their ⭐ at the same moment. Don't step on the red spikes! Every puzzle is new and guaranteed to be solvable.</p>
+                <button class="btn" id="startBtn">🪞 Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Mirror Twins</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button><button data-k="undo">↶</button></div>
+    <p class="hint">Use walls on purpose: bump one twin into a wall so only the other one moves.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Mirror Twins — two twins, one controller. The right twin moves in mirror image. Get both onto their stars at the same time
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "mirrortwinsBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const N = 7, CS = 52, GAP = 40, OXL = (W - 2 * N * CS - GAP) / 2, OXR = OXL + N * CS + GAP, OY = 110;
+        let L, R, a, b, ga, gb, level, moves, minMoves, state = "ready", hist, winT = 0, shake = 0;
+        Kit.stat("best", Kit.best(BEST));
+        // map cells: 0 floor, 1 wall, 2 spike
+        function solve(L, R, a, b, ga, gb) {
+            const key = (p, q) => p[0] * 7 + p[1] + 49 * (q[0] * 7 + q[1]); const seen = new Map([[key(a, b), 0]]); const qu = [[a, b]];
+            while (qu.length) { const [p, q] = qu.shift(), d = seen.get(key(p, q)); if (p[0] === ga[0] && p[1] === ga[1] && q[0] === gb[0] && q[1] === gb[1]) return d;
+                for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) { const np = stepOne(L, p, dr, dc), nq = stepOne(R, q, dr, -dc); if (!np || !nq) continue; const k = key(np, nq); if (!seen.has(k)) { seen.set(k, d + 1); qu.push([np, nq]); } } }
+            return -1;
+        }
+        function stepOne(M, p, dr, dc) { const r = p[0] + dr, c = p[1] + dc; if (r < 0 || c < 0 || r >= N || c >= N || M[r][c] === 1) return p; if (M[r][c] === 2) return null; return [r, c]; }
+        function gen(lv) {
+            const want = Math.min(26, 6 + lv * 2);
+            for (let tries = 0; tries < 4000; tries++) {
+                const mk = () => Array.from({ length: N }, () => Array.from({ length: N }, () => { const r = Math.random(); return r < 0.22 ? 1 : r < 0.22 + Math.min(0.12, lv * 0.015) ? 2 : 0; }));
+                const l = mk(), r = mk(); const pa = [Kit.randi(0, 6), Kit.randi(0, 6)], pb = [pa[0], 6 - pa[1]], qa = [Kit.randi(0, 6), Kit.randi(0, 6)], qb = [Kit.randi(0, 6), Kit.randi(0, 6)];
+                for (const [M, p] of [[l, pa], [r, pb], [l, qa], [r, qb]]) M[p[0]][p[1]] = 0;
+                const d = solve(l, r, pa, pb, qa, qb); if (d >= Math.min(want, 4 + lv) && d <= want + 8) return { l, r, pa, pb, qa, qb, d };
+            }
+            return gen(Math.max(1, lv - 1));
+        }
+        function load(lv) { level = lv; const g = gen(lv); L = g.l; R = g.r; a = g.pa; b = g.pb; ga = g.qa; gb = g.qb; minMoves = g.d; moves = 0; hist = []; winT = 0; state = "play"; Kit.stat("level", lv); Kit.stat("moves", `0 / ${minMoves}`); }
+        function start() { load(Math.max(1, +(localStorage.getItem("mirrortwinsLevel") || 1))); Kit.hide("start"); Kit.hide("over"); }
+        function move(dr, dc) {
+            if (state !== "play" || winT) return; const na = stepOne(L, a, dr, dc), nb = stepOne(R, b, dr, -dc);
+            if (!na || !nb) { shake = 0.4; beep(120, 0.2, "sawtooth", 0.05); hist.push([a, b]); moves++; Kit.stat("moves", `${moves} / ${minMoves}`); setTimeout(() => { const h = hist.pop(); if (h) { [a, b] = h; } }, 350); if (!na) a = [a[0] + dr, a[1] + dc]; if (!nb) b = [b[0] + dr, b[1] - dc]; return; }
+            hist.push([a, b]); a = na; b = nb; moves++; Kit.stat("moves", `${moves} / ${minMoves}`); beep(440, 0.03, "triangle", 0.03);
+            if (a[0] === ga[0] && a[1] === ga[1] && b[0] === gb[0] && b[1] === gb[1]) { winT = 1.3; tune([523, 659, 784, 1047], 0.08, "square", 0.05); Kit.save(moves <= minMoves ? 40 : 20); Kit.setBest(BEST, level); localStorage.setItem("mirrortwinsLevel", level + 1); }
+        }
+        function undo() { const h = hist.pop(); if (h) { [a, b] = h; moves = Math.max(0, moves - 1); Kit.stat("moves", `${moves} / ${minMoves}`); } }
+        function board(M, ox, p, goal, col) {
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const x = ox + c * CS, y = OY + r * CS, v = M[r][c]; ctx.fillStyle = v === 1 ? "#3a3f6b" : (r + c) % 2 ? "#20244a" : "#1c2044"; ctx.fillRect(x, y, CS, CS); if (v === 1) { ctx.fillStyle = "#4a5088"; ctx.fillRect(x + 3, y + 3, CS - 6, 8); } if (v === 2) { ctx.fillStyle = "#ff4d6d"; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x + 6 + k * 14, y + CS - 8); ctx.lineTo(x + 13 + k * 14, y + 10); ctx.lineTo(x + 20 + k * 14, y + CS - 8); ctx.fill(); } } }
+            Kit.text(ctx, "⭐", ox + goal[1] * CS + CS / 2, OY + goal[0] * CS + CS / 2 + 10, 28, "#000", "center");
+            const x = ox + p[1] * CS + CS / 2, y = OY + p[0] * CS + CS / 2; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x - 6, y - 3, 5, 0, 7); ctx.arc(x + 6, y - 3, 5, 0, 7); ctx.fill(); ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(x - 6, y - 2, 2.4, 0, 7); ctx.arc(x + 6, y - 2, 2.4, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 2; ctx.strokeRect(ox, OY, N * CS, N * CS);
+        }
+        function draw() {
+            ctx.fillStyle = "#12142a"; ctx.fillRect(0, 0, W, H);
+            if (!L) return;
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-4, 4), 0);
+            board(L, OXL, a, ga, "#5cc8ff"); board(R, OXR, b, gb, "#ff9a3c");
+            ctx.strokeStyle = "#ffc94d55"; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(W / 2, OY - 10); ctx.lineTo(W / 2, OY + N * CS + 10); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, 44, 24, "#fff", "center"); Kit.text(ctx, T("⬅ ➡ are mirrored on the right side · Z = undo · R = new puzzle", "⬅ ➡ הפוכים בצד ימין · Z = ביטול · R = פאזל חדש"), W / 2, 76, 14, "#ffffff88", "center");
+            if (winT) Kit.text(ctx, moves <= minMoves ? T("Perfect! ⭐⭐⭐", "מושלם! ⭐⭐⭐") : T("Solved! 🎉", "נפתר! 🎉"), W / 2, OY + N * CS + 50, 26, "#ffc94d", "center");
+        }
+        Kit.onKeys({ ArrowUp: "u", ArrowDown: "d", ArrowLeft: "l", ArrowRight: "r", KeyW: "u", KeyS: "d", KeyA: "l", KeyD: "r", KeyZ: "undo", Backspace: "undo", KeyR: "new", Enter: "enter" }, (a2) => { if (a2 === "enter") { if (state !== "play") start(); return; } if (a2 === "undo") return undo(); if (a2 === "new") return load(level); move(...{ u: [-1, 0], d: [1, 0], l: [0, -1], r: [0, 1] }[a2]); });
+        Kit.swipe(cv, (d) => move(...{ up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }[d]));
+        Kit.touchButtons((k) => (k === "undo" ? undo() : move(...{ up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }[k])));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (shake > 0) shake -= dt; if (winT) { winT -= dt; if (winT <= 0) { winT = 0; load(level + 1); } } draw(); }).start();
+        if (window.__test) window.__test.mt = { get s() { return { state, level, minMoves, moves }; }, start, load };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Mirror Twins</h2><p>A brain-twisting puzzle about doing two things at once. A blue twin and an orange twin stand on two separate boards. Every arrow press moves both: up and down move them together, while left and right move them in opposite directions, like a reflection in a mirror. Each board has its own walls and spikes. The trick is using walls to hold one twin still while the other moves. Get both onto their stars at the same time to solve the puzzle. Levels are made fresh each time and checked by a solver.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrows / WASD / swipe</td><td>Move both twins</td></tr><tr><td>Z</td><td>Undo</td></tr><tr><td>R</td><td>New puzzle</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>A twin pressed against a wall stays still while the other moves.</li><li>Left and right are swapped for the orange twin.</li><li>The move counter shows the shortest possible solution.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Mirror Twins</h3><p>Mirror Twins is all about walls. If both twins always moved together, you could never fix a difference between them. But a twin that bumps into a wall stays put while the other one moves. That's how you line them up.</p><p>Remember the mirror: up and down are the same for both, but left and right are opposite. When the blue twin needs to go left and the orange twin also needs to go left, you'll need a wall to block one of them for some of the moves.</p><p>Spikes end the attempt, so check both boards before each move. The counter shows how many moves you've made and the shortest possible solution, so try to match it for a perfect solve.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve 5 puzzles.</li><li><b>Getting good:</b> Solve a puzzle in the fewest moves.</li><li><b>Expert:</b> Reach level 15.</li></ul><h3>Did you know?</h3><p>Our brains are good at mirrored movements: try drawing circles with both hands at once, one going clockwise and one going anticlockwise. It's harder than it sounds!</p><h3>Questions players ask</h3><h4>Is every puzzle solvable?</h4><p>Yes. Each puzzle is checked by a solver before you see it.</p><h4>What does the second number mean?</h4><p>The fewest moves needed to solve it.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/MoonLander/moonlander">Moon Lander</a><a href="/NeonSlope/neonslope">Neon Slope</a><a href="/ParkingPro/parking">Parking Pro</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

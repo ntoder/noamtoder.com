@@ -134,6 +134,8 @@ export const GAMES = {
     dropmerge: { name: "Drop Merge", path: "/DropMerge/dropmerge", img: "/thumbs/dropmerge.png", tags: ["puzzle"], desc: "Drop number blocks. Matching numbers merge and double. Chain them!", isNew: true },
     echobat: { name: "Echo Bat", path: "/EchoBat/echobat", img: "/thumbs/echobat.png", tags: ["arcade"], desc: "Fly a blind bat through a pitch-black cave. Use sonar to see the walls!", isNew: true },
     timeloop: { name: "Time Loop", path: "/TimeLoop/timeloop", img: "/thumbs/timeloop.png", tags: ["arcade", "brain"], desc: "Every 8 seconds time rewinds, and your past selves replay as ghosts!", isNew: true },
+    orbitbuilder: { name: "Orbit Builder", path: "/OrbitBuilder/orbit", img: "/thumbs/orbitbuilder.png", tags: ["physics", "creative"], desc: "Throw moons into orbit around a planet and build your own solar system.", isNew: true },
+    mirrortwins: { name: "Mirror Twins", path: "/MirrorTwins/mirrortwins", img: "/thumbs/mirrortwins.png", tags: ["puzzle", "brain"], desc: "Move two twins at once: one copies you, the other moves in a mirror!", isNew: true },
 };
 
 // Games that only count plays (no score)

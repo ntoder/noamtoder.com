@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A space physics toy with a goal. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Orbit Builder · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Orbit <span>Builder</span></h1>
+        <div class="stats"><div class="stat"><b id="goal">0/3</b><small>Orbiting</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="820" height="600"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Orbit Builder</h2>
+                <p id="startText">Press anywhere in space, drag in the direction you want to throw the moon, and let go. The planet's gravity pulls it into a curve. The dotted line shows its path!<br>Get 3 moons orbiting at once for 5 seconds to reach the next level. Moons that crash into the planet, hit each other or fly away cost a life.</p>
+                <button class="btn" id="startBtn">🪐 Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🪐 Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Throw sideways, not toward the planet. A moon moving sideways at just the right speed falls around the planet forever.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Orbit Builder — launch moons into orbit around a planet. Keep them circling without crashing into each other or the planet
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "orbitBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CX = W / 2, CY = H / 2, PR = 42, GM = 2.2e6, MR = 9;
+        let moons, drag, lives, score, level, need, holdT, state = "ready", fx = Kit.particles(), stars, msg = null, trailsOn = true;
+        Kit.stat("best", Kit.best(BEST));
+        stars = Array.from({ length: 140 }, () => [Math.random() * W, Math.random() * H, Math.random()]);
+        function start() { moons = []; lives = 3; score = 0; level = 1; need = 3; holdT = 0; state = "play"; drag = null; Kit.stat("lives", "❤️❤️❤️"); Kit.stat("goal", `0/${need}`); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function acc(x, y) { const dx = CX - x, dy = CY - y, d2 = dx * dx + dy * dy, d = Math.sqrt(d2); return [(GM * dx) / (d2 * d), (GM * dy) / (d2 * d)]; }
+        function predict(x, y, vx, vy) { const pts = []; for (let i = 0; i < 520; i++) { for (let k = 0; k < 2; k++) { const [ax, ay] = acc(x, y); vx += ax * 0.004; vy += ay * 0.004; x += vx * 0.004; y += vy * 0.004; } if (i % 4 === 0) pts.push([x, y]); if (Math.hypot(x - CX, y - CY) < PR || x < -100 || x > W + 100 || y < -100 || y > H + 100) break; } return pts; }
+        function launch() { if (!drag || !drag.cur) return; const vx = (drag.cur.x - drag.x) * 2.4, vy = (drag.cur.y - drag.y) * 2.4; if (Math.hypot(vx, vy) < 20) return; moons.push({ x: drag.x, y: drag.y, vx, vy, hue: Kit.randi(0, 360), age: 0, ang: Math.atan2(drag.y - CY, drag.x - CX), turns: 0, trail: [] }); beep(400, 0.15, "sine", 0.04, 300); }
+        function lose(m, why) { m.dead = true; lives--; fx.burst(m.x, m.y, `hsl(${m.hue},80%,65%)`, 26, 4); beep(100, 0.4, "sawtooth", 0.05); msg = { s: why, t: 1.5 }; Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) + "🖤".repeat(3 - Math.max(0, lives))); if (lives <= 0) end(); }
+        function update(dt) {
+            const n = 6, h = dt / n;
+            for (let s = 0; s < n; s++) for (const m of moons) { if (m.dead) continue; const [ax, ay] = acc(m.x, m.y); m.vx += ax * h; m.vy += ay * h; m.x += m.vx * h; m.y += m.vy * h; }
+            for (const m of moons) {
+                if (m.dead) continue; m.age += dt; m.trail.push([m.x, m.y]); if (m.trail.length > 60) m.trail.shift();
+                const a = Math.atan2(m.y - CY, m.x - CX); let da = a - m.ang; if (da > Math.PI) da -= Math.PI * 2; if (da < -Math.PI) da += Math.PI * 2; m.turns += da / (Math.PI * 2); m.ang = a;
+                if (Math.abs(m.turns) >= 1) { m.turns = 0; score += 10 * moons.filter((q) => !q.dead).length; Kit.stat("score", score); beep(1200, 0.03, "sine", 0.02); }
+                if (Math.hypot(m.x - CX, m.y - CY) < PR + MR) lose(m, T("A moon crashed into the planet!", "ירח התרסק לכוכב!"));
+                else if (m.x < -250 || m.x > W + 250 || m.y < -250 || m.y > H + 250) lose(m, T("A moon flew off into space!", "ירח עף לחלל!"));
+            }
+            for (const a of moons) for (const b of moons) if (a !== b && !a.dead && !b.dead && Math.hypot(a.x - b.x, a.y - b.y) < MR * 2) { lose(a, T("Moon collision!", "התנגשות ירחים!")); if (state === "play") lose(b, T("Moon collision!", "התנגשות ירחים!")); }
+            moons = moons.filter((m) => !m.dead);
+            const alive = moons.filter((m) => m.age > 2).length; Kit.stat("goal", `${alive}/${need}`);
+            if (alive >= need) { holdT += dt; if (holdT > 5) { score += 200 * level; level++; need = Math.min(9, need + 1); holdT = 0; tune([523, 659, 784, 1047], 0.08, "square", 0.05); msg = { s: `${T("Level", "שלב")} ${level}! ${T("Now get", "עכשיו")} ${need} ${T("moons orbiting", "ירחים במסלול")}`, t: 2.5 }; Kit.save(50); } } else holdT = 0;
+        }
+        function end() { state = "over"; Kit.save(Math.floor(score / 20)); const b = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Your solar system fell apart!", "מערכת השמש שלכם התפרקה!")}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${b}`; Kit.show("over"); }, 800); }
+        function draw() {
+            ctx.fillStyle = "#04030f"; ctx.fillRect(0, 0, W, H);
+            for (const [x, y, b] of stars) { ctx.fillStyle = `rgba(255,255,255,${0.2 + b * 0.6})`; ctx.fillRect(x, y, 1.5, 1.5); }
+            const g = ctx.createRadialGradient(CX, CY, PR * 0.4, CX, CY, PR * 2.4); g.addColorStop(0, "#4a8aff55"); g.addColorStop(1, "#4a8aff00"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, PR * 2.4, 0, 7); ctx.fill();
+            const p = ctx.createRadialGradient(CX - 14, CY - 14, 6, CX, CY, PR); p.addColorStop(0, "#9fd8ff"); p.addColorStop(0.5, "#2a74ff"); p.addColorStop(1, "#14306a"); ctx.fillStyle = p; ctx.beginPath(); ctx.arc(CX, CY, PR, 0, 7); ctx.fill();
+            ctx.fillStyle = "#2ee6a099"; ctx.beginPath(); ctx.ellipse(CX - 10, CY - 6, 14, 9, 0.4, 0, 7); ctx.ellipse(CX + 14, CY + 12, 10, 6, -0.3, 0, 7); ctx.fill();
+            if (!moons) return;
+            for (const m of moons) { if (trailsOn) { ctx.strokeStyle = `hsla(${m.hue},80%,65%,0.35)`; ctx.lineWidth = 2; ctx.beginPath(); m.trail.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); } ctx.fillStyle = `hsl(${m.hue},70%,70%)`; ctx.beginPath(); ctx.arc(m.x, m.y, MR, 0, 7); ctx.fill(); ctx.fillStyle = "#0003"; ctx.beginPath(); ctx.arc(m.x + 3, m.y + 2, MR * 0.4, 0, 7); ctx.fill(); }
+            if (drag && drag.cur) { const vx = (drag.cur.x - drag.x) * 2.4, vy = (drag.cur.y - drag.y) * 2.4; const pts = predict(drag.x, drag.y, vx, vy); ctx.fillStyle = "#ffffff88"; pts.forEach(([x, y], i) => { if (i % 2 === 0) { ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill(); } }); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(drag.x, drag.y); ctx.lineTo(drag.cur.x, drag.cur.y); ctx.stroke(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(drag.x, drag.y, MR, 0, 7); ctx.fill(); }
+            if (holdT > 0) { ctx.strokeStyle = "#2ee6a0"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(CX, CY, PR + 12, -Math.PI / 2, -Math.PI / 2 + (holdT / 5) * Math.PI * 2); ctx.stroke(); }
+            fx.draw(ctx);
+            if (msg && msg.t > 0) Kit.text(ctx, msg.s, W / 2, 40, 20, "#ffc94d", "center");
+            else if (state === "play" && !moons.length) Kit.text(ctx, T("Press anywhere, drag in the direction to throw, let go", "לחצו בכל מקום, גררו לכיוון הזריקה ועזבו"), W / 2, H - 24, 15, "#ffffffaa", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play") return; const p = Kit.point(cv, e); if (Math.hypot(p.x - CX, p.y - CY) < PR + 30) return; drag = { x: p.x, y: p.y, cur: p }; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (drag) drag.cur = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => { launch(); drag = null; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Enter: "enter", KeyT: "t" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "t") trailsOn = !trailsOn; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); if (msg) msg.t -= dt; fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.orb = { get s() { return { state, n: moons && moons.length, lives, level }; }, start, add: (x, y, vx, vy) => { drag = { x, y, cur: { x: x + vx / 2.4, y: y + vy / 2.4 } }; launch(); drag = null; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Orbit Builder</h2><p>A space physics toy with a goal. A planet sits in the middle of the screen with real gravity. Throw moons into space and watch them curve: too slow and they spiral into the planet, too fast and they escape into deep space, but just right and they circle in an orbit. Each level asks you to keep more moons orbiting at the same time, without any of them colliding. The predicted path line helps you aim.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Press, drag and let go</td><td>Throw a moon</td></tr><tr><td>T</td><td>Show / hide trails</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Throw at right angles to the line to the planet.</li><li>Moons closer to the planet must move faster.</li><li>Give each moon its own lane at a different distance.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Orbit Builder</h3><p>Orbit Builder uses the same idea that keeps the real Moon going around Earth. A moon is always falling toward the planet, but if it's moving sideways fast enough, it keeps missing. To get an orbit, throw the moon sideways, at right angles to the line pointing to the planet.</p><p>Speed depends on distance. Close to the planet, moons need to go fast; far away, slowly. The dotted line shows the predicted path, so adjust your drag until the dots make a loop that doesn't touch the planet.</p><p>With several moons, collisions are the danger. Put each moon at a different distance from the planet, like lanes on a running track, and throw them all in the same direction around the planet.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Get 3 moons orbiting.</li><li><b>Getting good:</b> Reach level 3.</li><li><b>Expert:</b> Keep 6 moons orbiting at once.</li></ul><h3>Did you know?</h3><p>The International Space Station orbits Earth at about 28,000 km/h. It circles the whole planet roughly every 90 minutes.</p><h3>Questions players ask</h3><h4>Why did my moon crash?</h4><p>It was too slow, or aimed too much toward the planet.</p><h4>Why did my moon fly away?</h4><p>It was too fast. Escaping a planet's gravity needs extra speed.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PaintTerritory/paintland">Paint Territory</a><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
