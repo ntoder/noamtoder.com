@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A neon racing game inspired by sci-fi movies. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Light Bikes · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Light <span>Bikes</span></h1>
+        <div class="stats"><div class="stat"><b id="round">1</b><small>Round</small></div><div class="stat"><b id="wins">0</b><small>Wins</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Light Bikes</h2>
+                <p id="startText">You ride the blue bike. It never stops and leaves a wall of light behind it. Steer with the arrow keys or swipe.<br>Crash into any wall and you're out. Be the last bike riding to win the round!<br><span class="seg"><button id="twoBtn" type="button">👥 2 Players</button></span>(Player 2 rides orange with W A S D.)</p>
+                <button class="btn" id="startBtn">▶ 1 Player</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">Don't race into small spaces. Stay where there's lots of room, and let the other bikes trap themselves.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Light Bikes — leave a glowing trail; make the others crash. 1 or 2 players vs CPU bikes
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "lightbikesBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CELL = 8, GW = Math.floor(W / CELL), GH = Math.floor(H / CELL), DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+        let grid, bikes, tick, acc, state = "ready", fx = Kit.particles(), wins = 0, round = 0, two = false, roundEnd = 0;
+        Kit.stat("best", Kit.best(BEST));
+        const COLORS = ["#5cc8ff", "#ff9a3c", "#ff4dd2", "#2ee6a0"];
+        function newRound() {
+            grid = new Uint8Array(GW * GH); acc = 0; roundEnd = 0;
+            const spots = [[8, GH / 2 | 0, "right"], [GW - 9, GH / 2 | 0, "left"], [GW / 2 | 0, 8, "down"], [GW / 2 | 0, GH - 9, "up"]];
+            bikes = spots.map(([x, y, d], i) => ({ x, y, d, nd: d, alive: true, c: COLORS[i], human: i === 0 || (two && i === 1), trail: [[x, y]] }));
+            bikes.forEach((b, i) => (grid[b.y * GW + b.x] = i + 1));
+            round++; Kit.stat("round", round);
+        }
+        function start(twoP) { two = !!twoP; wins = 0; round = 0; state = "play"; newRound(); Kit.stat("wins", 0); Kit.hide("start"); Kit.hide("over"); }
+        const free = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && !grid[y * GW + x];
+        const opp = { up: "down", down: "up", left: "right", right: "left" };
+        function turn(b, d) { if (b && b.alive && d !== opp[b.d]) b.nd = d; }
+        function space(x, y, limit) { // flood fill count
+            const seen = new Set(); const st = [[x, y]]; let n = 0;
+            while (st.length && n < limit) { const [cx, cy] = st.pop(); const k = cy * GW + cx; if (seen.has(k) || !free(cx, cy)) continue; seen.add(k); n++; st.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]); }
+            return n;
+        }
+        function ai(b) {
+            let best = null, bs = -1;
+            for (const d of Object.keys(DIRS)) {
+                if (d === opp[b.d]) continue; const [dx, dy] = DIRS[d]; const nx = b.x + dx, ny = b.y + dy;
+                if (!free(nx, ny)) continue;
+                let s = space(nx, ny, 300) + (d === b.d ? 3 : 0) + Math.random() * 4;
+                // look ahead straight
+                let run = 0; while (run < 20 && free(nx + dx * run, ny + dy * run)) run++; s += run * 0.6;
+                if (s > bs) { bs = s; best = d; }
+            }
+            if (best) b.nd = best;
+        }
+        function step() {
+            for (const b of bikes) if (b.alive && !b.human) ai(b);
+            const moves = [];
+            for (const b of bikes) { if (!b.alive) continue; b.d = b.nd; const [dx, dy] = DIRS[b.d]; moves.push([b, b.x + dx, b.y + dy]); }
+            for (const [b, nx, ny] of moves) {
+                const clash = moves.some(([o, ox, oy]) => o !== b && ox === nx && oy === ny);
+                if (!free(nx, ny) || clash) { b.alive = false; fx.burst(b.x * CELL, b.y * CELL, b.c, 40, 4); beep(90, 0.4, "sawtooth", 0.06, -40); continue; }
+            }
+            for (const [b, nx, ny] of moves) if (b.alive) { b.x = nx; b.y = ny; grid[ny * GW + nx] = bikes.indexOf(b) + 1; b.trail.push([nx, ny]); }
+            const alive = bikes.filter((b) => b.alive), humans = alive.filter((b) => b.human);
+            if (!humans.length || alive.length <= 1) {
+                roundEnd = 2;
+                const winner = alive.length === 1 ? alive[0] : null;
+                if (winner && winner.human) { wins++; Kit.stat("wins", wins); tune([523, 659, 784, 1047], 0.08, "square", 0.05); }
+                endMsg = winner ? (winner.human ? (two ? (bikes.indexOf(winner) === 0 ? T("Blue wins!", "הכחול ניצח!") : T("Orange wins!", "הכתום ניצח!")) : T("You win the round!", "ניצחתם בסיבוב!")) : T("A computer bike wins.", "אופנוע מחשב ניצח.")) : !humans.length ? T("You crashed!", "התרסקתם!") : T("Draw!", "תיקו!");
+                lost = !humans.length && !two;
+            }
+        }
+        let endMsg = "", lost = false;
+        function update(dt) {
+            if (roundEnd > 0) { roundEnd -= dt; if (roundEnd <= 0) { if (lost) return gameOver(); newRound(); } return; }
+            acc += dt; const sp = 1 / (16 + Math.min(10, round)); while (acc > sp) { acc -= sp; step(); if (roundEnd > 0) break; }
+        }
+        function gameOver() { state = "over"; Kit.save(wins * 100); const best = Kit.setBest(BEST, wins); $("overText").innerHTML = `${endMsg}<br>${T("Rounds won", "סיבובים שניצחתם")}: ${wins} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#04060f"; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#0f1e3a"; ctx.lineWidth = 1; for (let x = 0; x < W; x += CELL * 5) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += CELL * 5) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            if (!bikes) return;
+            ctx.lineCap = "square";
+            for (const b of bikes) {
+                ctx.strokeStyle = b.c + (b.alive ? "" : "55"); ctx.lineWidth = CELL * 0.6; ctx.shadowColor = b.c; ctx.shadowBlur = b.alive ? 10 : 0;
+                ctx.beginPath(); b.trail.forEach(([x, y], i) => (i ? ctx.lineTo(x * CELL + CELL / 2, y * CELL + CELL / 2) : ctx.moveTo(x * CELL + CELL / 2, y * CELL + CELL / 2))); ctx.stroke();
+                ctx.shadowBlur = 0;
+                if (b.alive) { ctx.fillStyle = "#fff"; ctx.fillRect(b.x * CELL - 1, b.y * CELL - 1, CELL + 2, CELL + 2); }
+            }
+            ctx.strokeStyle = "#5cc8ff"; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, W - 3, H - 3);
+            fx.draw(ctx);
+            if (roundEnd > 0) Kit.text(ctx, endMsg, W / 2, H / 2, 30, "#fff", "center");
+        }
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "w", KeyS: "s", KeyA: "a", KeyD: "d", Enter: "enter" }, (a) => {
+            if (a === "enter") { if (state !== "play") start(two); return; }
+            if (state !== "play" || !bikes) return;
+            const m = { w: "up", s: "down", a: "left", d: "right" };
+            if (two) { if (m[a]) turn(bikes[1], m[a]); else turn(bikes[0], a); }
+            else turn(bikes[0], m[a] || a);
+        });
+        Kit.swipe(cv, (d) => state === "play" && bikes && turn(bikes[0], d));
+        Kit.touchButtons((k) => state === "play" && bikes && turn(bikes[0], k));
+        $("startBtn").onclick = () => start(false); $("twoBtn").onclick = () => start(true); $("againBtn").onclick = () => start(two);
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.bikes = { get s() { return { state, wins, round }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Light Bikes</h2><p>A neon racing game inspired by sci-fi movies. Four light bikes speed around a dark grid, each leaving a solid wall of light behind it. You can only turn left or right, never stop. Any bike that hits a wall, a trail or another bike is out. Be the last one riding to win the round. Play alone against three computer bikes, or with a friend on the same keyboard.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrow keys or swipe</td><td>Steer the blue bike</td></tr><tr><td>W A S D</td><td>Steer the orange bike (2 players)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Cut across in front of another bike to box it in.</li><li>Leave yourself an escape route. Avoid narrow tunnels.</li><li>The bikes get a little faster every round.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Light Bikes</h3><p>Light Bikes is about space. Every bike is always making walls, so the arena gets smaller and smaller. The safest place is wherever there's the most open room. Avoid driving into a pocket that's closing, because you can't stop or reverse.</p><p>To attack, drive alongside another bike and then turn across its path. If you're ahead of it, your new trail becomes a wall it has to dodge. Near the edges this can trap it completely.</p><p>When only you and one other bike are left, try to cut the arena in two with your trail and keep the bigger half for yourself. Then ride in tight back-and-forth lines to fill your half slowly, while the other bike runs out of room first.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a round.</li><li><b>Getting good:</b> Win 3 rounds in a row.</li><li><b>Expert:</b> Beat a friend in 2-player mode.</li></ul><h3>Did you know?</h3><p>The idea of racing bikes that leave walls of light comes from a 1982 science-fiction film about a computer world. It became one of the most copied ideas in video games.</p><h3>Questions players ask</h3><h4>Can I stop or go backwards?</h4><p>No. Your bike always moves, and you can only turn left or right.</p><h4>How does 2-player mode work?</h4><p>Player 1 is blue with the arrow keys, Player 2 is orange with W A S D. Two computer bikes join in too.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/LightsOut/lightsout">Lights Out</a><a href="/MoonLander/moonlander">Moon Lander</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

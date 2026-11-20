@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A bouncy luck-and-aim game inspired by a famous TV game show board. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Plinko · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Plin<span>ko</span></h1>
+        <div class="stats"><div class="stat"><b id="balls">10</b><small>Balls</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="580" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Plinko</h2>
+                <p id="startText">Move the mouse (or ⬅ ➡) to aim, then click, tap or press Space to drop a ball.<br>It bounces down through the pegs into a slot. The edge slots are worth 100! Hit the gold peg to double that ball's points. You have 10 balls.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Balls usually end up close to where you drop them, but not always. Drop near an edge to aim for the big slots.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Plinko — drop balls through pegs into scoring slots
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "plinkoBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const ROWS = 12, PR = 5, BR = 8, TOP = 120, GAP = 44;
+        const SLOTS = [100, 25, 10, 5, 0, 2, 50, 2, 0, 5, 10, 25, 100];
+        let pegs, balls, left, score, state = "ready", aimX = W / 2, fx = Kit.particles(), hits = [], gold, round;
+        Kit.stat("best", Kit.best(BEST));
+        function build() {
+            pegs = []; for (let r = 0; r < ROWS; r++) { const n = r % 2 ? 12 : 13, off = r % 2 ? GAP / 2 : 0; for (let i = 0; i < n; i++) pegs.push({ x: W / 2 - ((13 - 1) * GAP) / 2 + off + i * GAP, y: TOP + r * 42, lit: 0 }); }
+            gold = Kit.pick(pegs.filter((p) => p.y > TOP + 100)); gold.gold = true;
+        }
+        function start() { build(); balls = []; left = 10; score = 0; round = 0; state = "play"; Kit.stat("score", 0); Kit.stat("balls", left); Kit.hide("start"); Kit.hide("over"); }
+        const SW = W / SLOTS.length, SLOT_Y = TOP + ROWS * 42 + 10;
+        function drop() { if (state !== "play" || left <= 0) return; left--; Kit.stat("balls", left); balls.push({ x: Math.max(30, Math.min(W - 30, aimX)) + Kit.rand(-1, 1), y: 70, vx: 0, vy: 0, mult: 1 }); beep(500, 0.04, "sine", 0.03); }
+        function update(dt) {
+            for (const b of balls) {
+                const steps = 3, h = dt / steps;
+                for (let s = 0; s < steps; s++) {
+                    b.vy += 900 * h; b.x += b.vx * h; b.y += b.vy * h; b.vx *= 0.999;
+                    if (b.x < BR) { b.x = BR; b.vx = Math.abs(b.vx) * 0.6; } if (b.x > W - BR) { b.x = W - BR; b.vx = -Math.abs(b.vx) * 0.6; }
+                    for (const p of pegs) {
+                        const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy);
+                        if (d < PR + BR) {
+                            const nx = dx / d, ny = dy / d; b.x = p.x + nx * (PR + BR); b.y = p.y + ny * (PR + BR);
+                            const dot = b.vx * nx + b.vy * ny; if (dot < 0) { b.vx -= 1.5 * dot * nx; b.vy -= 1.5 * dot * ny; b.vx += Kit.rand(-12, 12); }
+                            if (p.lit < 0.5) { beep(700 + p.y, 0.02, "triangle", 0.015); }
+                            p.lit = 1; if (p.gold && !b.golden) { b.golden = true; b.mult = 2; tune([880, 1320], 0.05, "square", 0.04); fx.burst(p.x, p.y, "#ffc94d", 16, 3); }
+                        }
+                    }
+                    // slot dividers
+                    if (b.y > SLOT_Y) { for (let i = 0; i <= SLOTS.length; i++) { const x = i * SW; if (Math.abs(b.x - x) < BR + 2) { b.vx = (b.x < x ? -1 : 1) * Math.abs(b.vx) * 0.5; b.x = x + (b.x < x ? -BR - 2 : BR + 2); } } }
+                    if (b.y > H - 30) {
+                        b.done = true; const i = Math.max(0, Math.min(SLOTS.length - 1, Math.floor(b.x / SW))); const pts = SLOTS[i] * b.mult;
+                        score += pts; Kit.stat("score", score); hits.push({ i, t: 1, pts });
+                        if (pts >= 50) { tune([523, 659, 784, 1047], 0.07, "square", 0.05); fx.burst(b.x, H - 40, "#ffc94d", 40, 5); } else if (pts > 0) beep(400 + pts * 10, 0.1, "square", 0.04); else beep(150, 0.15, "sawtooth", 0.03);
+                        break;
+                    }
+                }
+            }
+            balls = balls.filter((b) => !b.done);
+            pegs.forEach((p) => (p.lit = Math.max(0, p.lit - dt * 2)));
+            if (left <= 0 && !balls.length && state === "play") {
+                state = "end"; setTimeout(() => { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Out of balls!", "נגמרו הכדורים!")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 600);
+            }
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a1050"); g.addColorStop(1, "#0b0624"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!pegs) return;
+            for (const p of pegs) { ctx.fillStyle = p.gold ? "#ffc94d" : p.lit > 0 ? `rgba(92,200,255,${0.4 + p.lit * 0.6})` : "#8a8fc9"; if (p.lit > 0 || p.gold) { ctx.shadowColor = p.gold ? "#ffc94d" : "#5cc8ff"; ctx.shadowBlur = 12; } ctx.beginPath(); ctx.arc(p.x, p.y, p.gold ? PR + 2 : PR, 0, 7); ctx.fill(); ctx.shadowBlur = 0; }
+            for (let i = 0; i < SLOTS.length; i++) {
+                const v = SLOTS[i], hit = hits.find((h) => h.i === i && h.t > 0);
+                ctx.fillStyle = v >= 100 ? "#ff4dd2" : v >= 25 ? "#ff9a3c" : v >= 10 ? "#ffc94d" : v > 0 ? "#2ee6a0" : "#3a3f6b";
+                if (hit) ctx.globalAlpha = 0.5 + Math.sin(hit.t * 20) * 0.5;
+                Kit.rr(ctx, i * SW + 3, H - 56, SW - 6, 46, 6); ctx.fill(); ctx.globalAlpha = 1;
+                Kit.text(ctx, String(v), i * SW + SW / 2, H - 28, v >= 100 ? 13 : 15, "#10142a", "center");
+            }
+            ctx.fillStyle = "#ffffff33"; for (let i = 0; i <= SLOTS.length; i++) ctx.fillRect(i * SW - 1, SLOT_Y, 2, H - SLOT_Y - 56);
+            for (const b of balls) { ctx.fillStyle = b.golden ? "#ffc94d" : "#ff4d6d"; ctx.beginPath(); ctx.arc(b.x, b.y, BR, 0, 7); ctx.fill(); ctx.fillStyle = "#ffffff99"; ctx.beginPath(); ctx.arc(b.x - 3, b.y - 3, 3, 0, 7); ctx.fill(); }
+            for (const h of hits) if (h.t > 0) Kit.text(ctx, h.pts ? `+${h.pts}` : "0", h.i * SW + SW / 2, H - 70 - (1 - h.t) * 40, 18, "#fff", "center");
+            if (state === "play" && left > 0) { const x = Math.max(30, Math.min(W - 30, aimX)); ctx.fillStyle = "#ff4d6d88"; ctx.beginPath(); ctx.arc(x, 70, BR, 0, 7); ctx.fill(); ctx.strokeStyle = "#ffffff44"; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(x, 80); ctx.lineTo(x, TOP - 10); ctx.stroke(); ctx.setLineDash([]); }
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), W / 2, 40, 28, "#fff", "center", "'Press Start 2P', monospace", 400);
+            for (let i = 0; i < left; i++) { ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(20 + i * 18, 30, 6, 0, 7); ctx.fill(); }
+        }
+        cv.addEventListener("pointermove", (e) => (aimX = Kit.point(cv, e).x));
+        cv.addEventListener("pointerdown", (e) => { aimX = Kit.point(cv, e).x; drop(); });
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", Space: "drop", ArrowDown: "drop", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play" && state !== "end") start(); else if (a === "drop") drop(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (Kit.keys.has("left")) aimX -= 300 * dt; if (Kit.keys.has("right")) aimX += 300 * dt; aimX = Math.max(30, Math.min(W - 30, aimX)); if (pegs) update(dt); hits.forEach((h) => (h.t -= dt)); hits = hits.filter((h) => h.t > 0); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.plinko = { get s() { return { state, score, left }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Plinko</h2><p>A bouncy luck-and-aim game inspired by a famous TV game show board. Drop a ball from the top and watch it bounce off rows of pegs, zig-zagging down into one of the scoring slots. The outside slots are worth the most but are hard to reach, and the middle has some zeros. A gold peg doubles the points of any ball that touches it.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse or ⬅ ➡</td><td>Aim</td></tr><tr><td>Click, tap or Space</td><td>Drop a ball</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Drop close to the walls to aim for the 100 slots.</li><li>The middle has the 50 slot, but zeros right next to it.</li><li>Every ball that touches the gold peg turns gold and scores double.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Plinko</h3><p>Plinko is mostly luck, but aim matters. A ball usually lands somewhere near the spot you dropped it, with a random spread of a few slots either way. Dropping near the left or right wall gives you a real chance at the 100 slots, and the wall stops it bouncing too far out.</p><p>The middle is a gamble: the 50 slot sits between two zeros. If you want steady points, aim for the area between the edge and the middle, where the 10s and 25s are.</p><p>Keep an eye on the gold peg. It moves to a new place every game. Dropping right above it gives the best chance to turn your ball gold and double its score.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 200 points.</li><li><b>Getting good:</b> Land a ball in a 100 slot.</li><li><b>Expert:</b> Score 600 points in one game.</li></ul><h3>Did you know?</h3><p>When lots of balls fall through a peg board, most land in the middle and fewer reach the edges. Scientists call this shape a bell curve, and a peg board that shows it is called a Galton board.</p><h3>Questions players ask</h3><h4>How many balls do I get?</h4><p>Ten per game.</p><h4>What does the gold peg do?</h4><p>Any ball that touches it turns gold and scores double.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Reversi/reversi">Reversi</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

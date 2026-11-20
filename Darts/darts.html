@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Darts, the classic pub and tournament game, in your browser. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Darts · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Dar<span>ts</span></h1>
+        <div class="stats"><div class="stat"><b id="left">301</b><small>To go</small></div><div class="stat"><b id="darts">0</b><small>Darts</small></div><div class="stat"><b id="best">-</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Darts</h2>
+                <p id="startText">Aim with the mouse (or arrow keys); your hand wobbles a bit! Click, tap or press Space to throw.<br>Start at 301 and subtract what you hit. You must finish exactly on 0 with a double (the thin outer ring). Go below that and it's a BUST: your turn doesn't count.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Checkout!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Treble 20 (the thin inner ring at the top) is worth 60. Near the end, work out which double you need and aim for it.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Darts — a wobbling aim; click to throw. Score 501 down to zero in as few darts as possible (or Around the Clock)
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dartsBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CX = W / 2, CY = 330, R = 230;
+        const NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+        // radii as fraction of R (standard board ratios)
+        const RB = 0.037, RO = 0.094, TI = 0.582, TO = 0.629, DI = 0.953, DO = 1.0;
+        let left, darts, turnDarts = [], thrown = [], aim, wob, state = "ready", msg = null, turnStart, fx = Kit.particles(), flying = null, steady = 1;
+        Kit.stat("best", Kit.best(BEST) || "-");
+        function start() { left = 301; darts = 0; turnDarts = []; turnStart = left; thrown = []; state = "play"; msg = null; aim = { x: CX, y: CY }; wob = 0; Kit.stat("left", left); Kit.stat("darts", 0); Kit.hide("start"); Kit.hide("over"); }
+        function scoreAt(x, y) {
+            const dx = x - CX, dy = y - CY, d = Math.hypot(dx, dy) / R;
+            if (d <= RB) return { v: 50, m: 2, n: "BULL" }; if (d <= RO) return { v: 25, m: 1, n: "25" };
+            if (d > DO) return { v: 0, m: 0, n: T("Miss", "החטאה") };
+            let a = Math.atan2(dx, -dy) * 180 / Math.PI; a = (a + 360 + 9) % 360; const n = NUMS[Math.floor(a / 18)];
+            if (d >= DI) return { v: n * 2, m: 2, n: "D" + n }; if (d >= TI && d <= TO) return { v: n * 3, m: 3, n: "T" + n };
+            return { v: n, m: 1, n: String(n) };
+        }
+        let mouse = { x: CX, y: CY };
+        function throwDart() {
+            if (state !== "play" || flying || msg) return;
+            const hx = aim.x, hy = aim.y; flying = { x: hx, y: H + 40, tx: hx, ty: hy, t: 0 }; beep(900, 0.05, "sine", 0.02, -500);
+        }
+        function land(x, y) {
+            darts++; Kit.stat("darts", darts); const s = scoreAt(x, y); thrown.push({ x, y }); turnDarts.push(s); beep(200, 0.06, "square", 0.05);
+            const after = left - s.v;
+            if (after < 0 || after === 1 || (after === 0 && s.m !== 2)) { msg = { t: 1.6, s: `${T("BUST!", "חריגה!")} ${T("Back to", "חוזרים ל-")}${turnStart}`, bad: true }; left = turnStart; endTurn(); return; }
+            left = after; Kit.stat("left", left);
+            if (s.v >= 50 || s.m === 3) fx.burst(x, y, "#ffc94d", 18, 3);
+            if (left === 0) { tune([523, 659, 784, 1047, 1319], 0.09, "square", 0.05); return finish(); }
+            if (turnDarts.length === 3) { const tot = turnDarts.reduce((a, b) => a + b.v, 0); msg = { t: 1.4, s: tot === 180 ? "ONE HUNDRED AND EIGHTY!" : `${T("Turn", "סבב")}: ${tot}` }; if (tot >= 100) tune([659, 784, 988], 0.08, "square", 0.04); endTurn(); }
+        }
+        function endTurn() { turnDarts = []; turnStart = left; setTimeout(() => (thrown = []), 1300); }
+        function finish() { state = "over"; Kit.save(Math.max(0, 300 - darts * 10)); const prev = Kit.best(BEST); const best = !prev || darts < prev ? darts : prev; localStorage.setItem(BEST, best); Kit.stat("best", best); setTimeout(() => { $("overText").innerHTML = `${T("Checkout! You finished 301 in", "סיימתם 301 ב-")} ${darts} ${T("darts", "חצים")}.<br>${T("Best", "שיא")}: ${best}`; Kit.show("over"); }, 900); }
+        function update(dt) {
+            wob += dt; const sway = 26 + Math.min(40, darts * 0.6);
+            aim.x = mouse.x + Math.sin(wob * 2.1) * sway * 0.6 + Math.sin(wob * 3.7) * sway * 0.4;
+            aim.y = mouse.y + Math.cos(wob * 1.7) * sway * 0.6 + Math.sin(wob * 4.3) * sway * 0.3;
+            if (flying) { flying.t += dt * 4; if (flying.t >= 1) { const f = flying; flying = null; land(f.tx, f.ty); } }
+            if (msg) { msg.t -= dt; if (msg.t <= 0) msg = null; }
+        }
+        function draw() {
+            ctx.fillStyle = "#13261b"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#0b0b0b"; ctx.beginPath(); ctx.arc(CX, CY, R * 1.18, 0, 7); ctx.fill();
+            for (let i = 0; i < 20; i++) {
+                const a0 = (i * 18 - 9 - 90) * Math.PI / 180, a1 = a0 + Math.PI / 10, dark = i % 2 === 0;
+                const ring = (r0, r1, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(CX, CY, r1 * R, a0, a1); ctx.arc(CX, CY, r0 * R, a1, a0, true); ctx.closePath(); ctx.fill(); };
+                ring(RO, TI, dark ? "#1a1a1a" : "#f1e3c2"); ring(TI, TO, dark ? "#d62b3a" : "#1f9a4b"); ring(TO, DI, dark ? "#1a1a1a" : "#f1e3c2"); ring(DI, DO, dark ? "#d62b3a" : "#1f9a4b");
+                const am = (i * 18 - 90) * Math.PI / 180; Kit.text(ctx, String(NUMS[i]), CX + Math.cos(am) * R * 1.09, CY + Math.sin(am) * R * 1.09 + 6, 17, "#fff", "center");
+            }
+            ctx.fillStyle = "#1f9a4b"; ctx.beginPath(); ctx.arc(CX, CY, RO * R, 0, 7); ctx.fill(); ctx.fillStyle = "#d62b3a"; ctx.beginPath(); ctx.arc(CX, CY, RB * R, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#c0c0c0aa"; ctx.lineWidth = 1; for (const r of [RO, TI, TO, DI, DO]) { ctx.beginPath(); ctx.arc(CX, CY, r * R, 0, 7); ctx.stroke(); }
+            for (const d of thrown) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(d.x, d.y, 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#2a74ff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + 10, d.y + 18); ctx.stroke(); }
+            if (flying) { const s = 1 + (1 - flying.t) * 2, y = flying.y + (flying.ty - flying.y) * flying.t; ctx.strokeStyle = "#2a74ff"; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.moveTo(flying.tx, y); ctx.lineTo(flying.tx + 10 * s, y + 18 * s); ctx.stroke(); }
+            fx.draw(ctx);
+            if (state === "play" && !flying && !msg) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(aim.x, aim.y, 10, 0, 7); ctx.moveTo(aim.x - 16, aim.y); ctx.lineTo(aim.x + 16, aim.y); ctx.moveTo(aim.x, aim.y - 16); ctx.lineTo(aim.x, aim.y + 16); ctx.stroke(); }
+            // HUD
+            ctx.fillStyle = "#0008"; Kit.rr(ctx, 16, H - 92, W - 32, 76, 12); ctx.fill();
+            Kit.text(ctx, String(left ?? 301), 80, H - 42, 34, "#ffc94d", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, T("to go", "נשאר"), 80, H - 22, 12, "#fff", "center");
+            for (let i = 0; i < 3; i++) { const s = turnDarts && turnDarts[i]; ctx.fillStyle = s ? "#2a74ff" : "#ffffff22"; Kit.rr(ctx, 170 + i * 110, H - 78, 96, 48, 8); ctx.fill(); if (s) Kit.text(ctx, s.n, 218 + i * 110, H - 48, 18, "#fff", "center"); }
+            if (state === "play" && left <= 40 && left % 2 === 0 && left > 0) Kit.text(ctx, `${T("Finish on", "סיימו על")} D${left / 2}`, W / 2, 48, 18, "#2ee6a0", "center");
+            if (msg) Kit.text(ctx, msg.s, W / 2, 48, 22, msg.bad ? "#ff4d6d" : "#fff", "center");
+        }
+        cv.addEventListener("pointermove", (e) => (mouse = Kit.point(cv, e)));
+        cv.addEventListener("pointerdown", (e) => { mouse = Kit.point(cv, e); if (e.pointerType === "touch") { pendingTouch = true; } else throwDart(); });
+        let pendingTouch = false;
+        cv.addEventListener("pointerup", () => { if (pendingTouch) { pendingTouch = false; throwDart(); } });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "t", Enter: "enter", ArrowLeft: "l", ArrowRight: "r", ArrowUp: "u", ArrowDown: "d" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "t") throwDart(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { const k = Kit.keys, s = 220 * dt; if (k.has("l")) mouse.x -= s; if (k.has("r")) mouse.x += s; if (k.has("u")) mouse.y -= s; if (k.has("d")) mouse.y += s; if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.darts = { get s() { return { state, left, darts }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Darts</h2><p>Darts, the classic pub and tournament game, in your browser. You start on 301 and every dart takes away what it hits. The thin outer ring doubles a number and the thin inner ring triples it. To win you must hit exactly zero, and the last dart must be a double or the bullseye. Your aim wobbles, so time your throw for when the crosshair drifts over your target. Try to finish in as few darts as you can.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse or arrow keys</td><td>Aim</td></tr><tr><td>Click, tap or Space</td><td>Throw</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Treble 20 is the biggest score on the board: 60.</li><li>Leave yourself an even number at the end so there's a double to finish on.</li><li>Watch the wobble and throw when the crosshair swings over your target.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Darts</h3><p>The fastest way to bring 301 down is the 20 at the top, especially the treble ring, which makes it worth 60. Three treble 20s is 180, the best possible turn. If you keep missing to the sides, try the treble 19 at the bottom: the numbers around it (7 and 3) are less painful misses than the 1 and 5 next to the 20.</p><p>Your crosshair wobbles in a pattern. Instead of chasing it, keep the mouse still on your target and watch it swing. Throw at the moment it passes through the spot you want.</p><p>The finish is the tricky part. You must land on exactly zero with a double. At 40 you need double 20, at 32 double 16 and so on. Try to leave an even number, ideally one that can be halved several times (32, 16, 8), so a near miss still leaves you a double.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Finish a game.</li><li><b>Getting good:</b> Finish 301 in under 25 darts.</li><li><b>Expert:</b> Score 100 or more in one turn.</li></ul><h3>Did you know?</h3><p>The highest possible three-dart score is 180, from three treble 20s. Players and crowds shout it out in a famous long call: one hundred and eighty!</p><h3>Questions players ask</h3><h4>What's a bust?</h4><p>If your score goes below zero, to exactly 1, or to zero without a double, the whole turn is cancelled.</p><h4>Why do I have to finish on a double?</h4><p>That's the real rule in tournament darts. The bullseye (50) counts as a double too.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

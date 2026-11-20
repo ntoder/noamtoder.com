@@ -83,6 +83,10 @@ export const GAMES = {
     stickbridge: { name: "Stick Bridge", path: "/StickBridge/stickbridge", img: "/thumbs/stickbridge.png", tags: ["arcade"], desc: "Grow a stick just long enough to cross the gap.", isNew: true },
     citydefender: { name: "City Defender", path: "/CityDefender/citydefender", img: "/thumbs/citydefender.png", tags: ["arcade", "shooter"], desc: "Tap the sky to stop falling rockets and save your cities.", isNew: true },
     alieninvaders: { name: "Alien Invaders", path: "/AlienInvaders/invaders", img: "/thumbs/alieninvaders.png", tags: ["arcade", "shooter"], desc: "Blast the marching alien army before it lands.", isNew: true },
+    lightbikes: { name: "Light Bikes", path: "/LightBikes/lightbikes", img: "/thumbs/lightbikes.png", tags: ["arcade", "2 players"], desc: "Ride a glowing bike and trap the others with your trail.", isNew: true },
+    moonlander: { name: "Moon Lander", path: "/MoonLander/moonlander", img: "/thumbs/moonlander.png", tags: ["arcade", "physics"], desc: "Fire your engine carefully and land softly on the Moon.", isNew: true },
+    darts: { name: "Darts", path: "/Darts/darts", img: "/thumbs/darts.png", tags: ["sports"], desc: "Play 301: count down to zero and finish on a double.", isNew: true },
+    plinko: { name: "Plinko", path: "/Plinko/plinko", img: "/thumbs/plinko.png", tags: ["arcade", "physics"], desc: "Drop balls through the pegs and hope for the 100 slot.", isNew: true },
 };
 
 // Games that only count plays (no score)

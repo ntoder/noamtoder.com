@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A gentle physics challenge. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Moon Lander · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Moon <span>Lander</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="fuel">0</b><small>Fuel</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="680"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Moon Lander</h2>
+                <p id="startText">⬆ (or W / Space) fires the engine, ⬅ ➡ tilt the lander.<br>Land on a green pad: slowly, straight up and not sliding sideways. The numbers top-left turn green when you're safe. Smaller pads score more!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⟲</button><button data-k="up">🔥</button><button data-k="right">⟳</button></div>
+    <p class="hint">Use short bursts of the engine. Holding it down too long wastes fuel and sends you flying back up.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Moon Lander — thrust and rotate to land gently on a flat pad
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "moonlanderBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const G = 22;
+        let ship, terrain, pads, level, score, state = "ready", fx = Kit.particles(), flame = 0, result = null, stars, landedT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function makeTerrain() {
+            terrain = []; pads = []; const n = 48, step = W / n; let y = H - 120;
+            const padCount = level < 3 ? 3 : 2, padIdx = []; while (padIdx.length < padCount) { const i = Kit.randi(2, n - 8); if (padIdx.every((p) => Math.abs(p - i) > 8)) padIdx.push(i); }
+            for (let i = 0; i <= n; i++) {
+                const pi = padIdx.find((p) => i >= p && i <= p + (level < 4 ? 4 : 3) - 1);
+                if (pi !== undefined && i > pi) { terrain.push({ x: i * step, y: terrain[terrain.length - 1].y }); continue; }
+                if (pi === i) { terrain.push({ x: i * step, y }); continue; }
+                y += Kit.rand(-55, 55) * (1 + level * 0.12); y = Math.max(H * 0.4, Math.min(H - 30, y)); terrain.push({ x: i * step, y });
+            }
+            for (const p of padIdx) { const w = (level < 4 ? 4 : 3) - 1; pads.push({ x0: terrain[p].x, x1: terrain[p + w].x, y: terrain[p].y, mult: w === 3 ? (padIdx.indexOf(p) === 0 ? 2 : 1) : 3 }); }
+            pads.forEach((p) => (p.mult = Math.max(1, Math.round(5 - (p.x1 - p.x0) / step) + (p.y > H - 100 ? 0 : 1))));
+        }
+        function newLevel() { makeTerrain(); ship = { x: Kit.rand(80, W - 80), y: 70, vx: Kit.rand(-30, 30), vy: 0, a: 0, fuel: Math.max(400, 1000 - level * 60) }; result = null; Kit.stat("level", level); }
+        function start() { level = 1; score = 0; state = "play"; stars = Array.from({ length: 90 }, () => [Math.random() * W, Math.random() * H, Math.random()]); newLevel(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function groundAt(x) { for (let i = 0; i < terrain.length - 1; i++) { const a = terrain[i], b = terrain[i + 1]; if (x >= a.x && x <= b.x) return a.y + ((x - a.x) / (b.x - a.x)) * (b.y - a.y); } return H; }
+        function update(dt) {
+            if (result) { landedT -= dt; if (landedT <= 0) { if (result.ok) { level++; newLevel(); } else gameOver(); } return; }
+            const k = Kit.keys; let thrust = false;
+            if (k.has("left")) ship.a -= 2.6 * dt; if (k.has("right")) ship.a += 2.6 * dt;
+            ship.a = Math.max(-1.6, Math.min(1.6, ship.a));
+            if (k.has("up") && ship.fuel > 0) { thrust = true; ship.fuel -= 60 * dt; ship.vx += Math.sin(ship.a) * 55 * dt; ship.vy -= Math.cos(ship.a) * 55 * dt; if (Math.random() < 0.6) fx.burst(ship.x - Math.sin(ship.a) * 14, ship.y + Math.cos(ship.a) * 14, Kit.pick(["#ffc94d", "#ff7a3c"]), 1, 1); }
+            flame = thrust ? Math.min(1, flame + dt * 8) : Math.max(0, flame - dt * 8);
+            if (thrust && Math.random() < 0.3) beep(60 + Math.random() * 30, 0.05, "sawtooth", 0.015);
+            ship.vy += G * dt; ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+            if (ship.x < 0) ship.x += W; if (ship.x > W) ship.x -= W;
+            Kit.stat("fuel", Math.max(0, Math.round(ship.fuel)));
+            const legs = [ship.x - 11, ship.x + 11];
+            if (legs.some((lx) => ship.y + 14 >= groundAt(lx)) || ship.y < -200) {
+                const pad = pads.find((p) => legs[0] >= p.x0 && legs[1] <= p.x1);
+                const soft = ship.vy < 28 && Math.abs(ship.vx) < 16 && Math.abs(ship.a) < 0.22;
+                if (pad && soft) {
+                    const pts = Math.round((50 + ship.fuel * 0.1) * pad.mult); score += pts; Kit.stat("score", score);
+                    ship.y = pad.y - 14; result = { ok: true, msg: `${T("Perfect landing!", "נחיתה מושלמת!")} +${pts}` }; tune([523, 659, 784, 1047], 0.09, "triangle", 0.05); ship.fuel += 150;
+                } else {
+                    result = { ok: false, msg: !pad ? T("You crashed into the rocks!", "התרסקתם בסלעים!") : ship.vy >= 28 ? T("Too fast!", "מהר מדי!") : Math.abs(ship.a) >= 0.22 ? T("Not straight!", "לא ישר!") : T("Sliding sideways!", "החלקה לצד!") };
+                    fx.burst(ship.x, ship.y, "#ff7a3c", 50, 5); fx.burst(ship.x, ship.y, "#cccccc", 30, 3); beep(70, 0.7, "sawtooth", 0.08, -30);
+                }
+                ship.vx = ship.vy = 0; landedT = 2;
+            }
+        }
+        function gameOver() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${result ? result.msg : ""}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#03040c"; ctx.fillRect(0, 0, W, H);
+            if (!terrain) return;
+            for (const [x, y, b] of stars) { ctx.fillStyle = `rgba(255,255,255,${0.2 + b * 0.6})`; ctx.fillRect(x, y, 1.5, 1.5); }
+            ctx.fillStyle = "#3a8fd9"; ctx.beginPath(); ctx.arc(W - 70, 80, 28, 0, 7); ctx.fill(); ctx.fillStyle = "#2ee6a0"; ctx.beginPath(); ctx.arc(W - 78, 72, 10, 0, 7); ctx.arc(W - 60, 92, 7, 0, 7); ctx.fill();
+            ctx.fillStyle = "#4a4d5e"; ctx.beginPath(); ctx.moveTo(0, H); for (const p of terrain) ctx.lineTo(p.x, p.y); ctx.lineTo(W, H); ctx.fill();
+            ctx.strokeStyle = "#9aa0b5"; ctx.lineWidth = 2; ctx.beginPath(); terrain.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+            for (const p of pads) { ctx.fillStyle = "#2ee6a0"; ctx.fillRect(p.x0, p.y - 2, p.x1 - p.x0, 5); Kit.text(ctx, `x${p.mult}`, (p.x0 + p.x1) / 2, p.y + 22, 14, "#2ee6a0", "center"); }
+            fx.draw(ctx);
+            if (!(result && !result.ok)) {
+                ctx.save(); ctx.translate(ship.x, ship.y); ctx.rotate(ship.a);
+                if (flame > 0) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(-6, 8); ctx.lineTo(0, 8 + flame * (18 + Math.random() * 10)); ctx.lineTo(6, 8); ctx.fill(); }
+                ctx.strokeStyle = "#ddd"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-7, 6); ctx.lineTo(-12, 14); ctx.moveTo(7, 6); ctx.lineTo(12, 14); ctx.stroke();
+                ctx.fillStyle = "#c9ccd9"; ctx.fillRect(-10, -2, 20, 10); ctx.fillStyle = "#e8ebf5"; ctx.beginPath(); ctx.arc(0, -6, 9, 0, 7); ctx.fill(); ctx.fillStyle = "#5cc8ff"; ctx.beginPath(); ctx.arc(0, -7, 4, 0, 7); ctx.fill();
+                ctx.restore();
+            }
+            // HUD
+            const ok = (v, lim) => (v < lim ? "#2ee6a0" : "#ff4d6d");
+            Kit.text(ctx, `${T("Down", "ירידה")} ${Math.round(ship.vy)}`, 16, 30, 14, ok(ship.vy, 28), "left");
+            Kit.text(ctx, `${T("Side", "צד")} ${Math.round(Math.abs(ship.vx))}`, 16, 52, 14, ok(Math.abs(ship.vx), 16), "left");
+            Kit.text(ctx, `${T("Tilt", "הטיה")} ${Math.round(ship.a * 57)}°`, 16, 74, 14, ok(Math.abs(ship.a), 0.22), "left");
+            ctx.fillStyle = "#ffffff22"; ctx.fillRect(16, 86, 120, 8); ctx.fillStyle = ship.fuel > 200 ? "#ffc94d" : "#ff4d6d"; ctx.fillRect(16, 86, Math.min(120, (ship.fuel / 1000) * 120), 8);
+            if (result) Kit.text(ctx, result.msg, W / 2, H / 3, 24, result.ok ? "#2ee6a0" : "#ff4d6d", "center");
+        }
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", KeyA: "left", KeyD: "right", KeyW: "up", Space: "up", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.moon = { get s() { return { state, score, level }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Moon Lander</h2><p>A gentle physics challenge. Your lander is falling toward the Moon, pulled down by gravity. Fire the engine to slow down, and tilt to move sideways. To land safely you must touch down on a flat green pad going slowly, standing straight and not drifting. Each landing gives points for the pad's multiplier and leftover fuel, then the next level has rougher ground and less fuel.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ W or Space</td><td>Fire the engine</td></tr><tr><td>⬅ ➡ or A D</td><td>Tilt the lander</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Stop sliding sideways first, then worry about falling.</li><li>Tilt back to straight before you touch down.</li><li>The x2 and x3 pads are worth the risk if you have fuel.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Moon Lander</h3><p>Moon Lander is all about speed control. Gravity pulls you down a little faster every second, so it's easier to keep your speed low the whole way than to brake hard at the end. Give the engine short taps to hover your falling speed around 15 to 20.</p><p>To move sideways, tilt the lander and fire. Then tilt the other way and fire again to stop. The three numbers in the corner show your falling speed, sideways speed and tilt. All three must be green when your legs touch the pad.</p><p>Pick your pad early. Smaller pads have bigger multipliers, but they need more precise flying. If your fuel is getting low, go for the nearest pad, because a crash ends the game but a landing refills some fuel.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Land once.</li><li><b>Getting good:</b> Land on a x3 pad.</li><li><b>Expert:</b> Reach level 5.</li></ul><h3>Did you know?</h3><p>The Moon's gravity is about one sixth of Earth's. That's why astronauts could bounce around, and why a lander only needs a small engine to hover.</p><h3>Questions players ask</h3><h4>Why did I crash on the pad?</h4><p>One of the three numbers was red: falling too fast, sliding sideways, or tilted.</p><h4>What happens when I run out of fuel?</h4><p>The engine stops working and you just fall, so be careful!</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
