@@ -112,6 +112,7 @@ export const GAMES = {
     parkingpro: { name: "Parking Pro", path: "/ParkingPro/parking", img: "/thumbs/parkingpro.png", tags: ["puzzle", "sports"], desc: "Steer carefully and park in the glowing spot without a scratch.", isNew: true },
     neonslope: { name: "Neon Slope", path: "/NeonSlope/neonslope", img: "/thumbs/neonslope.png", tags: ["arcade", "runner"], desc: "Roll down an endless glowing track. Dodge the blocks and jump the gaps!", isNew: true },
     pinball: { name: "Pinball", path: "/Pinball/pinball", img: "/thumbs/pinball.png", tags: ["arcade", "physics"], desc: "Flip, bump and light up the table. Keep the ball alive!", isNew: true },
+    ludo: { name: "Ludo", path: "/Ludo/ludo", img: "/thumbs/ludo.png", tags: ["board"], desc: "Race your four tokens around the board and home. Capture your rivals!", isNew: true },
 };
 
 // Games that only count plays (no score)

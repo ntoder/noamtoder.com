@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The classic race board game for two to four players. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Ludo · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Lu<span>do</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Ludo</h2>
+                <p id="startText"><span class="seg" id="players"><button data-p="1,4" class="on">🙂 vs 🤖🤖🤖</button><button data-p="1,2">🙂 vs 🤖</button><button data-p="2,2">👥 2 Players</button><button data-p="3,3">3 Players</button><button data-p="4,4">4 Players</button></span>Roll the die (Space or the Roll button), then tap a glowing token to move it. You need a 6 to bring a token out of your yard.<br>Land on a rival to send it home! ★ squares are safe. A 6 gives another roll. Get all four tokens to the middle to win.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Don't leave a token sitting just in front of a rival. Move to ★ safe squares when you can.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Ludo — 2 to 4 players (people or computer). Roll 6 to leave the yard, capture rivals, get all 4 tokens home
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const N = 15, CS = 40, OX = 20, OY = 20;
+        const COLORS = ["#ff4d6d", "#2ee6a0", "#ffc94d", "#2a74ff"], NAMES = () => [T("Red", "אדום"), T("Green", "ירוק"), T("Yellow", "צהוב"), T("Blue", "כחול")];
+        const TRACK = []; (() => { const add = (c, r) => TRACK.push([c, r]); for (let c = 1; c <= 5; c++) add(c, 6); for (let r = 5; r >= 0; r--) add(6, r); add(7, 0); add(8, 0); for (let r = 1; r <= 5; r++) add(8, r); for (let c = 9; c <= 14; c++) add(c, 6); add(14, 7); add(14, 8); for (let c = 13; c >= 9; c--) add(c, 8); for (let r = 9; r <= 14; r++) add(8, r); add(7, 14); add(6, 14); for (let r = 13; r >= 9; r--) add(6, r); for (let c = 5; c >= 0; c--) add(c, 8); add(0, 7); add(0, 6); })();
+        const HOME = [[1, 7, 1, 0], [7, 1, 0, 1], [13, 7, -1, 0], [7, 13, 0, -1]].map(([c, r, dc, dr]) => Array.from({ length: 6 }, (_, i) => [c + dc * i, r + dr * i]));
+        const YARD = [[1.5, 1.5], [10.5, 1.5], [10.5, 10.5], [1.5, 10.5]];
+        const SEAT = [0, 1, 2, 3]; // board corner per colour: red top-left, green top-right, yellow bottom-right, blue bottom-left
+        const SAFE = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+        let players, turn, die = 0, rolled = false, rolling = 0, state = "ready", humans = 1, total = 4, msg = "", sixes = 0, anim = null, movable = [];
+        document.querySelectorAll("#players button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#players button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); [humans, total] = b.dataset.p.split(",").map(Number); }));
+        function start() {
+            const cols = total === 2 ? [0, 2] : total === 3 ? [0, 1, 2] : [0, 1, 2, 3];
+            players = cols.map((c, i) => ({ c, cpu: i >= humans, tok: [-1, -1, -1, -1], done: false }));
+            turn = 0; die = 0; rolled = false; sixes = 0; state = "play"; msg = `${NAMES()[players[0].c]}: ${T("roll the die!", "הטילו את הקובייה!")}`; Kit.hide("start"); Kit.hide("over"); cpuMaybe();
+        }
+        const abs = (c, rel) => (rel + c * 13) % 52;
+        function cellOf(c, rel, k) { if (rel < 0) { const [x, y] = YARD[c]; return [x + (k % 2) * 2, y + Math.floor(k / 2) * 2]; } if (rel <= 50) return TRACK[abs(c, rel)]; return HOME[c][Math.min(5, rel - 51)]; }
+        function legal(p, d) { const out = []; p.tok.forEach((r, k) => { if (r === 56) return; if (r < 0) { if (d === 6) out.push(k); return; } if (r + d <= 56) out.push(k); }); return out; }
+        function roll() {
+            if (state !== "play" || rolled || rolling || anim) return; rolling = 0.6; beep(300, 0.03, "square", 0.02);
+        }
+        function afterRoll() {
+            const p = players[turn]; rolled = true; movable = legal(p, die);
+            if (die === 6) sixes++; else sixes = 0;
+            if (sixes === 3) { msg = `${NAMES()[p.c]} ${T("rolled three 6s. Turn lost!", "הטיל שלוש פעמים 6. התור הולך!")}`; sixes = 0; return setTimeout(() => nextTurn(false), 900); }
+            if (!movable.length) { msg = `${NAMES()[p.c]} ${T("rolled", "הטיל")} ${die}. ${T("No move.", "אין מהלך.")}`; return setTimeout(() => nextTurn(die === 6), 900); }
+            msg = `${NAMES()[p.c]} ${T("rolled", "הטיל")} ${die}. ${p.cpu ? "" : T("Pick a token to move.", "בחרו כלי להזיז.")}`;
+            if (p.cpu) setTimeout(() => move(cpuPick(p)), 600); else if (movable.length === 1) setTimeout(() => state === "play" && rolled && move(movable[0]), 350);
+        }
+        function cpuPick(p) {
+            let best = movable[0], bs = -1e9;
+            for (const k of movable) {
+                const r = p.tok[k], nr = r < 0 ? 0 : r + die; let s = Math.random();
+                if (nr === 56) s += 50; if (r < 0) s += 30;
+                if (nr <= 50) { const a = abs(p.c, nr); if (!SAFE.has(a) && players.some((o) => o !== p && o.tok.some((t) => t >= 0 && t <= 50 && abs(o.c, t) === a))) s += 80; if (SAFE.has(a)) s += 10; }
+                if (nr > 50) s += 15; s += nr * 0.2; if (r >= 0 && r <= 50 && !SAFE.has(abs(p.c, r))) s += 5;
+                if (s > bs) { bs = s; best = k; }
+            }
+            return best;
+        }
+        function move(k) {
+            const p = players[turn]; if (!movable.includes(k)) return;
+            const from = p.tok[k], to = from < 0 ? 0 : from + die; const path = []; if (from < 0) path.push(0); else for (let r = from + 1; r <= to; r++) path.push(r);
+            anim = { p, k, path, t: 0 }; movable = [];
+        }
+        function finishMove() {
+            const { p, k } = anim; anim = null; const r = p.tok[k]; let bonus = die === 6, captured = false;
+            if (r >= 0 && r <= 50) { const a = abs(p.c, r); if (!SAFE.has(a)) for (const o of players) if (o !== p) o.tok.forEach((t, j) => { if (t >= 0 && t <= 50 && abs(o.c, t) === a) { o.tok[j] = -1; captured = true; } }); }
+            if (captured) { bonus = true; msg = `${NAMES()[p.c]} ${T("captured a token! Roll again.", "תפס כלי! עוד תור.")}`; beep(150, 0.3, "sawtooth", 0.05); }
+            if (r === 56) { bonus = true; tune([659, 880, 1100], 0.06, "triangle", 0.04); msg = `${NAMES()[p.c]} ${T("got a token home!", "הכניס כלי הביתה!")}`; }
+            if (p.tok.every((t) => t === 56)) { state = "over"; tune([523, 659, 784, 1047, 1319], 0.1, "square", 0.05); if (!p.cpu) Kit.save(100); setTimeout(() => { $("overText").innerHTML = `🏆 ${NAMES()[p.c]} ${T("wins!", "ניצח!")}`; Kit.show("over"); }, 800); return; }
+            nextTurn(bonus);
+        }
+        function nextTurn(again) { rolled = false; if (!again) { turn = (turn + 1) % players.length; sixes = 0; } if (!msg.includes("!") || !again) msg = `${NAMES()[players[turn].c]}: ${T("roll the die!", "הטילו את הקובייה!")}`; cpuMaybe(); }
+        function cpuMaybe() { if (state === "play" && players[turn].cpu) setTimeout(() => state === "play" && players[turn].cpu && !rolled && roll(), 700); }
+        function step(dt) {
+            if (rolling) { rolling -= dt; die = Kit.randi(1, 6); if (rolling <= 0) { rolling = 0; afterRoll(); } }
+            if (anim) { anim.t += dt; if (anim.t > 0.16) { anim.t = 0; anim.p.tok[anim.k] = anim.path.shift(); beep(500, 0.03, "triangle", 0.02); if (!anim.path.length) finishMove(); } }
+        }
+        const px = (c) => OX + c * CS, py = (r) => OY + r * CS;
+        function drawBoard() {
+            ctx.fillStyle = "#fff"; ctx.fillRect(OX, OY, N * CS, N * CS);
+            SEAT.forEach((s, c) => { const [x, y] = [[0, 0], [9, 0], [9, 9], [0, 9]][c]; ctx.fillStyle = COLORS[c]; ctx.fillRect(px(x), py(y), 6 * CS, 6 * CS); ctx.fillStyle = "#fff"; Kit.rr(ctx, px(x + 1), py(y + 1), 4 * CS, 4 * CS, 12); ctx.fill(); });
+            ctx.strokeStyle = "#c8cbd6"; ctx.lineWidth = 1;
+            TRACK.forEach(([c, r], i) => { const own = [0, 13, 26, 39].indexOf(i); ctx.fillStyle = own >= 0 ? COLORS[own] : "#fff"; ctx.fillRect(px(c), py(r), CS, CS); ctx.strokeRect(px(c), py(r), CS, CS); if (SAFE.has(i) && own < 0) Kit.text(ctx, "★", px(c) + CS / 2, py(r) + CS / 2 + 7, 20, "#c8cbd6", "center"); });
+            HOME.forEach((cells, c) => cells.forEach(([x, y], i) => { if (i === 5) return; ctx.fillStyle = COLORS[c]; ctx.fillRect(px(x), py(y), CS, CS); ctx.strokeRect(px(x), py(y), CS, CS); }));
+            const cx = px(7.5), cy = py(7.5), h = CS * 1.5; [[0, -1, 1], [1, 0, 2], [0, 1, 3], [-1, 0, 0]].forEach(([dx, dy, c], i) => { ctx.fillStyle = COLORS[[1, 2, 3, 0][i]]; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (dx - dy) * h, cy + (dy + dx) * h); ctx.lineTo(cx + (dx + dy) * h, cy + (dy - dx) * h); ctx.fill(); });
+        }
+        function token(x, y, c, glow, n) { ctx.fillStyle = "#0005"; ctx.beginPath(); ctx.ellipse(x, y + 9, 13, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = COLORS[c]; ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fill(); ctx.strokeStyle = glow ? "#1a1a2a" : "#fff"; ctx.lineWidth = glow ? 4 : 3; ctx.stroke(); ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.arc(x - 4, y - 4, 4, 0, 7); ctx.fill(); if (n > 1) Kit.text(ctx, String(n), x, y + 5, 13, "#1a1a2a", "center"); }
+        function tokenPos(p, k) { const r = p.tok[k]; const [c, rr] = cellOf(p.c, r, k); return r < 0 ? [px(c) + CS / 2, py(rr) + CS / 2] : [px(c) + CS / 2, py(rr) + CS / 2]; }
+        function draw() {
+            ctx.fillStyle = "#1b1f3b"; ctx.fillRect(0, 0, W, H); drawBoard();
+            if (!players) return;
+            const stack = {};
+            for (const p of players) p.tok.forEach((r, k) => { if (r === 56) return; const pos = tokenPos(p, k); const key = pos.join(","); stack[key] = (stack[key] || 0) + 1; const n = stack[key]; const glow = state === "play" && players[turn] === p && movable.includes(k) && !p.cpu && Math.floor(performance.now() / 300) % 2; token(pos[0] + (n - 1) * 4, pos[1] - (n - 1) * 4, p.c, glow, 1); });
+            // side panel
+            const sx = OX + N * CS + 20, pw = W - sx - 16;
+            players.forEach((p, i) => { const y = 30 + i * 52; ctx.fillStyle = i === turn && state === "play" ? "#ffffff22" : "transparent"; Kit.rr(ctx, sx, y - 4, pw, 44, 10); ctx.fill(); ctx.fillStyle = COLORS[p.c]; ctx.beginPath(); ctx.arc(sx + 20, y + 18, 11, 0, 7); ctx.fill(); Kit.text(ctx, NAMES()[p.c] + (p.cpu ? " 🤖" : ""), sx + 40, y + 24, 16, "#fff", "left"); Kit.text(ctx, `🏠 ${p.tok.filter((t) => t === 56).length}/4`, sx + pw - 10, y + 24, 14, "#ffc94d", "right"); });
+            const dx = sx + pw / 2 - 40, dy = 260; ctx.fillStyle = "#fff"; Kit.rr(ctx, dx, dy, 80, 80, 14); ctx.fill(); ctx.strokeStyle = COLORS[players[turn].c]; ctx.lineWidth = 5; ctx.stroke();
+            if (die) { const P = { 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]], 4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], 6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] }[die]; ctx.fillStyle = "#1a1a2a"; for (const [a, b] of P) { ctx.beginPath(); ctx.arc(dx + 20 + a * 20, dy + 20 + b * 20, 7, 0, 7); ctx.fill(); } }
+            const me = players[turn];
+            if (state === "play" && !me.cpu && !rolled && !rolling) { ctx.fillStyle = COLORS[me.c]; Kit.rr(ctx, sx, 360, pw, 50, 12); ctx.fill(); Kit.text(ctx, T("🎲 Roll", "🎲 הטלה"), sx + pw / 2, 392, 20, "#1a1a2a", "center"); }
+            wrap(msg, sx, 450, pw, 22);
+        }
+        function wrap(s, x, y, w, lh) { ctx.font = "700 15px Inter, Rubik, sans-serif"; let line = ""; for (const wd of s.split(" ")) { const t = line ? line + " " + wd : wd; if (ctx.measureText(t).width > w && line) { Kit.text(ctx, line, x, y, 15, "#dfe3ff", "left", undefined, 700); y += lh; line = wd; } else line = t; } if (line) Kit.text(ctx, line, x, y, 15, "#dfe3ff", "left", undefined, 700); }
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play" || !players || players[turn].cpu) return; const p = Kit.point(cv, e);
+            if (!rolled) { if (p.x > OX + N * CS) roll(); return; }
+            const pl = players[turn]; let best = -1, bd = 26;
+            for (const k of movable) { const [x, y] = tokenPos(pl, k), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = k; } }
+            if (best >= 0) move(best);
+        });
+        Kit.onKeys({ Space: "roll", Enter: "enter", Digit1: "t0", Digit2: "t1", Digit3: "t2", Digit4: "t3" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "roll" && players && !players[turn].cpu) { if (!rolled) roll(); else if (movable.length) move(movable[0]); } else if (a[0] === "t" && rolled && players && !players[turn].cpu) move(+a[1]); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") step(dt); draw(); }).start();
+        if (window.__test) window.__test.ludo = { get s() { return { state, turn, tok: players && players.map((p) => p.tok.join(",")) }; }, start, auto: () => { players.forEach((p) => (p.cpu = true)); cpuMaybe(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Ludo</h2><p>The classic race board game for two to four players. Each player has four tokens waiting in their coloured yard. Roll a 6 to bring a token onto the track, then race it all the way around the board and up your coloured home column to the centre. Land exactly on a rival's token to send it back to its yard, but watch out, because they can do the same to you. Star squares are safe. First to get all four tokens home wins.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Space or Roll button</td><td>Roll the die</td></tr><tr><td>Tap a glowing token, or 1–4</td><td>Move that token</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Rolling a 6 or capturing gives you another turn.</li><li>Nobody can capture you on a ★ square or a start square.</li><li>You need the exact number to reach the centre.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Ludo</h3><p>Ludo mixes luck with clever choices. Each roll often lets you move one of several tokens. Think about which move is safest and which one gets you closest to winning.</p><p>Capturing is powerful: it sends a rival token all the way back and gives you another roll. If a rival token is a few squares ahead of you, try to land on it. If a rival is a few squares behind one of your tokens, move that token away or onto a ★ safe square.</p><p>Having more than one token out gives you more choices each turn, so when you roll a 6 it's often worth bringing out a new token. Near the end, remember you need the exact number to land in the centre.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a game against one computer player.</li><li><b>Getting good:</b> Capture 3 tokens in one game.</li><li><b>Expert:</b> Win a 4-player game.</li></ul><h3>Did you know?</h3><p>Ludo comes from Pachisi, a game played in India for centuries. Emperor Akbar is said to have played it on a giant board in his palace courtyard, with real people as the pieces.</p><h3>Questions players ask</h3><h4>How do I get a token out?</h4><p>Roll a 6. Then pick the token in your yard.</p><h4>What are the ★ squares?</h4><p>Safe squares. A token there can't be captured.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Mancala/mancala">Mancala</a><a href="/MoonLander/moonlander">Moon Lander</a><a href="/ParkingPro/parking">Parking Pro</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
