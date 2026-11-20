@@ -130,6 +130,8 @@ export const GAMES = {
     codebreaker: { name: "Code Breaker", path: "/CodeBreaker/codebreaker", img: "/thumbs/codebreaker.png", tags: ["brain", "puzzle"], desc: "Crack the secret colour code using clever clues. A classic logic puzzle.", isNew: true },
     timberchop: { name: "Timber Chop", path: "/TimberChop/timberchop", img: "/thumbs/timberchop.png", tags: ["arcade"], desc: "Chop the tree as fast as you can, but dodge the falling branches!", isNew: true },
     sumopush: { name: "Sumo Push", path: "/SumoPush/sumo", img: "/thumbs/sumopush.png", tags: ["sports", "arcade", "2p"], desc: "Shove your rival out of the ring. Best of five wins!", isNew: true },
+    colorlines: { name: "Color Lines", path: "/ColorLines/colorlines", img: "/thumbs/colorlines.png", tags: ["puzzle", "brain"], desc: "Move balls to make lines of five. Three new balls arrive every turn!", isNew: true },
+    dropmerge: { name: "Drop Merge", path: "/DropMerge/dropmerge", img: "/thumbs/dropmerge.png", tags: ["puzzle"], desc: "Drop number blocks. Matching numbers merge and double. Chain them!", isNew: true },
 };
 
 // Games that only count plays (no score)

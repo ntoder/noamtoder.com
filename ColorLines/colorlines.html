@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic puzzle from the 1990s. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Color Lines · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Color <span>Lines</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Color Lines</h2>
+                <p id="startText">Tap a ball, then tap an empty square to move it there. It can only travel along an open path (no jumping over balls).<br>Line up 5 or more of the same colour across, down or diagonally to clear them. If your move doesn't make a line, 3 new balls appear. Don't let the board fill up!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Keep open lanes across the board, otherwise balls get trapped and can't reach where you need them.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Color Lines — move balls along open paths to make lines of 5; 3 new balls appear after each non-scoring move
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "colorlinesBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const N = 9, CS = 58, OX = (W - N * CS) / 2, OY = 100, COLS = ["#ff4d6d", "#2ee6a0", "#2a74ff", "#ffc94d", "#a64dff", "#ff9a3c", "#5cc8ff"];
+        let g, sel, preview, score, state = "ready", moving = null, pops = [];
+        Kit.stat("best", Kit.best(BEST));
+        function empties() { const e = []; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (g[r][c] < 0) e.push([r, c]); return e; }
+        function newPreview() { preview = [Kit.randi(0, 6), Kit.randi(0, 6), Kit.randi(0, 6)]; }
+        function place() { for (const col of preview) { const e = empties(); if (!e.length) break; const [r, c] = Kit.pick(e); g[r][c] = col; clearLines(r, c, false); } newPreview(); if (!empties().length) end(); }
+        function start() { g = Array.from({ length: N }, () => Array(N).fill(-1)); score = 0; sel = null; newPreview(); place(); newPreview(); state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function path(a, b) { const prev = {}, q = [a], key = (p) => p[0] * N + p[1]; prev[key(a)] = null; while (q.length) { const p = q.shift(); if (p[0] === b[0] && p[1] === b[1]) { const out = []; let k = key(p); while (k !== null) { out.unshift([Math.floor(k / N), k % N]); k = prev[k]; } return out; } for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = [p[0] + dr, p[1] + dc]; if (n[0] < 0 || n[1] < 0 || n[0] >= N || n[1] >= N || g[n[0]][n[1]] >= 0 || key(n) in prev) continue; prev[key(n)] = key(p); q.push(n); } } return null; }
+        function clearLines(r, c, byPlayer) {
+            const col = g[r][c]; let gone = [[r, c]];
+            for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) { const line = []; for (const s of [1, -1]) { let rr = r + dr * s, cc = c + dc * s; while (rr >= 0 && cc >= 0 && rr < N && cc < N && g[rr][cc] === col) { line.push([rr, cc]); rr += dr * s; cc += dc * s; } } if (line.length >= 4) gone = gone.concat(line); }
+            if (gone.length >= 5) { const pts = gone.length * 2 + (gone.length - 5) * 6; score += pts; Kit.stat("score", score); for (const [a, b] of gone) { pops.push({ x: OX + b * CS + CS / 2, y: OY + a * CS + CS / 2, c: COLS[g[a][b]], t: 0.5 }); g[a][b] = -1; } tune([659, 880, 1100], 0.05, "square", 0.04); return true; }
+            return false;
+        }
+        function tap(r, c) {
+            if (state !== "play" || moving) return;
+            if (g[r][c] >= 0) { sel = [r, c]; beep(600, 0.03, "sine", 0.02); return; }
+            if (!sel) return; const p = path(sel, [r, c]); if (!p) { beep(130, 0.08, "square", 0.03); return; }
+            moving = { col: g[sel[0]][sel[1]], p, i: 0, t: 0 }; g[sel[0]][sel[1]] = -1; sel = null;
+        }
+        function endMove() { const [r, c] = moving.p[moving.p.length - 1]; g[r][c] = moving.col; moving = null; beep(400, 0.04, "triangle", 0.03); if (!clearLines(r, c, true)) place(); }
+        function end() { state = "over"; Kit.save(score); const b = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("The board is full!", "הלוח מלא!")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${b}`; Kit.show("over"); }, 400); }
+        function ball(x, y, col, s = 1) { const r = CS * 0.36 * s; const gr = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r); gr.addColorStop(0, "#fff"); gr.addColorStop(0.25, COLS[col]); gr.addColorStop(1, "#0006"); ctx.fillStyle = COLS[col]; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+        function draw() {
+            ctx.fillStyle = "#1c1f38"; ctx.fillRect(0, 0, W, H);
+            if (!g) return;
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { ctx.fillStyle = (r + c) % 2 ? "#2a2f57" : "#262a4f"; ctx.fillRect(OX + c * CS, OY + r * CS, CS, CS); }
+            const bounce = Math.abs(Math.sin(performance.now() / 150)) * 6;
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (g[r][c] >= 0) ball(OX + c * CS + CS / 2, OY + r * CS + CS / 2 - (sel && sel[0] === r && sel[1] === c ? bounce : 0), g[r][c]);
+            if (moving) { const [r, c] = moving.p[Math.min(moving.i, moving.p.length - 1)]; ball(OX + c * CS + CS / 2, OY + r * CS + CS / 2, moving.col); }
+            for (const p of pops) { ctx.globalAlpha = p.t * 2; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, CS * 0.36 * (1 + (0.5 - p.t) * 2), 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+            Kit.text(ctx, T("Next:", "הבאים:"), OX, 60, 16, "#ffffffaa", "left"); preview.forEach((c, i) => ball(OX + 90 + i * 40, 54, c, 0.5));
+            Kit.text(ctx, String(score), OX + N * CS, 62, 26, "#fff", "right", "'Press Start 2P', monospace", 400);
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); const c = Math.floor((p.x - OX) / CS), r = Math.floor((p.y - OY) / CS); if (r >= 0 && c >= 0 && r < N && c < N) tap(r, c); });
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (moving) { moving.t += dt; if (moving.t > 0.035) { moving.t = 0; moving.i++; if (moving.i >= moving.p.length) endMove(); } } pops.forEach((p) => (p.t -= dt)); pops = pops.filter((p) => p.t > 0); draw(); }).start();
+        if (window.__test) window.__test.cl = { get s() { return { state, score }; }, start, tap };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Color Lines</h2><p>A classic puzzle from the 1990s. A 9×9 board slowly fills with coloured balls. Each turn you move one ball to any empty square it can reach by an open path. Make a line of five or more of the same colour, in any direction, to clear it and score points. Moves that don't clear a line bring three new balls onto the board, and the colours of the next three are shown at the top. How long can you keep the board from filling up?</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a ball, then a square</td><td>Move it</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Longer lines score much more than five.</li><li>Diagonals count too!</li><li>Use the preview to see which colours are coming.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Color Lines</h3><p>Color Lines is a game of planning ahead. Every move that doesn't clear a line adds three more balls, so try to build several lines at once. When you have four in a row in two places, every new ball of that colour helps.</p><p>Space is the real enemy. A ball surrounded by others can't move, and a board full of small separate gaps leaves no paths. Try to keep wide open rows and columns so balls can travel anywhere.</p><p>Clearing a line gives you a free move (no new balls appear). Lines longer than five score bonus points, so if it's safe, wait and make six or seven.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 100 points.</li><li><b>Getting good:</b> Clear a line of 6.</li><li><b>Expert:</b> Score 800 points.</li></ul><h3>Did you know?</h3><p>Color Lines was made in Russia in 1992 and became one of the most popular computer games in Eastern Europe.</p><h3>Questions players ask</h3><h4>Why can't I move a ball there?</h4><p>There's no open path. Balls can't jump over other balls.</p><h4>Do I get new balls after clearing a line?</h4><p>No. Clearing a line is a free turn.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/ColorTrick/colortrick">Color Trick</a><a href="/Darts/darts">Darts</a><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

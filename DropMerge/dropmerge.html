@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A merging puzzle that mixes 2048 with a falling-block game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Drop Merge · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Drop <span>Merge</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="740"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Drop Merge</h2>
+                <p id="startText">Tap a column (or use ⬅ ➡ and Space) to drop the next block there. When blocks with the same number touch, they merge into one bigger block!<br>Merges can set off chain reactions for bonus points. The next two blocks are shown at the top. The game ends when every column is full.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Keep big numbers in one corner and build up towards them, like in 2048.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Drop Merge — drop numbered blocks into columns; equal numbers touching merge and double (chain reactions!)
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dropmergeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = 5, ROWS = 7, CS = 80, OX = (W - COLS * CS) / 2, OY = 140;
+        let g, next, nextNext, score, state = "ready", anim = [], busy = false, hover = 2, best;
+        Kit.stat("best", Kit.best(BEST));
+        const color = (v) => `hsl(${(Math.log2(v) * 37) % 360},75%,${55 - Math.min(15, Math.log2(v))}%)`;
+        function rnd() { const mx = Math.max(2, ...g.flat().filter(Boolean)); const lim = Math.min(6, Math.max(2, Math.log2(mx) - 2)); return 2 ** Kit.randi(1, lim); }
+        function start() { g = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); score = 0; next = 2; nextNext = 4; state = "play"; busy = false; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function drop(c) {
+            if (state !== "play" || busy) return; let r = ROWS - 1; while (r >= 0 && g[r][c]) r--;
+            if (r < 0) { beep(120, 0.1, "square", 0.03); return; }
+            g[r][c] = next; next = nextNext; nextNext = rnd(); beep(300, 0.04, "triangle", 0.03); busy = true; resolve([[r, c]], 0);
+        }
+        function gravity() { for (let c = 0; c < COLS; c++) { const col = []; for (let r = ROWS - 1; r >= 0; r--) if (g[r][c]) col.push(g[r][c]); for (let r = ROWS - 1, i = 0; r >= 0; r--, i++) g[r][c] = col[i] || 0; } }
+        function resolve(cells, chain) {
+            // merge: for each changed cell, absorb equal neighbours
+            let merged = false; const changed = [];
+            for (const [r, c] of cells) {
+                const v = g[r][c]; if (!v) continue; const nb = [[r + 1, c], [r - 1, c], [r, c - 1], [r, c + 1]].filter(([a, b]) => a >= 0 && a < ROWS && b >= 0 && b < COLS && g[a][b] === v);
+                if (nb.length) { for (const [a, b] of nb) g[a][b] = 0; const nv = v * 2 ** nb.length; g[r][c] = nv; score += nv * (chain + 1); merged = true; changed.push([r, c]); anim.push({ r, c, t: 0.3 }); }
+            }
+            Kit.stat("score", score);
+            if (merged) { tune([440 * 2 ** (chain / 6), 660 * 2 ** (chain / 6)], 0.05, "square", 0.04); setTimeout(() => { gravity(); const all = []; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (g[r][c]) all.push([r, c]); resolve(all, chain + 1); }, 220); return; }
+            busy = false; if (g[0].every(Boolean) && !g.some((row, r) => row.some((v, c) => v === next && false))) { if (g[0].every(Boolean)) end(); }
+        }
+        function end() { state = "over"; Kit.save(Math.floor(score / 20)); const b = Kit.setBest(BEST, score); const top = Math.max(...g.flat()); $("overText").innerHTML = `${T("The board is full!", "הלוח מלא!")}<br>${T("Biggest block", "הקובייה הגדולה")}: ${top} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${b}`; Kit.show("over"); }
+        function block(x, y, v, s = 1) { const w = (CS - 8) * s; ctx.fillStyle = color(v); Kit.rr(ctx, x + (CS - w) / 2, y + (CS - w) / 2, w, w, 12); ctx.fill(); Kit.text(ctx, String(v), x + CS / 2, y + CS / 2 + 9 * s, (v >= 1000 ? 20 : 26) * s, "#fff", "center"); }
+        function draw() {
+            ctx.fillStyle = "#171a33"; ctx.fillRect(0, 0, W, H);
+            if (!g) return;
+            ctx.fillStyle = "#22264a"; Kit.rr(ctx, OX - 8, OY - 8, COLS * CS + 16, ROWS * CS + 16, 14); ctx.fill();
+            if (state === "play") { ctx.fillStyle = "#ffffff0c"; ctx.fillRect(OX + hover * CS, OY, CS, ROWS * CS); }
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const v = g[r][c]; if (v) { const a = anim.find((q) => q.r === r && q.c === c); block(OX + c * CS, OY + r * CS, v, a ? 1 + a.t * 0.5 : 1); } }
+            if (state === "play") { block(OX + hover * CS, 30, next, 0.9); Kit.text(ctx, T("next", "הבא"), W - 60, 50, 14, "#ffffff88", "center"); block(W - 100, 58, nextNext, 0.55); }
+            Kit.text(ctx, String(score), 70, 70, 24, "#fff", "center", "'Press Start 2P', monospace", 400);
+        }
+        cv.addEventListener("pointermove", (e) => { const p = Kit.point(cv, e); hover = Math.max(0, Math.min(COLS - 1, Math.floor((p.x - OX) / CS))); });
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); hover = Math.max(0, Math.min(COLS - 1, Math.floor((p.x - OX) / CS))); drop(hover); });
+        Kit.onKeys({ ArrowLeft: "l", ArrowRight: "r", Space: "d", ArrowDown: "d", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "l") hover = Math.max(0, hover - 1); if (a === "r") hover = Math.min(COLS - 1, hover + 1); if (a === "d") drop(hover); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { anim.forEach((a) => (a.t -= dt)); anim = anim.filter((a) => a.t > 0); draw(); }).start();
+        if (window.__test) window.__test.dm = { get s() { return { state, score }; }, start, drop };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Drop Merge</h2><p>A merging puzzle that mixes 2048 with a falling-block game. You drop numbered blocks into five columns. Whenever a block touches others with the same number, they combine into one block worth double (or more, if three or four join at once). Blocks fall to fill gaps, which can trigger chain reactions worth extra points. Plan where each block lands so the board doesn't fill up.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a column</td><td>Drop the block</td></tr><tr><td>⬅ ➡ then Space</td><td>Choose and drop</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Three of the same touching merges into ×4!</li><li>Chain reactions multiply your points.</li><li>Check the next-next block to plan ahead.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Drop Merge</h3><p>Drop Merge is about keeping order. If you keep bigger numbers along the bottom and on one side, new small blocks will merge up into them step by step. A messy board with big and small numbers mixed together fills up fast.</p><p>Look at the next two blocks before you drop. If a 4 is coming after a 2, drop the 2 where it will make a 4 that can then meet the next block.</p><p>Chain reactions happen when a merge makes blocks fall onto matching numbers. Each step of a chain scores more, so setting them up on purpose is the way to big scores.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Make a 128 block.</li><li><b>Getting good:</b> Make a 512 block.</li><li><b>Expert:</b> Score 30,000 points.</li></ul><h3>Did you know?</h3><p>Doubling grows really fast: start at 2 and double just 20 times and you're past one million.</p><h3>Questions players ask</h3><h4>When does the game end?</h4><p>When all five columns are full to the top.</p><h4>What happens if three blocks match?</h4><p>They all merge into one block worth four times as much.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Fireworks/fireworks">Fireworks</a><a href="/GoldMiner/goldminer">Gold Miner</a><a href="/Hanoi/hanoi">Tower of Hanoi</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
