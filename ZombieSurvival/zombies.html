@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A top-down survival shooter with silly green zombies. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Zombie Survival · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Zombie <span>Survival</span></h1>
+        <div class="stats"><div class="stat"><b id="wave">1</b><small>Wave</small></div><div class="stat"><b id="kills">0</b><small>Zombies</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Zombie Survival</h2>
+                <p id="startText">WASD or arrow keys to move. Aim with the mouse and hold the mouse button (or Space) to shoot.<br>Zombies come from every side, and each wave has more. Big zombies drop power-ups: ❤️ health, 🔫 machine gun, 💥 shotgun. On a phone, use the arrows to move and tap where to shoot.</p>
+                <button class="btn" id="startBtn">▶ Survive</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Try again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">Keep moving in a big circle. Standing still lets the zombies surround you.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Zombie Survival — top-down twin-stick: move with WASD, aim with mouse, survive the waves
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "zombiesBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let p, zs, bullets, drops, wave, toSpawn, spawnT, kills, state = "ready", fx = Kit.particles(), mouse = { x: W / 2, y: 0 }, firing = false, cool = 0, between = 0, hurt = 0, blood = [];
+        Kit.stat("best", Kit.best(BEST));
+        function start() { p = { x: W / 2, y: H / 2, hp: 100, gun: "pistol", ammo: Infinity, speed: 200 }; zs = []; bullets = []; drops = []; blood = []; wave = 0; kills = 0; state = "play"; nextWave(); Kit.stat("kills", 0); Kit.hide("start"); Kit.hide("over"); }
+        function nextWave() { wave++; toSpawn = 6 + wave * 4; spawnT = 1; between = 2.5; Kit.stat("wave", wave); }
+        const GUNS = { pistol: { rate: 0.28, spread: 0.03, n: 1, dmg: 1, sp: 700 }, smg: { rate: 0.08, spread: 0.12, n: 1, dmg: 1, sp: 760 }, shotgun: { rate: 0.6, spread: 0.35, n: 6, dmg: 1, sp: 640 } };
+        function spawnZ() {
+            const side = Kit.randi(0, 3), x = side === 0 ? -20 : side === 1 ? W + 20 : Kit.rand(0, W), y = side === 2 ? -20 : side === 3 ? H + 20 : Kit.rand(0, H);
+            const big = wave > 2 && Math.random() < 0.12, fast = wave > 1 && !big && Math.random() < 0.2;
+            zs.push({ x, y, hp: big ? 8 : fast ? 1 : 2 + Math.floor(wave / 4), r: big ? 22 : 14, sp: (big ? 45 : fast ? 120 : 65) + wave * 3, big, fast, wob: Math.random() * 6 });
+        }
+        function shoot() {
+            const g = GUNS[p.gun]; if (cool > 0) return; cool = g.rate;
+            const a = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+            for (let i = 0; i < g.n; i++) { const aa = a + Kit.rand(-g.spread, g.spread); bullets.push({ x: p.x + Math.cos(a) * 18, y: p.y + Math.sin(a) * 18, vx: Math.cos(aa) * g.sp, vy: Math.sin(aa) * g.sp, life: 0.8 }); }
+            if (p.gun !== "pistol") { p.ammo -= 1; if (p.ammo <= 0) { p.gun = "pistol"; p.ammo = Infinity; } }
+            beep(p.gun === "shotgun" ? 120 : 600, 0.04, "square", 0.03, -300);
+        }
+        function update(dt) {
+            cool -= dt; hurt -= dt;
+            const k = Kit.keys; let mx = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0), my = (k.has("down") ? 1 : 0) - (k.has("up") ? 1 : 0); const ml = Math.hypot(mx, my) || 1;
+            p.x = Math.max(16, Math.min(W - 16, p.x + (mx / ml) * p.speed * dt)); p.y = Math.max(16, Math.min(H - 16, p.y + (my / ml) * p.speed * dt));
+            if (firing) shoot();
+            if (between > 0) { between -= dt; } else { spawnT -= dt; if (toSpawn > 0 && spawnT <= 0) { spawnZ(); toSpawn--; spawnT = Math.max(0.2, 1.1 - wave * 0.07); } }
+            for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; for (const z of zs) if (!z.dead && Math.hypot(z.x - b.x, z.y - b.y) < z.r) { z.hp -= GUNS[p.gun] ? 1 : 1; b.life = 0; z.x += b.vx * 0.01; z.y += b.vy * 0.01; fx.burst(b.x, b.y, "#5aa83a", 4, 2); if (z.hp <= 0) { z.dead = true; kills++; Kit.stat("kills", kills); blood.push({ x: z.x, y: z.y, r: z.r }); beep(160, 0.08, "sawtooth", 0.03, -80); if (Math.random() < (z.big ? 0.9 : 0.07)) drops.push({ x: z.x, y: z.y, k: Kit.pick(["hp", "smg", "shotgun"]), t: 10 }); } break; } }
+            bullets = bullets.filter((b) => b.life > 0 && b.x > -10 && b.x < W + 10 && b.y > -10 && b.y < H + 10);
+            for (const z of zs) {
+                if (z.dead) continue; z.wob += dt * 6; const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) || 1;
+                z.x += (dx / d) * z.sp * dt; z.y += (dy / d) * z.sp * dt;
+                for (const o of zs) if (o !== z && !o.dead) { const ox = z.x - o.x, oy = z.y - o.y, od = Math.hypot(ox, oy); if (od < z.r + o.r - 4 && od > 0) { z.x += (ox / od) * 30 * dt; z.y += (oy / od) * 30 * dt; } }
+                if (d < z.r + 14 && hurt <= 0) { p.hp -= z.big ? 20 : 10; hurt = 0.5; beep(90, 0.15, "square", 0.05); if (p.hp <= 0) return gameOver(); }
+            }
+            zs = zs.filter((z) => !z.dead);
+            for (const dr of drops) { dr.t -= dt; if (Math.hypot(dr.x - p.x, dr.y - p.y) < 24) { dr.t = 0; if (dr.k === "hp") p.hp = Math.min(100, p.hp + 35); else { p.gun = dr.k; p.ammo = dr.k === "smg" ? 120 : 30; } tune([660, 990], 0.05, "square", 0.04); } }
+            drops = drops.filter((d) => d.t > 0); blood = blood.slice(-60);
+            if (!toSpawn && !zs.length && between <= 0) { nextWave(); p.hp = Math.min(100, p.hp + 15); tune([523, 659, 784], 0.08, "square", 0.04); }
+        }
+        function gameOver() { state = "over"; const sc = kills * 10 + wave * 50; Kit.save(sc); const best = Kit.setBest(BEST, wave); beep(60, 0.8, "sawtooth", 0.08, -20); $("overText").innerHTML = `${T("The zombies got you!", "הזומבים תפסו אתכם!")} 🧟<br>${T("Wave", "גל")} ${wave} · ${kills} ${T("zombies", "זומבים")} · ${T("best wave", "גל שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#3d4a2e"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#46553400"; for (let i = 0; i < 40; i++) { ctx.fillStyle = "#35402a"; ctx.beginPath(); ctx.arc((i * 137) % W, (i * 89) % H, 18 + (i % 4) * 6, 0, 7); ctx.fill(); }
+            if (!p) return;
+            for (const b of blood) { ctx.fillStyle = "#2a3a1a"; ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r * 1.2, b.r * 0.8, 0, 0, 7); ctx.fill(); }
+            for (const d of drops) { const blink = d.t < 3 && Math.floor(d.t * 6) % 2; if (blink) continue; ctx.fillStyle = "#fff"; Kit.rr(ctx, d.x - 14, d.y - 14, 28, 28, 6); ctx.fill(); Kit.text(ctx, d.k === "hp" ? "❤️" : d.k === "smg" ? "🔫" : "💥", d.x, d.y + 7, 18, "#000", "center"); }
+            for (const z of zs) {
+                ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(Math.atan2(p.y - z.y, p.x - z.x));
+                ctx.fillStyle = z.big ? "#4a6a2a" : z.fast ? "#8aa84a" : "#6a8a3a"; ctx.beginPath(); ctx.arc(0, 0, z.r, 0, 7); ctx.fill();
+                ctx.fillStyle = "#5a7a32"; const arm = Math.sin(z.wob) * 3; ctx.fillRect(z.r * 0.3, -z.r * 0.8 + arm, z.r * 1.1, z.r * 0.35); ctx.fillRect(z.r * 0.3, z.r * 0.45 - arm, z.r * 1.1, z.r * 0.35);
+                ctx.fillStyle = "#ff3b3b"; ctx.beginPath(); ctx.arc(z.r * 0.45, -z.r * 0.3, z.r * 0.14, 0, 7); ctx.arc(z.r * 0.45, z.r * 0.3, z.r * 0.14, 0, 7); ctx.fill();
+                ctx.restore();
+            }
+            ctx.fillStyle = "#ffe08a"; for (const b of bullets) { ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, 7); ctx.fill(); }
+            const a = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(a); if (hurt > 0 && Math.floor(hurt * 20) % 2) ctx.globalAlpha = 0.5;
+            ctx.fillStyle = "#333"; ctx.fillRect(8, -3, p.gun === "shotgun" ? 22 : p.gun === "smg" ? 18 : 14, 6);
+            ctx.fillStyle = "#2a74ff"; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 7); ctx.fill(); ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(2, 0, 8, 0, 7); ctx.fill(); ctx.fillStyle = "#3a2a1a"; ctx.beginPath(); ctx.arc(-1, 0, 8, Math.PI / 2, -Math.PI / 2); ctx.fill();
+            ctx.restore(); ctx.globalAlpha = 1;
+            fx.draw(ctx);
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 8, 0, 7); ctx.stroke();
+            ctx.fillStyle = "#0008"; Kit.rr(ctx, 14, 14, 204, 22, 8); ctx.fill(); ctx.fillStyle = p.hp > 30 ? "#2ee6a0" : "#ff4d6d"; Kit.rr(ctx, 16, 16, 2 * Math.max(0, p.hp), 18, 7); ctx.fill();
+            Kit.text(ctx, p.gun === "pistol" ? T("Pistol ∞", "אקדח ∞") : `${p.gun === "smg" ? T("Machine gun", "מקלע") : T("Shotgun", "רובה ציד")} ${p.ammo}`, W - 16, 32, 16, "#fff", "right");
+            if (between > 0) Kit.text(ctx, `${T("Wave", "גל")} ${wave}`, W / 2, H / 2 - 60, 36, "#ffe08a", "center", "'Press Start 2P', monospace", 400);
+        }
+        cv.addEventListener("pointermove", (e) => (mouse = Kit.point(cv, e)));
+        cv.addEventListener("pointerdown", (e) => { mouse = Kit.point(cv, e); firing = true; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointerup", () => (firing = false));
+        cv.style.touchAction = "none"; cv.style.cursor = "none";
+        Kit.onKeys({ KeyW: "up", KeyA: "left", KeyS: "down", KeyD: "right", ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right", Space: "fire", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "fire") firing = true; }, (a) => { if (a === "fire") firing = false; });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.zom = { get s() { return { state, wave, kills }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Zombie Survival</h2><p>A top-down survival shooter with silly green zombies. They shuffle in from every edge of the screen, and each wave brings more of them, with fast runners and big tough ones mixed in. Move with the keyboard, aim and shoot with the mouse, and grab power-ups for a machine gun, a shotgun or extra health. You recover a little health between waves. How many waves can you survive?</p></section>
+        <section><h3>How to play</h3><table><tr><td>WASD or arrows</td><td>Move</td></tr><tr><td>Mouse</td><td>Aim</td></tr><tr><td>Hold click or Space</td><td>Shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Keep moving: zombies are slower than you.</li><li>Big zombies almost always drop a power-up.</li><li>The shotgun is great when they get close.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Zombie Survival</h3><p>The golden rule in Zombie Survival is to keep moving. You're faster than ordinary zombies, so walking in a big circle around the edge of the arena keeps them bunched up behind you, where you can shoot them in a line.</p><p>Watch out for the fast, pale-green runners: shoot them first, because they catch up quickly. Big dark zombies are slow but tough. They take lots of hits, but they nearly always drop a power-up.</p><p>The machine gun and shotgun have limited ammo, then you go back to the pistol. Save the shotgun for close moments, when a crowd is about to reach you. Grab ❤️ drops when your health bar turns red.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Survive wave 3.</li><li><b>Getting good:</b> Defeat 100 zombies.</li><li><b>Expert:</b> Reach wave 10.</li></ul><h3>Did you know?</h3><p>Zombies in films are usually slow because the first zombie movies showed them shuffling. Fast zombies only became common in films much later.</p><h3>Questions players ask</h3><h4>How do I get better weapons?</h4><p>Shoot zombies; sometimes they drop a 🔫 or 💥. Big zombies almost always do.</p><h4>Do I get health back?</h4><p>A little between waves, and a lot from ❤️ drops.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

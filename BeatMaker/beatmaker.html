@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A music toy for making beats. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Beat Maker · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.bmbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:12px auto 0;color:#dfe3ff;font-weight:700}.bmbar input{vertical-align:middle}.bmbar .btn{padding:8px 16px}.bmbar .ghost{background:#262a4d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Beat <span>Maker</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="820" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Beat Maker</h2>
+                <p id="startText">Each row is an instrument and each column is a step in the beat. Click squares to switch sounds on, then press Play!<br>Try a preset, change the tempo, add some swing, and share your beat with a link.</p>
+                <button class="btn" id="startBtn">🎵 Start making</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Beat Maker</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Start with a kick on every 4th step and a snare on steps 5 and 13. That's the heartbeat of most pop songs!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Beat Maker — 8-instrument, 16-step sequencer with tempo, presets, and share-by-link
+        const { $ } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const INST = [["Kick", "תוף בס", "#ff4d6d"], ["Snare", "סנר", "#ff9a3c"], ["Clap", "מחיאה", "#ffc94d"], ["Hi-hat", "היי-האט", "#2ee6a0"], ["Bass", "בס", "#5cc8ff"], ["Pluck", "פריטה", "#2a74ff"], ["Bell", "פעמון", "#a64dff"], ["Chord", "אקורד", "#ff4dd2"]];
+        const STEPS = 16, LX = 120, TOP = 70, CS = (W - LX - 20) / STEPS, RH = (H - TOP - 90) / INST.length;
+        const SCALE = [0, 3, 5, 7, 10, 12, 15, 17];
+        let grid = Array.from({ length: INST.length }, () => Array(STEPS).fill(0)), step = 0, playing = false, bpm = 110, acc = 0, ac = null, noise = null, swing = 0, flash = Array(INST.length).fill(0), paint = null;
+        const PRESETS = {
+            "Pop": "1000100010001000|0000100000001000|0000000000000000|1010101010101010|1000001000100000|0000000000000000|0000000000000000|1000000010000000",
+            "Hip-hop": "1000000110100000|0000100000001000|0000000000001001|1010101010101010|1000000100100000|0000000000000000|0010000000000010|0000000000000000",
+            "Dance": "1000100010001000|0000100000001000|0000100000001000|0010001000100010|1010101010101010|0001000100010001|0000000000000000|1000000000000000",
+            "Chill": "1000000000100000|0000100000000000|0000000000000000|0010001000100010|1000000010000000|0100010001000100|0000001000000010|1000000010000000",
+        };
+        function ensure() { if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)(); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; }
+        function env(g, t, a, d, v) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+        function play(i, t, row) {
+            if (Kit.muted && Kit.muted()) return; const out = ac.destination;
+            const osc = (type, f) => { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); return o; };
+            const nz = (hp, dur, v) => { const s = ac.createBufferSource(); s.buffer = noise; const fl = ac.createBiquadFilter(); fl.type = "highpass"; fl.frequency.value = hp; const g = ac.createGain(); env(g, t, 0.002, dur, v); s.connect(fl).connect(g).connect(out); s.start(t); s.stop(t + dur + 0.05); };
+            const root = 110;
+            if (i === 0) { const o = osc("sine", 150), g = ac.createGain(); o.frequency.exponentialRampToValueAtTime(40, t + 0.15); env(g, t, 0.002, 0.3, 0.9); o.connect(g).connect(out); o.start(t); o.stop(t + 0.35); }
+            if (i === 1) { nz(1500, 0.15, 0.4); const o = osc("triangle", 200), g = ac.createGain(); env(g, t, 0.002, 0.1, 0.3); o.connect(g).connect(out); o.start(t); o.stop(t + 0.15); }
+            if (i === 2) { for (const dl of [0, 0.012, 0.024]) { const s = ac.createBufferSource(); s.buffer = noise; const fl = ac.createBiquadFilter(); fl.type = "bandpass"; fl.frequency.value = 1200; const g = ac.createGain(); env(g, t + dl, 0.001, 0.08, 0.35); s.connect(fl).connect(g).connect(out); s.start(t + dl); s.stop(t + dl + 0.12); } }
+            if (i === 3) nz(7000, 0.05, 0.25);
+            const note = (sem) => root * Math.pow(2, sem / 12);
+            if (i === 4) { const o = osc("sawtooth", note(SCALE[row % 8]) / 2), fl = ac.createBiquadFilter(), g = ac.createGain(); fl.type = "lowpass"; fl.frequency.setValueAtTime(800, t); fl.frequency.exponentialRampToValueAtTime(120, t + 0.25); env(g, t, 0.005, 0.28, 0.35); o.connect(fl).connect(g).connect(out); o.start(t); o.stop(t + 0.35); }
+            if (i === 5) { const o = osc("square", note(SCALE[(row * 3) % 8] + 12)), g = ac.createGain(); env(g, t, 0.003, 0.18, 0.12); o.connect(g).connect(out); o.start(t); o.stop(t + 0.22); }
+            if (i === 6) { const o = osc("sine", note(SCALE[(row * 5) % 8] + 24)), g = ac.createGain(); env(g, t, 0.002, 0.6, 0.18); o.connect(g).connect(out); o.start(t); o.stop(t + 0.7); }
+            if (i === 7) { for (const s of [0, 3, 7]) { const o = osc("triangle", note(s + (row % 2 ? 5 : 0) + 12)), g = ac.createGain(); env(g, t, 0.02, 0.5, 0.08); o.connect(g).connect(out); o.start(t); o.stop(t + 0.6); } }
+        }
+        function tick() { const t = ac.currentTime + 0.02; for (let i = 0; i < INST.length; i++) if (grid[i][step]) { play(i, t, step); flash[i] = 1; } }
+        function toggle() { ensure(); playing = !playing; acc = 0; step = 0; if (playing) tick(); $("playBtn").textContent = playing ? T("⏸ Stop", "⏸ עצירה") : T("▶ Play", "▶ נגינה"); }
+        function load(str) { str.split("|").forEach((r, i) => { if (grid[i]) grid[i] = r.padEnd(STEPS, "0").slice(0, STEPS).split("").map(Number); }); }
+        function enc() { return grid.map((r) => r.join("")).join("|"); }
+        function cellAt(p) { const c = Math.floor((p.x - LX) / CS), r = Math.floor((p.y - TOP) / RH); return c >= 0 && c < STEPS && r >= 0 && r < INST.length ? [r, c] : null; }
+        function draw() {
+            ctx.fillStyle = "#12142a"; ctx.fillRect(0, 0, W, H);
+            Kit.text(ctx, `${bpm} BPM`, W - 20, 40, 18, "#fff", "right");
+            for (let r = 0; r < INST.length; r++) {
+                const y = TOP + r * RH; flash[r] *= 0.88;
+                ctx.fillStyle = INST[r][2]; ctx.globalAlpha = 0.25 + flash[r] * 0.75; Kit.rr(ctx, 10, y + 3, LX - 20, RH - 6, 8); ctx.fill(); ctx.globalAlpha = 1;
+                Kit.text(ctx, T(INST[r][0], INST[r][1]), LX / 2, y + RH / 2 + 5, 14, "#fff", "center");
+                for (let c = 0; c < STEPS; c++) {
+                    const x = LX + c * CS, on = grid[r][c], cur = playing && c === step;
+                    ctx.fillStyle = on ? INST[r][2] : c % 4 === 0 ? "#262a4d" : "#1d2040"; if (cur && !on) ctx.fillStyle = "#33386a";
+                    Kit.rr(ctx, x + 2, y + 3, CS - 4, RH - 6, 6); ctx.fill(); if (on && cur) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke(); }
+                }
+            }
+            if (playing) { ctx.fillStyle = "#fff"; ctx.fillRect(LX + step * CS + CS / 2 - 3, TOP - 14, 6, 6); }
+            Kit.text(ctx, T("Click squares to add beats · drag to paint", "לחצו על ריבועים כדי להוסיף צלילים · גררו כדי לצייר"), W / 2, H - 50, 14, "#ffffff88", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { ensure(); const c = cellAt(Kit.point(cv, e)); if (!c) return; const v = grid[c[0]][c[1]] ? 0 : 1; grid[c[0]][c[1]] = v; paint = v; if (v) play(c[0], ac.currentTime + 0.01, c[1]); cv.setPointerCapture(e.pointerId); Kit.save(10); });
+        cv.addEventListener("pointermove", (e) => { if (paint === null) return; const c = cellAt(Kit.point(cv, e)); if (c && grid[c[0]][c[1]] !== paint) { grid[c[0]][c[1]] = paint; if (paint) play(c[0], ac.currentTime + 0.01, c[1]); } });
+        window.addEventListener("pointerup", () => (paint = null));
+        cv.style.touchAction = "none";
+        // controls bar
+        const bar = document.createElement("div"); bar.className = "bmbar";
+        bar.innerHTML = `<button id="playBtn" class="btn">${T("▶ Play", "▶ נגינה")}</button>
+        <label>${T("Tempo", "קצב")} <input id="tempo" type="range" min="70" max="170" value="110"></label>
+        <label>${T("Swing", "סווינג")} <input id="swing" type="range" min="0" max="60" value="0"></label>
+        <span class="seg" id="presets">${Object.keys(PRESETS).map((k) => `<button data-p="${k}">${k}</button>`).join("")}</span>
+        <button id="clearBtn" class="btn ghost">${T("🗑 Clear", "🗑 ניקוי")}</button><button id="shareBtn" class="btn ghost">${T("🔗 Copy link", "🔗 העתקת קישור")}</button>`;
+        cv.parentElement.after(bar);
+        $("playBtn").onclick = toggle;
+        $("tempo").oninput = (e) => (bpm = +e.target.value); $("swing").oninput = (e) => (swing = +e.target.value / 100);
+        document.querySelectorAll("#presets button").forEach((b) => (b.onclick = () => { load(PRESETS[b.dataset.p]); if (!playing) toggle(); }));
+        $("clearBtn").onclick = () => grid.forEach((r) => r.fill(0));
+        $("shareBtn").onclick = () => { const url = location.origin + location.pathname + "#b=" + btoa(enc()) + "&t=" + bpm; navigator.clipboard && navigator.clipboard.writeText(url); $("shareBtn").textContent = T("✓ Copied!", "✓ הועתק!"); setTimeout(() => ($("shareBtn").textContent = T("🔗 Copy link", "🔗 העתקת קישור")), 1500); };
+        try { const m = location.hash.match(/b=([^&]+)/); if (m) load(atob(m[1])); const t = location.hash.match(/t=(\d+)/); if (t) { bpm = +t[1]; $("tempo").value = bpm; } else load(PRESETS.Pop); } catch (e) { load(PRESETS.Pop); }
+        Kit.onKeys({ Space: "play" }, () => toggle());
+        $("startBtn").onclick = () => { Kit.hide("start"); ensure(); if (!playing) toggle(); };
+        Kit.loop((dt) => { if (playing) { acc += dt; const sd = 60 / bpm / 4, len = step % 2 ? sd * (1 - swing) : sd * (1 + swing); if (acc >= len) { acc -= len; step = (step + 1) % STEPS; tick(); } } draw(); }).start();
+        if (window.__test) window.__test.bm = { get s() { return { playing, step }; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Beat Maker</h2><p>A music toy for making beats. The grid has eight instruments, from kick drum and snare to bass, bells and chords, and sixteen steps that loop round and round. Switch squares on and off to build a rhythm and a tune, change the speed with the tempo slider, and add swing for a bouncy groove. Load a preset to get started, and copy a link to share your beat with friends.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or drag on the grid</td><td>Add or remove notes</td></tr><tr><td>Space</td><td>Play / stop</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The melody rows play different notes on different steps.</li><li>Swing makes every second step a little late for a bouncy feel.</li><li>Copy the link to save your beat or send it to a friend.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Beat Maker</h3><p>Beat Maker works like a real drum machine. The 16 columns are steps, one bar of music, and the playhead moves left to right in a loop. Every square you switch on plays when the playhead reaches it.</p><p>Most beats are built from the drums up. A kick on steps 1, 5, 9 and 13 gives a steady pulse. Add snare or clap on 5 and 13, then hi-hats on every other step. Once that sounds good, add a bass line and some melody.</p><p>The melody instruments (bass, pluck, bell and chord) play different notes depending on which step they're on, so moving a note left or right changes the tune. Experiment! There are no wrong answers.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Make a beat using every instrument.</li><li><b>Getting good:</b> Change the tempo and add swing.</li><li><b>Expert:</b> Share a beat with a friend.</li></ul><h3>Did you know?</h3><p>BPM means beats per minute. Most pop songs are between 100 and 130 BPM, and a resting heart beats about 60 to 100 times a minute.</p><h3>Questions players ask</h3><h4>How do I save my beat?</h4><p>Click Copy link. Opening that link brings your beat back exactly as it was.</p><h4>Why can't I hear anything?</h4><p>Check the sound button in the top corner isn't muted, and that your device volume is up.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BrickBalls/brickballs">Brick Balls</a><a href="/CellEater/celleater">Cell Eater</a><a href="/ColorTrick/colortrick">Color Trick</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

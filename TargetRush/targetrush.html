@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An aim-training game for mouse and touch. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Target Rush · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Target <span>Rush</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="acc">-</b><small>Accuracy</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="760" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Target Rush</h2>
+                <p id="startText"><span class="seg" id="mode"><button data-m="classic" class="on">🎯 Classic</button><button data-m="moving">💨 Moving</button><button data-m="tiny">🔍 Tiny</button></span>Targets pop up and shrink away. Click or tap them before they disappear!<br>Hit the centre for double points, chain hits for a streak bonus, and gold targets are worth 5×. Missed clicks lower your accuracy bonus. 45 seconds!</p>
+                <button class="btn" id="startBtn">▶ Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Accuracy counts at the end, so don't click wildly. A calm, careful click is worth more than two quick misses.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Target Rush — aim trainer: click targets before they shrink away. 45 seconds, accuracy bonus
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "targetrushBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let targets, score, hits, shots, time, spawnT, state = "ready", fx = Kit.particles(), pops = [], streak, mode = "classic";
+        Kit.stat("best", Kit.best(BEST));
+        document.querySelectorAll("#mode button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#mode button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); mode = b.dataset.m; }));
+        function start() { targets = []; score = 0; hits = 0; shots = 0; streak = 0; time = 45; spawnT = 0; state = "play"; Kit.stat("score", 0); Kit.stat("acc", "-"); Kit.hide("start"); Kit.hide("over"); }
+        function spawn() {
+            const el = 45 - time, life = Math.max(1.1, 2.4 - el * 0.03), r = mode === "tiny" ? 14 : Kit.rand(22, 38);
+            const t = { x: Kit.rand(50, W - 50), y: Kit.rand(70, H - 50), r, life, max: life, gold: Math.random() < 0.08, vx: 0, vy: 0 };
+            if (mode === "moving" || (el > 20 && Math.random() < 0.3)) { const a = Math.random() * 7, s = Kit.rand(60, 140); t.vx = Math.cos(a) * s; t.vy = Math.sin(a) * s; }
+            targets.push(t);
+        }
+        function shoot(x, y) {
+            if (state !== "play") return; shots++;
+            for (let i = targets.length - 1; i >= 0; i--) {
+                const t = targets[i], rr = t.r * Math.min(1, (t.life / t.max) * 1.4), d = Math.hypot(x - t.x, y - t.y);
+                if (d < rr) {
+                    targets.splice(i, 1); hits++; streak++;
+                    const center = d < rr * 0.35, pts = Math.round((t.gold ? 50 : 10) * (center ? 2 : 1) * (1 + Math.min(streak, 20) / 10) * (mode === "tiny" ? 1.5 : 1));
+                    score += pts; Kit.stat("score", score); pops.push({ x: t.x, y: t.y, s: center ? `🎯 +${pts}` : `+${pts}`, t: 1 });
+                    fx.burst(t.x, t.y, t.gold ? "#ffc94d" : "#ff4d6d", center ? 20 : 10, 3); center ? tune([1320, 1760], 0.03, "square", 0.03) : beep(900, 0.04, "square", 0.03);
+                    Kit.stat("acc", Math.round((hits / shots) * 100) + "%"); return;
+                }
+            }
+            streak = 0; beep(180, 0.05, "sine", 0.02); pops.push({ x, y, s: "✗", t: 0.6 }); Kit.stat("acc", Math.round((hits / shots) * 100) + "%");
+        }
+        function update(dt) {
+            time -= dt; if (time <= 0) return end();
+            spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = Math.max(0.35, 0.9 - (45 - time) * 0.012); }
+            for (const t of targets) { t.life -= dt; t.x += t.vx * dt; t.y += t.vy * dt; if (t.x < t.r || t.x > W - t.r) t.vx *= -1; if (t.y < 60 + t.r || t.y > H - t.r) t.vy *= -1; }
+            const miss = targets.filter((t) => t.life <= 0).length; if (miss) streak = 0;
+            targets = targets.filter((t) => t.life > 0);
+        }
+        function end() { state = "over"; const acc = shots ? hits / shots : 0, bonus = Math.round(score * acc * 0.5); score += bonus; Kit.stat("score", score); Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${hits} ${T("hits", "פגיעות")} · ${Math.round(acc * 100)}% ${T("accuracy", "דיוק")} (+${bonus})<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#14182e"; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#ffffff08"; for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            if (!targets) return;
+            for (const t of targets) {
+                const rr = t.r * Math.min(1, (t.life / t.max) * 1.4);
+                const rings = t.gold ? ["#ffc94d", "#fff", "#ffc94d"] : ["#ff4d6d", "#fff", "#ff4d6d"];
+                rings.forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(t.x, t.y, rr * (1 - i * 0.32), 0, 7); ctx.fill(); });
+                ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(t.x, t.y, t.r + 5, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * t.life) / t.max); ctx.stroke();
+            }
+            fx.draw(ctx);
+            for (const p of pops) Kit.text(ctx, p.s, p.x, p.y - (1 - p.t) * 30, 16, "#fff", "center");
+            ctx.fillStyle = "#ffffff14"; ctx.fillRect(0, 0, W, 50);
+            Kit.text(ctx, `${Math.ceil(Math.max(0, time))}s`, 20, 33, 20, time < 10 ? "#ff4d6d" : "#fff", "left");
+            Kit.text(ctx, String(score), W / 2, 34, 22, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (streak >= 5) Kit.text(ctx, `🔥 ${streak}`, W - 20, 33, 18, "#ffc94d", "right");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); const p = Kit.point(cv, e); shoot(p.x, p.y); });
+        cv.style.touchAction = "none"; cv.style.cursor = "crosshair";
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); pops.forEach((p) => (p.t -= dt * 1.5)); pops = pops.filter((p) => p.t > 0); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.tr = { get s() { return { state, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Target Rush</h2><p>An aim-training game for mouse and touch. Round targets pop up all over the screen and slowly shrink before vanishing. Hit them while you can: the centre gives double points, hitting in a row builds a streak multiplier, and gold targets are worth five times as much. At the end, your accuracy gives a bonus, so every missed click costs you. Try the Moving mode, where targets drift around, or Tiny mode for a real challenge.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap</td><td>Shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Aim for the white middle ring for double points.</li><li>Your streak resets when you miss or a target vanishes.</li><li>Accuracy bonus = half your score × your accuracy.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Target Rush</h3><p>Target Rush rewards being both quick and careful. Every hit adds to your streak, which multiplies your points, and the centre of each target doubles them. A miss or a vanished target resets the streak.</p><p>Don't panic-click. At the end, your score gets a bonus based on your accuracy, up to half your score again. Clicking wildly at empty space throws that away. Move to the target, then click once.</p><p>Targets shrink as their timer runs out (the ring around them shows how long is left). Older targets are smaller and harder to hit, so it's usually best to hit the newest, biggest ones first, unless an old one is a gold target.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 1,000 in Classic.</li><li><b>Getting good:</b> Get 90% accuracy.</li><li><b>Expert:</b> Score 2,000 in Tiny mode.</li></ul><h3>Did you know?</h3><p>Professional gamers often practise aim with trainers like this for an hour a day, just like musicians practise scales.</p><h3>Questions players ask</h3><h4>What's the accuracy bonus?</h4><p>At the end you get extra points equal to half your score times your accuracy.</p><h4>What do the modes change?</h4><p>Moving makes targets drift around, and Tiny makes them smaller but worth 1.5× points.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TileMatch/tilematch">Tile Match</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

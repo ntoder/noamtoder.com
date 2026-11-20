@@ -103,6 +103,10 @@ export const GAMES = {
     paintterritory: { name: "Paint Territory", path: "/PaintTerritory/paintland", img: "/thumbs/paintterritory.png", tags: ["arcade", "strategy"], desc: "Draw loops to claim land. Cut other players' trails, but protect your own!", isNew: true },
     crazyeights: { name: "Crazy Eights", path: "/CrazyEights/crazyeights", img: "/thumbs/crazyeights.png", tags: ["board"], desc: "Match the suit or number, play wild 8s and empty your hand first.", isNew: true },
     burgerchef: { name: "Burger Chef", path: "/BurgerChef/burgerchef", img: "/thumbs/burgerchef.png", tags: ["arcade", "brain"], desc: "Stack each burger exactly the way the customer ordered it. Fast!", isNew: true },
+    zombiesurvival: { name: "Zombie Survival", path: "/ZombieSurvival/zombies", img: "/thumbs/zombiesurvival.png", tags: ["arcade", "shooter"], desc: "Hold off wave after wave of cartoon zombies. How long can you last?", isNew: true },
+    colorhop: { name: "Color Hop", path: "/ColorHop/colorhop", img: "/thumbs/colorhop.png", tags: ["arcade"], desc: "Hop through the spinning shapes, but only through your own colour!", isNew: true },
+    beatmaker: { name: "Beat Maker", path: "/BeatMaker/beatmaker", img: "/thumbs/beatmaker.png", tags: ["creative", "music"], desc: "Make your own beats with drums, bass and melody. Share them with a link!", isNew: true },
+    targetrush: { name: "Target Rush", path: "/TargetRush/targetrush", img: "/thumbs/targetrush.png", tags: ["arcade", "brain"], desc: "Click the targets before they vanish. How sharp is your aim?", isNew: true },
 };
 
 // Games that only count plays (no score)

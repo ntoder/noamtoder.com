@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A tricky one-tap timing game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Color Hop · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Color <span>Hop</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Stars</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Color Hop</h2>
+                <p id="startText">Tap, click or press Space to make the ball hop up. Gravity pulls it back down.<br>You can only pass through parts that are the <b>same colour</b> as your ball. Grab the ★ stars, and touch the colour wheel to get a new colour!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Wait just below an obstacle with small hops until your colour comes round, then hop through.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Color Hop — tap to hop up; only pass through parts of obstacles that match your colour
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "colorhopBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = ["#ff3b7a", "#ffd23b", "#3bd1ff", "#9b5bff"], CX = W / 2;
+        let ball, obs, camY, score, state = "ready", fx = Kit.particles(), t = 0, started;
+        Kit.stat("best", Kit.best(BEST));
+        function addObs(y, i) {
+            const kind = i < 2 ? "ring" : Kit.pick(["ring", "ring", "bars", "cross", "double"]), dir = Math.random() < 0.5 ? 1 : -1, sp = 1.4 + Math.min(1.6, i * 0.06);
+            obs.push({ y, kind, dir, sp, a: Math.random() * 7, star: true, switcher: true, off: Math.random() * 400 });
+        }
+        function start() { ball = { y: H - 160, vy: 0, c: Kit.randi(0, 3) }; obs = []; camY = 0; score = 0; started = false; for (let i = 0; i < 5; i++) addObs(H - 420 - i * 380, i); state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function hop() { if (state !== "play") return; started = true; ball.vy = -430; beep(500, 0.03, "sine", 0.02, 200); }
+        // returns colour index at a point for an obstacle (or -1 if empty)
+        function colorAt(o, x, y) {
+            const dx = x - CX, dy = y - o.y;
+            if (o.kind === "ring" || o.kind === "double") {
+                const rings = o.kind === "double" ? [[100, 1], [130, -1]] : [[110, 1]];
+                for (const [R, s] of rings) { const d = Math.hypot(dx, dy); if (Math.abs(d - R) < 12) { let a = Math.atan2(dy, dx) - o.a * s; a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); return Math.floor(a / (Math.PI / 2)); } }
+                return -1;
+            }
+            if (o.kind === "bars") { if (Math.abs(dy) > 10) return -1; return barCol(o, x); }
+            if (o.kind === "cross") { const ox = CX + 90; const lx = x - ox, ly = y - o.y; for (let k = 0; k < 4; k++) { const a = o.a + (k * Math.PI) / 2, ux = Math.cos(a), uy = Math.sin(a); const along = lx * ux + ly * uy, perp = Math.abs(-lx * uy + ly * ux); if (along > 0 && along < 110 && perp < 10) return k; } return -1; }
+            return -1;
+        }
+        function barCol(o, x) { const seg = W / 2, px = (((x + o.a * 120) % (seg * 4)) + seg * 4) % (seg * 4); return Math.floor(px / seg); }
+        function update(dt) {
+            t += dt;
+            if (started) { ball.vy += 1300 * dt; ball.y += ball.vy * dt; }
+            camY = Math.min(camY, ball.y - H * 0.55);
+            for (const o of obs) {
+                o.a += o.sp * o.dir * dt;
+                if (o.star && Math.abs(ball.y - o.y) < 18) { o.star = false; score++; Kit.stat("score", score); tune([880, 1320], 0.04, "square", 0.03); fx.burst(CX, o.y - camY, "#fff", 12, 3); }
+                const sy = o.y - 190; if (o.switcher && Math.abs(ball.y - sy) < 16) { o.switcher = false; let c; do c = Kit.randi(0, 3); while (c === ball.c); ball.c = c; beep(700, 0.06, "triangle", 0.03); }
+                for (const yy of [ball.y - 10, ball.y + 10]) { const c = colorAt(o, CX, yy); if (c >= 0 && c !== ball.c) return die(); }
+            }
+            if (ball.y - camY > H + 20 && started) return die();
+            while (obs[0] && obs[0].y - camY > H + 200) obs.shift();
+            while (obs.length < 6) addObs(obs[obs.length - 1].y - 380, score + obs.length);
+        }
+        function die() { state = "over"; fx.burst(CX, ball.y - camY, COLS[ball.c], 40, 5); beep(100, 0.4, "sawtooth", 0.06); Kit.save(score * 10); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Wrong colour!", "צבע לא נכון!")}<br>${score} ${T("stars", "כוכבים")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 600); }
+        function drawObs(o) {
+            const y = o.y - camY; if (y < -200 || y > H + 200) return;
+            ctx.lineWidth = 20; ctx.lineCap = "butt";
+            if (o.kind === "ring" || o.kind === "double") { const rings = o.kind === "double" ? [[100, 1], [130, -1]] : [[110, 1]]; for (const [R, s] of rings) for (let k = 0; k < 4; k++) { ctx.strokeStyle = COLS[k]; ctx.beginPath(); ctx.arc(CX, y, R, o.a * s + (k * Math.PI) / 2, o.a * s + ((k + 1) * Math.PI) / 2); ctx.stroke(); } }
+            if (o.kind === "bars") { for (let x = 0; x < W; x += 4) { ctx.fillStyle = COLS[barCol(o, x + 2)]; ctx.fillRect(x, y - 10, 4, 20); } }
+            if (o.kind === "cross") { const ox = CX + 90; ctx.lineCap = "round"; for (let k = 0; k < 4; k++) { const a = o.a + (k * Math.PI) / 2; ctx.strokeStyle = COLS[k]; ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + Math.cos(a) * 110, y + Math.sin(a) * 110); ctx.stroke(); } }
+            if (o.star) { ctx.fillStyle = "#fff"; star(CX, y, 14); }
+            if (o.switcher) { const sy = y - 190; for (let k = 0; k < 4; k++) { ctx.fillStyle = COLS[k]; ctx.beginPath(); ctx.moveTo(CX, sy); ctx.arc(CX, sy, 14, (k * Math.PI) / 2, ((k + 1) * Math.PI) / 2); ctx.fill(); } }
+        }
+        function star(x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = (i * Math.PI) / 5 - Math.PI / 2, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.fill(); }
+        function draw() {
+            ctx.fillStyle = "#1a1a24"; ctx.fillRect(0, 0, W, H);
+            if (!ball) return;
+            // fix bars drawing: simpler approach
+            for (const o of obs) drawObs(o);
+            if (state === "play" || state === "ready") { ctx.fillStyle = COLS[ball.c]; ctx.beginPath(); ctx.arc(CX, ball.y - camY, 12, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), 30, 50, 30, "#fff", "left", "'Press Start 2P', monospace", 400);
+            if (!started && state === "play") Kit.text(ctx, T("Tap to hop!", "הקישו כדי לקפוץ!"), CX, H - 80, 20, "#fff", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); hop(); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "hop", ArrowUp: "hop", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "hop") hop(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.ch = { get s() { return { state, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Color Hop</h2><p>A tricky one-tap timing game. Your little ball bounces upward each time you tap. Spinning rings, sliding bars and turning crosses block the way, each split into four colours. You can only pass through the part that matches your ball's colour; touch any other colour and it's over. Every obstacle has a star in the middle to collect, and a colour wheel above it that changes your ball to a new random colour.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap, click or Space</td><td>Hop</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Small, steady taps let you hover in place.</li><li>Watch the new colour after a colour wheel, then plan.</li><li>Falling off the bottom ends the game too.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Color Hop</h3><p>Color Hop is all about patience. You don't have to rush. Tap gently to hover just below an obstacle while it spins, and wait until your colour is at the bottom where you'll go through. Then hop twice quickly to get through before it turns.</p><p>Each obstacle has two danger points: the bottom edge, where you enter, and the top edge, where you leave. For rings, the same colour that's at the bottom when you enter is usually at the top by the time you leave only if you're fast. Short, quick double-hops work best.</p><p>Right after a colour wheel, your colour changes to something new. Stop and look before you go on. Many games end because players keep tapping out of habit.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Collect 5 stars.</li><li><b>Getting good:</b> Collect 20 stars.</li><li><b>Expert:</b> Collect 40 stars.</li></ul><h3>Did you know?</h3><p>The four colours in each obstacle make a full circle of 360 degrees, so each colour covers exactly 90 degrees: a right angle.</p><h3>Questions players ask</h3><h4>What does the colour wheel do?</h4><p>It changes your ball to a different random colour.</p><h4>What ends the game?</h4><p>Touching a part of an obstacle that's a different colour, or falling off the bottom of the screen.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/ColorTrick/colortrick">Color Trick</a><a href="/Darts/darts">Darts</a><a href="/Fireworks/fireworks">Fireworks</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
