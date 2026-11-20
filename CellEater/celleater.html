@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A survival-of-the-biggest game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Cell Eater · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Cell <span>Eater</span></h1>
+        <div class="stats"><div class="stat"><b id="mass">20</b><small>Mass</small></div><div class="stat"><b id="rank">#-</b><small>Rank</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Cell Eater</h2>
+                <p id="startText">Move your mouse (or drag your finger) and your cell follows it. Eat the coloured dots to grow.<br>You can swallow any cell a bit smaller than you, but bigger cells can swallow you! Press Space for a quick speed boost (it costs a little mass).</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="boost">⚡</button></div>
+    <p class="hint">Bigger cells are slower. When you're small, use your speed to dart around them.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Cell Eater — grow by eating dots and smaller cells; avoid bigger ones. Big arena with camera
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "celleaterBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const WORLD = 3000, NAMES = ["Blob", "Zippy", "Mochi", "Gloop", "Pixel", "Bubbles", "Noodle", "Jelly", "Comet", "Sprout", "Tofu", "Wobble", "Nova", "Pebble"];
+        let me, bots, food, cam, state = "ready", mouse = { x: W / 2, y: H / 2 }, boost = 0, eaten;
+        Kit.stat("best", Kit.best(BEST));
+        const rad = (m) => Math.sqrt(m) * 4;
+        function mk(x, y, m, name, hue) { return { x, y, m, name, hue, vx: 0, vy: 0, tx: x, ty: y, think: 0 }; }
+        function start() {
+            me = mk(WORLD / 2, WORLD / 2, 20, T("You", "אתם"), 190); me.isMe = true;
+            bots = NAMES.map((n) => mk(Kit.rand(100, WORLD - 100), Kit.rand(100, WORLD - 100), Kit.rand(10, 90), n, Kit.randi(0, 360)));
+            food = Array.from({ length: 700 }, () => ({ x: Math.random() * WORLD, y: Math.random() * WORLD, h: Kit.randi(0, 360) }));
+            cam = { x: me.x, y: me.y, z: 1 }; eaten = 0; state = "play"; Kit.hide("start"); Kit.hide("over");
+        }
+        function moveCell(c, tx, ty, dt, fast) {
+            const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy) || 1, sp = (220 / Math.pow(c.m, 0.22)) * (fast ? 1.8 : 1) * Math.min(1, d / 60);
+            c.x += (dx / d) * sp * dt * 2.2; c.y += (dy / d) * sp * dt * 2.2; const r = rad(c.m); c.x = Math.max(r, Math.min(WORLD - r, c.x)); c.y = Math.max(r, Math.min(WORLD - r, c.y));
+        }
+        function update(dt) {
+            const wx = cam.x + (mouse.x - W / 2) / cam.z, wy = cam.y + (mouse.y - H / 2) / cam.z;
+            const fast = boost > 0 && me.m > 25; if (fast) { me.m -= dt * 6; }
+            moveCell(me, wx, wy, dt, fast);
+            for (const b of bots) {
+                b.think -= dt;
+                if (b.think <= 0) {
+                    b.think = Kit.rand(0.2, 0.6); let best = null, bs = -1e9;
+                    for (const o of [me, ...bots]) { if (o === b || o.dead) continue; const d = Math.hypot(o.x - b.x, o.y - b.y); if (d > 450) continue; if (o.m > b.m * 1.15) { const s = 1000 - d; if (s > bs) { bs = s; best = { x: b.x * 2 - o.x, y: b.y * 2 - o.y }; } } else if (b.m > o.m * 1.15) { const s = 600 - d + o.m; if (s > bs) { bs = s; best = { x: o.x, y: o.y }; } } }
+                    if (!best) { let fd = 1e9; for (let i = 0; i < 40; i++) { const f = food[Kit.randi(0, food.length - 1)]; const d = Math.hypot(f.x - b.x, f.y - b.y); if (d < fd) { fd = d; best = f; } } }
+                    b.tx = best.x; b.ty = best.y;
+                }
+                moveCell(b, b.tx, b.ty, dt * 0.85, false);
+            }
+            const all = [me, ...bots];
+            for (const c of all) {
+                const r = rad(c.m);
+                for (const f of food) if (Math.abs(f.x - c.x) < r && Math.abs(f.y - c.y) < r && Math.hypot(f.x - c.x, f.y - c.y) < r) { c.m += 1; f.x = Math.random() * WORLD; f.y = Math.random() * WORLD; if (c === me && Math.random() < 0.3) beep(900 + Math.random() * 300, 0.02, "sine", 0.01); }
+                c.m = Math.max(10, c.m - c.m * 0.0025 * dt);
+            }
+            for (const a of all) for (const b of all) {
+                if (a === b || a.dead || b.dead || a.m < b.m * 1.15) continue;
+                const d = Math.hypot(a.x - b.x, a.y - b.y); if (d < rad(a.m) - rad(b.m) * 0.4) {
+                    a.m += b.m * 0.8; b.dead = true;
+                    if (b === me) return gameOver(a.name);
+                    if (a === me) { eaten++; beep(300, 0.15, "square", 0.05, 300); }
+                }
+            }
+            bots = bots.map((b) => (b.dead ? mk(Kit.rand(100, WORLD - 100), Kit.rand(100, WORLD - 100), Kit.rand(10, 40), b.name, Kit.randi(0, 360)) : b));
+            const zt = Math.max(0.35, Math.min(1, 1.6 / Math.pow(rad(me.m) / 18, 0.6)));
+            cam.x += (me.x - cam.x) * Math.min(1, dt * 6); cam.y += (me.y - cam.y) * Math.min(1, dt * 6); cam.z += (zt - cam.z) * dt * 2;
+            Kit.stat("mass", Math.floor(me.m)); boost = Math.max(0, boost - dt);
+            const rank = [me, ...bots].sort((a, b) => b.m - a.m).indexOf(me) + 1; Kit.stat("rank", "#" + rank);
+        }
+        function gameOver(by) { state = "over"; const sc = Math.floor(me.m); Kit.save(sc); const best = Kit.setBest(BEST, sc); $("overText").innerHTML = `${T("You were eaten by", "נאכלתם על ידי")} ${by}!<br>${T("Mass", "מסה")} ${sc} · ${eaten} ${T("cells eaten", "תאים נאכלו")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function cell(c) {
+            const r = rad(c.m), x = (c.x - cam.x) * cam.z + W / 2, y = (c.y - cam.y) * cam.z + H / 2, rr = r * cam.z;
+            if (x < -rr || x > W + rr || y < -rr || y > H + rr) return;
+            ctx.fillStyle = `hsl(${c.hue},75%,55%)`; ctx.strokeStyle = `hsl(${c.hue},70%,40%)`; ctx.lineWidth = Math.max(2, rr * 0.08);
+            ctx.beginPath(); const n = 24, t = performance.now() / 300; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2, w = 1 + Math.sin(a * 5 + t + c.hue) * 0.02; const px = x + Math.cos(a) * rr * w, py = y + Math.sin(a) * rr * w; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.fill(); ctx.stroke();
+            if (rr > 14) Kit.text(ctx, c.name, x, y + Math.min(rr * 0.25, 7), Math.max(11, Math.min(26, rr * 0.4)), "#fff", "center");
+        }
+        function draw() {
+            ctx.fillStyle = "#f3f5fb"; ctx.fillRect(0, 0, W, H);
+            if (!me) return;
+            ctx.strokeStyle = "#dde2ee"; ctx.lineWidth = 1; const g = 50 * cam.z, ox = (W / 2 - cam.x * cam.z) % g, oy = (H / 2 - cam.y * cam.z) % g;
+            for (let x = ox; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = oy; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            ctx.strokeStyle = "#ff4d6d"; ctx.lineWidth = 4; ctx.strokeRect(W / 2 - cam.x * cam.z, H / 2 - cam.y * cam.z, WORLD * cam.z, WORLD * cam.z);
+            for (const f of food) { const x = (f.x - cam.x) * cam.z + W / 2, y = (f.y - cam.y) * cam.z + H / 2; if (x < -5 || x > W + 5 || y < -5 || y > H + 5) continue; ctx.fillStyle = `hsl(${f.h},80%,60%)`; ctx.beginPath(); ctx.arc(x, y, 5 * cam.z, 0, 7); ctx.fill(); }
+            [me, ...bots].sort((a, b) => a.m - b.m).forEach(cell);
+            // leaderboard
+            const top = [me, ...bots].sort((a, b) => b.m - a.m).slice(0, 5);
+            ctx.fillStyle = "#0006"; Kit.rr(ctx, W - 190, 12, 178, 30 + top.length * 22, 10); ctx.fill();
+            Kit.text(ctx, T("Top cells", "התאים המובילים"), W - 101, 34, 15, "#fff", "center");
+            top.forEach((c, i) => { Kit.text(ctx, `${i + 1}. ${c.name}`, W - 178, 58 + i * 22, 14, c === me ? "#ffc94d" : "#fff", "left"); Kit.text(ctx, String(Math.floor(c.m)), W - 22, 58 + i * 22, 14, c === me ? "#ffc94d" : "#fff", "right"); });
+            // minimap
+            ctx.fillStyle = "#0005"; ctx.fillRect(12, H - 112, 100, 100); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(12 + (me.x / WORLD) * 100, H - 112 + (me.y / WORLD) * 100, 3, 0, 7); ctx.fill();
+        }
+        cv.addEventListener("pointermove", (e) => (mouse = Kit.point(cv, e)));
+        cv.addEventListener("pointerdown", (e) => { mouse = Kit.point(cv, e); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "boost", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "boost") boost = 0.6; });
+        Kit.touchButtons((k) => k === "boost" && (boost = 0.6));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.05)); draw(); }).start();
+        if (window.__test) window.__test.cell = { get s() { return { state, m: me && me.m }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Cell Eater</h2><p>A survival-of-the-biggest game. You're a small cell in a big arena full of food dots and other hungry cells. Eat dots to grow, and once you're noticeably bigger than another cell you can swallow it whole. But the bigger you get, the slower you move, and there's always someone bigger out there. Climb the top-five leaderboard and become the biggest cell in the dish.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse or drag</td><td>Move</td></tr><tr><td>Space</td><td>Speed boost</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>You need to be about 15% bigger than a cell to eat it.</li><li>Big cells slowly shrink, so keep eating.</li><li>Use the boost to catch a cell that's running away, or to escape.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Cell Eater</h3><p>In Cell Eater, size is power, but speed is life. Small cells are quick and can dodge almost anything. Spend your early game safely eating dots, and only chase cells that are clearly smaller than you.</p><p>You can only swallow a cell if you're about 15% bigger, and you have to cover most of it. Corner small cells against the edge of the arena so they can't escape. The speed boost helps close the last gap, but it costs mass, so use it only when you're sure.</p><p>Once you're big, you're slow, and you slowly lose mass over time. Watch the leaderboard: if someone is bigger than you, stay away from them and keep eating. The minimap in the corner shows where you are in the arena.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Reach 100 mass.</li><li><b>Getting good:</b> Eat 5 other cells.</li><li><b>Expert:</b> Be #1 on the leaderboard.</li></ul><h3>Did you know?</h3><p>Real single-celled creatures called amoebas eat by flowing around their food and swallowing it, a bit like the cells in this game.</p><h3>Questions players ask</h3><h4>How do I eat another cell?</h4><p>Be about 15% bigger than it and move over it.</p><h4>Why am I getting smaller?</h4><p>All cells slowly lose mass over time, and boosting costs mass too.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/CityDefender/citydefender">City Defender</a><a href="/Darts/darts">Darts</a><a href="/Fireworks/fireworks">Fireworks</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

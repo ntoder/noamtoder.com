@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A land-grab game for quick thinkers. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Paint Territory · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Paint <span>Territory</span></h1>
+        <div class="stats"><div class="stat"><b id="land">0%</b><small>Land</small></div><div class="stat"><b id="time">120s</b><small>Time</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Paint Territory</h2>
+                <p id="startText">You're the blue square. Steer with the arrow keys or swipe. Leave your land to draw a trail, then come back home to fill in everything inside the loop!<br>If anyone touches your trail while you're outside, you're out. Hit someone else's trail to knock them out. Own as much as you can in 2 minutes!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">Make small, quick loops when other players are near. Go for big loops only when the coast is clear.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Paint Territory — leave a trail outside your land, close the loop to claim area. Don't let anyone cut your trail
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "paintlandBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const C = 10, GW = Math.floor(W / C), GH = Math.floor(H / C);
+        const COLORS = ["#2a74ff", "#ff4d6d", "#2ee6a0", "#ffc94d", "#a64dff"];
+        const DIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, OPP = { up: "down", down: "up", left: "right", right: "left" };
+        let own, trail, ps, acc, state = "ready", fx = Kit.particles(), time;
+        Kit.stat("best", Kit.best(BEST));
+        function spawn(i) {
+            let x, y, ok; do { x = Kit.randi(4, GW - 5); y = Kit.randi(4, GH - 5); ok = true; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (own[(y + dy) * GW + x + dx]) ok = false; } while (!ok);
+            for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) own[(y + dy) * GW + x + dx] = i + 1;
+            return { x, y, d: Kit.pick(Object.keys(DIR)), nd: null, alive: true, i, cpu: i > 0, plan: [], respawn: 0, path: [] };
+        }
+        function start() { own = new Uint8Array(GW * GH); trail = new Uint8Array(GW * GH); ps = []; for (let i = 0; i < 5; i++) ps.push(spawn(i)); ps[0].d = ps[0].x < GW / 2 ? "right" : "left"; acc = 0; time = 120; state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        function kill(p, by) {
+            p.alive = false; fx.burst(p.x * C, p.y * C, COLORS[p.i], 40, 4);
+            for (let k = 0; k < own.length; k++) { if (trail[k] === p.i + 1) trail[k] = 0; if (own[k] === p.i + 1) own[k] = 0; }
+            if (p.i === 0) { beep(90, 0.6, "sawtooth", 0.07); return end(by != null ? T("Your trail was cut!", "חתכו לכם את השובל!") : T("You crashed!", "התרסקתם!")); }
+            if (by === 0) { tune([660, 880, 1100], 0.06, "square", 0.04); } p.respawn = 3;
+        }
+        function fill(p) {
+            const id = p.i + 1;
+            for (let k = 0; k < trail.length; k++) if (trail[k] === id) { trail[k] = 0; own[k] = id; }
+            // flood from outside: anything not reachable from the border without crossing id is enclosed
+            const seen = new Uint8Array(GW * GH), st = [];
+            for (let x = 0; x < GW; x++) { st.push(x, GW * (GH - 1) + x); } for (let y = 0; y < GH; y++) { st.push(y * GW, y * GW + GW - 1); }
+            while (st.length) { const k = st.pop(); if (seen[k] || own[k] === id) continue; seen[k] = 1; const x = k % GW, y = (k / GW) | 0; if (x > 0) st.push(k - 1); if (x < GW - 1) st.push(k + 1); if (y > 0) st.push(k - GW); if (y < GH - 1) st.push(k + GW); }
+            let gained = 0; for (let k = 0; k < own.length; k++) if (!seen[k] && own[k] !== id) { if (trail[k]) { const v = ps[trail[k] - 1]; if (v.alive) kill(v, p.i); } own[k] = id; gained++; }
+            if (p.i === 0 && gained + 1) beep(500, 0.1, "triangle", 0.04, 300);
+        }
+        function cpuDir(p) {
+            const outside = own[p.y * GW + p.x] !== p.i + 1;
+            if (!p.plan.length && !outside) { const L = Kit.randi(4, 12), Wd = Kit.randi(3, 9), d0 = Kit.pick(Object.keys(DIR)); const turnR = { up: "right", right: "down", down: "left", left: "up" }; const cw = Math.random() < 0.5; const tn = (d) => (cw ? turnR[d] : OPP[turnR[d]]); let d = d0; p.plan = []; for (const n of [L, Wd]) { for (let i = 0; i < n; i++) p.plan.push(d); d = tn(d); } }
+            // danger: trail long or enemy near -> go home
+            if (outside && (!p.plan.length || p.path.length > 30 || ps.some((o) => o !== p && o.alive && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) < 6))) { p.plan = []; let best = null, bd = 1e9; for (const d of Object.keys(DIR)) { if (d === OPP[p.d]) continue; const [dx, dy] = DIR[d], nx = p.x + dx, ny = p.y + dy; if (nx < 0 || ny < 0 || nx >= GW || ny >= GH || trail[ny * GW + nx] === p.i + 1) continue; let md = 1e9; for (let k = 0; k < own.length; k += 3) if (own[k] === p.i + 1) { const dd = Math.abs((k % GW) - nx) + Math.abs(((k / GW) | 0) - ny); if (dd < md) md = dd; } if (md < bd) { bd = md; best = d; } } return best || p.d; }
+            let d = p.plan.length ? p.plan.shift() : p.d; if (d === OPP[p.d]) d = p.d;
+            const [dx, dy] = DIR[d], nx = p.x + dx, ny = p.y + dy;
+            if (nx < 1 || ny < 1 || nx >= GW - 1 || ny >= GH - 1 || trail[ny * GW + nx] === p.i + 1) { p.plan = []; for (const d2 of Kit.pick([["up", "left", "down", "right"], ["right", "down", "left", "up"]])) { if (d2 === OPP[p.d]) continue; const [ex, ey] = DIR[d2]; const mx = p.x + ex, my = p.y + ey; if (mx >= 1 && my >= 1 && mx < GW - 1 && my < GH - 1 && trail[my * GW + mx] !== p.i + 1) return d2; } }
+            return d;
+        }
+        function tick() {
+            for (const p of ps) {
+                if (!p.alive) continue;
+                if (p.cpu) p.d = cpuDir(p); else if (p.nd && p.nd !== OPP[p.d]) { p.d = p.nd; p.nd = null; }
+                const [dx, dy] = DIR[p.d], nx = p.x + dx, ny = p.y + dy;
+                if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) { kill(p); continue; }
+                const k = ny * GW + nx, t = trail[k];
+                if (t === p.i + 1) { kill(p); continue; }
+                if (t && t !== p.i + 1) { const v = ps[t - 1]; if (v.alive) kill(v, p.i); }
+                p.x = nx; p.y = ny;
+                if (own[k] === p.i + 1) { if (p.path.length) { fill(p); p.path = []; } }
+                else { trail[k] = p.i + 1; p.path.push(k); }
+            }
+            for (const p of ps) if (!p.alive && p.i > 0) { p.respawn -= 1 / 9; if (p.respawn <= 0) { const n = spawn(p.i); Object.assign(p, n); } }
+        }
+        function share(i) { let n = 0; for (let k = 0; k < own.length; k++) if (own[k] === i + 1) n++; return (n / own.length) * 100; }
+        function end(why) { if (state !== "play") return; state = "over"; const pct = share(0); const sc = Math.round(pct * 10); Kit.save(sc); const best = Kit.setBest(BEST, +pct.toFixed(1)); $("overText").innerHTML = `${why}<br>${T("You owned", "היה לכם")} ${pct.toFixed(1)}% ${T("of the map", "מהמפה")} · ${T("best", "שיא")} ${best}%`; Kit.show("over"); }
+        function update(dt) { time -= dt; if (time <= 0) return end(T("Time's up!", "הזמן נגמר!")); acc += dt; while (acc > 1 / 9) { acc -= 1 / 9; tick(); if (state !== "play") return; } Kit.stat("land", share(0).toFixed(1) + "%"); Kit.stat("time", Math.ceil(time) + "s"); }
+        function draw() {
+            ctx.fillStyle = "#eef0f6"; ctx.fillRect(0, 0, W, H);
+            if (!own) return;
+            for (let k = 0; k < own.length; k++) { const x = (k % GW) * C, y = ((k / GW) | 0) * C; if (own[k]) { ctx.fillStyle = COLORS[own[k] - 1]; ctx.fillRect(x, y, C, C); } else if (trail[k]) { ctx.fillStyle = COLORS[trail[k] - 1] + "88"; ctx.fillRect(x + 2, y + 2, C - 4, C - 4); } }
+            for (const p of ps) if (p.alive) { ctx.fillStyle = "#fff"; ctx.fillRect(p.x * C - 2, p.y * C - 2, C + 4, C + 4); ctx.fillStyle = COLORS[p.i]; ctx.fillRect(p.x * C, p.y * C, C, C); ctx.strokeStyle = "#1a1a2a"; ctx.lineWidth = 2; ctx.strokeRect(p.x * C - 2, p.y * C - 2, C + 4, C + 4); }
+            fx.draw(ctx);
+        }
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Enter: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); } else if (ps && ps[0]) ps[0].nd = a; });
+        Kit.swipe(cv, (d) => ps && ps[0] && (ps[0].nd = d));
+        Kit.touchButtons((k) => ps && ps[0] && (ps[0].nd = k));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.paint = { get s() { return { state, shares: own && ps.map((p) => +share(p.i).toFixed(1)) }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Paint Territory</h2><p>A land-grab game for quick thinkers. You and four computer players each start with a small square of land. When you leave your land you leave a trail, and when you return, everything inside your loop becomes yours. But while you're out, your trail is your weak spot: if another player crosses it, you're out. Cut their trails to wipe them out and take back the map. After two minutes, see how much of the map you own.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrow keys, WASD or swipe</td><td>Steer</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Shorter trips are safer.</li><li>Hitting your own trail knocks you out too!</li><li>When you knock out a player, their land disappears for anyone to take.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Paint Territory</h3><p>Paint Territory is about risk. The longer you stay outside your land, the bigger your loop, but also the longer your trail is exposed. Watch where the other squares are, and turn home as soon as one comes near.</p><p>A good pattern is a thin rectangle: go out a few squares, turn, run along the edge of your land, then turn back in. You gain a strip of land quickly without straying far from home.</p><p>Attacking is powerful. If a computer player is out on a long trail, cut across it and they're gone, along with all their land. Just make sure your own trail is short when you do it.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Own 10% of the map.</li><li><b>Getting good:</b> Knock out 3 players.</li><li><b>Expert:</b> Own 40% of the map.</li></ul><h3>Did you know?</h3><p>Mathematicians call the area-filling trick in this game a flood fill. It's the same idea a paint program uses when you click with the paint bucket.</p><h3>Questions players ask</h3><h4>How do I claim land?</h4><p>Leave your land, draw a loop, and come back. Everything inside the loop becomes yours.</p><h4>What knocks me out?</h4><p>Another player touching your trail, hitting your own trail, or hitting the edge of the map.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/Reversi/reversi">Reversi</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

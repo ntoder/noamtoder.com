@@ -99,6 +99,8 @@ export const GAMES = {
     skislope: { name: "Ski Slope", path: "/SkiSlope/skislope", img: "/thumbs/skislope.png", tags: ["arcade", "sports"], desc: "Ski down the mountain through the flags. Watch out for the yeti!", isNew: true },
     dicefive: { name: "Dice Five", path: "/DiceFive/dicefive", img: "/thumbs/dicefive.png", tags: ["board"], desc: "Roll five dice, keep the best and fill every box on the score card.", isNew: true },
     fireworks: { name: "Fireworks", path: "/Fireworks/fireworks", img: "/thumbs/fireworks.png", tags: ["creative", "relaxing"], desc: "A relaxing fireworks toy. Tap the sky to light it up!", isNew: true },
+    celleater: { name: "Cell Eater", path: "/CellEater/celleater", img: "/thumbs/celleater.png", tags: ["arcade"], desc: "Eat dots and smaller cells to grow. Run from the big ones!", isNew: true },
+    paintterritory: { name: "Paint Territory", path: "/PaintTerritory/paintland", img: "/thumbs/paintterritory.png", tags: ["arcade", "strategy"], desc: "Draw loops to claim land. Cut other players' trails, but protect your own!", isNew: true },
 };
 
 // Games that only count plays (no score)
