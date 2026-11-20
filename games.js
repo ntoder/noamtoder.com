@@ -138,6 +138,8 @@ export const GAMES = {
     mirrortwins: { name: "Mirror Twins", path: "/MirrorTwins/mirrortwins", img: "/thumbs/mirrortwins.png", tags: ["puzzle", "brain"], desc: "Move two twins at once: one copies you, the other moves in a mirror!", isNew: true },
     inkbridge: { name: "Ink Bridge", path: "/InkBridge/inkbridge", img: "/thumbs/inkbridge.png", tags: ["puzzle", "physics", "creative"], desc: "Draw ramps and bridges with your pen to roll the ball into the cup.", isNew: true },
     weatherwizard: { name: "Weather Wizard", path: "/WeatherWizard/weatherwizard", img: "/thumbs/weatherwizard.png", tags: ["strategy", "creative"], desc: "Control the weather! Rain, sunshine and wind to grow a garden and stop the storms.", isNew: true },
+    shapeshifter: { name: "Shape Shifter", path: "/ShapeShifter/shapeshifter", img: "/thumbs/shapeshifter.png", tags: ["arcade", "brain"], desc: "Change your shape and row to fit through the holes in the walls!", isNew: true },
+    dominochain: { name: "Domino Chain", path: "/DominoChain/dominochain", img: "/thumbs/dominochain.png", tags: ["puzzle", "physics", "creative"], desc: "Place dominoes over steps and gaps, then topple them all to ring the bell!", isNew: true },
 };
 
 // Games that only count plays (no score)

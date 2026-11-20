@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast thinking-and-reflex game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Shape Shifter · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Shape <span>Shifter</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Walls</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="820" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Shape Shifter</h2>
+                <p id="startText">Walls fly toward you, and each has a hole in a certain shape. Become that shape and move to that row before the wall hits you!<br>Keys: ⬆ ⬇ change row, 1 2 3 (or Z X C) pick ● ■ ▲, Space switches to the next shape. Touch: tap the left side to change shape, the right side to move up or down. After 30 walls, ★ joins the party!</p>
+                <button class="btn" id="startBtn">🔷 Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🔷 Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Look at the colour of the hole's outline: it's the same colour as the shape you need.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Shape Shifter — walls rush toward you with a shaped hole. Switch to the right shape and slide to the right row!
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "shapeshifterBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SHAPES = ["circle", "square", "triangle", "star"], COLS = ["#ff4d6d", "#2ee6a0", "#ffc94d", "#a64dff"], ROWS = [H * 0.28, H * 0.5, H * 0.72], PX = 150, S = 30;
+        let me, walls, speed, score, state = "ready", fx = Kit.particles(), spawnT, ty, nShapes, t;
+        Kit.stat("best", Kit.best(BEST));
+        function start() { me = { row: 1, y: ROWS[1], shape: 0 }; walls = []; speed = 260; score = 0; spawnT = 0.5; nShapes = 3; t = 0; state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function spawn() { walls.push({ x: W + 40, row: Kit.randi(0, 2), shape: Kit.randi(0, nShapes - 1), done: false }); }
+        function setShape(s) { if (state !== "play" || s >= nShapes) return; me.shape = s; beep(500 + s * 120, 0.04, "triangle", 0.03); }
+        function moveRow(d) { if (state !== "play") return; me.row = Math.max(0, Math.min(2, me.row + d)); beep(300, 0.03, "sine", 0.02); }
+        function update(dt) {
+            t += dt; speed = 260 + Math.min(320, t * 6); if (t > 30) nShapes = 4;
+            me.y += (ROWS[me.row] - me.y) * Math.min(1, dt * 14);
+            spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = Math.max(0.9, 2.1 - t * 0.02); }
+            for (const w of walls) { w.x -= speed * dt; if (!w.done && w.x < PX) { w.done = true; if (w.row === me.row && w.shape === me.shape && Math.abs(me.y - ROWS[me.row]) < 20) { score++; Kit.stat("score", score); tune([660 + score * 4, 990 + score * 4], 0.04, "square", 0.03); fx.burst(PX, me.y, COLS[me.shape], 14, 3); } else return die(); } }
+            walls = walls.filter((w) => w.x > -60);
+        }
+        function die() { state = "over"; fx.burst(PX, me.y, "#fff", 40, 5); beep(90, 0.5, "sawtooth", 0.07); Kit.save(score * 4); const b = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Splat! Wrong shape or wrong row.", "בום! צורה לא נכונה או שורה לא נכונה.")}<br>${score} ${T("walls", "קירות")} · ${T("best", "שיא")} ${b}`; Kit.show("over"); }, 600); }
+        function shapePath(s, x, y, r, keep) { if (!keep) ctx.beginPath(); else ctx.moveTo(x + r, y); if (s === 0) ctx.arc(x, y, r, 0, 7); else if (s === 1) ctx.rect(x - r * 0.9, y - r * 0.9, r * 1.8, r * 1.8); else if (s === 2) { ctx.moveTo(x, y - r * 1.1); ctx.lineTo(x + r, y + r * 0.8); ctx.lineTo(x - r, y + r * 0.8); ctx.closePath(); } else { for (let i = 0; i < 10; i++) { const a = (i * Math.PI) / 5 - Math.PI / 2, rr = i % 2 ? r * 0.5 : r * 1.1; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); } }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, "#1a1440"); g.addColorStop(1, "#3a1a5a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            for (let i = 0; i < 30; i++) { const x = ((i * 137 - (t || 0) * speed * 0.4) % W + W) % W; ctx.fillStyle = "#ffffff22"; ctx.fillRect(x, (i * 71) % H, 30, 2); }
+            if (!me) return;
+            for (const r of ROWS) { ctx.strokeStyle = "#ffffff12"; ctx.setLineDash([10, 14]); ctx.beginPath(); ctx.moveTo(0, r); ctx.lineTo(W, r); ctx.stroke(); } ctx.setLineDash([]);
+            for (const w of walls) {
+                ctx.save(); ctx.fillStyle = "#5a4a9a"; ctx.beginPath(); ctx.rect(w.x - 50, 30, 100, H - 60); shapePath(w.shape, w.x, ROWS[w.row], S + 6, true); ctx.fill("evenodd");
+                ctx.strokeStyle = COLS[w.shape]; ctx.lineWidth = 4; shapePath(w.shape, w.x, ROWS[w.row], S + 6); ctx.stroke(); ctx.restore();
+            }
+            ctx.fillStyle = COLS[me.shape]; ctx.shadowColor = COLS[me.shape]; ctx.shadowBlur = 16; shapePath(me.shape, PX, me.y, S); ctx.fill(); ctx.shadowBlur = 0;
+            fx.draw(ctx);
+            for (let i = 0; i < nShapes; i++) { const x = W / 2 - (nShapes * 70) / 2 + i * 70 + 35, y = H - 26; ctx.globalAlpha = i === me.shape ? 1 : 0.4; ctx.fillStyle = COLS[i]; shapePath(i, x, y, 14); ctx.fill(); Kit.text(ctx, String(i + 1), x + 22, y + 6, 12, "#fff", "center"); } ctx.globalAlpha = 1;
+            Kit.text(ctx, String(score), W - 30, 40, 28, "#fff", "right", "'Press Start 2P', monospace", 400);
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (p.y > H - 50) { const i = Math.floor((p.x - (W / 2 - (nShapes * 70) / 2)) / 70); if (i >= 0 && i < nShapes) return setShape(i); } if (p.x < W * 0.4) { setShape(((me ? me.shape : 0) + 1) % nShapes); } else moveRow(p.y < (me ? me.y : H / 2) ? -1 : 1); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowUp: "u", ArrowDown: "d", KeyW: "u", KeyS: "d", Digit1: "s0", Digit2: "s1", Digit3: "s2", Digit4: "s3", Space: "next", KeyZ: "s0", KeyX: "s1", KeyC: "s2", KeyQ: "s3", Enter: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); return; } if (a === "u") moveRow(-1); if (a === "d") moveRow(1); if (a[0] === "s") setShape(+a[1]); if (a === "next") setShape((me.shape + 1) % nShapes); });
+        window.GAMEPAD_MAP = [{ up: "ArrowUp", down: "ArrowDown", left: "ArrowUp", right: "ArrowDown", a: "KeyZ", b: "KeyX", x: "KeyC", y: "KeyQ", start: "Enter" }];
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.04)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.ss = { get s() { return { state, score, next: walls && walls.find((w) => !w.done) }; }, start, setShape, moveRow, row: (r) => { me.row = r; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Shape Shifter</h2><p>A fast thinking-and-reflex game. You're a glowing shape that can change form in an instant: circle, square or triangle, and later a star. Walls rush in from the right, each with a single hole in one of three rows. Match the shape AND the row before the wall reaches you, then do it again, faster and faster. The colour of each hole matches the shape it needs, which helps when things get hectic.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ ⬇</td><td>Change row</td></tr><tr><td>1 2 3 4 / Z X C Q</td><td>Pick a shape</td></tr><tr><td>Space</td><td>Next shape</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hole colours match shape colours.</li><li>Change shape first, then row.</li><li>Walls get faster and closer together.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Shape Shifter</h3><p>Shape Shifter asks you to do two things for every wall: pick the right shape and move to the right row. Do the shape first, because you can see it from far away, then slide into the row when the wall gets closer.</p><p>Use the colours. Each shape has its own colour (circle red, square green, triangle yellow, star purple), and each hole's outline uses that colour. With practice you'll react to the colour before you even think about the shape.</p><p>On a keyboard, keep your left hand on 1-2-3 (or Z-X-C) and your right hand on the arrow keys. Then you can change shape and row at the same time.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Pass 20 walls.</li><li><b>Getting good:</b> Unlock the star shape (30 walls).</li><li><b>Expert:</b> Pass 80 walls.</li></ul><h3>Did you know?</h3><p>Some TV game shows have used real walls with cut-out shapes that contestants must squeeze through before being pushed into a pool.</p><h3>Questions players ask</h3><h4>What ends the game?</h4><p>Hitting a wall with the wrong shape or in the wrong row.</p><h4>When does the star appear?</h4><p>After 30 seconds.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SkiSlope/skislope">Ski Slope</a><a href="/SlimeVolley/slimevolley">Slime Volley</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

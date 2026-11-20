@@ -49,6 +49,8 @@ export const TARGETS = {
     snakearena:   { easy: 800,  hard: 3000,  unit: "points" },
     roadhopper:   { easy: 30,   hard: 120,   unit: "hops" },
     hillrider:    { easy: 300,  hard: 1500,  unit: "m" },
+    dominochain: { easy: 3, hard: 6, unit: "levels" },
+    shapeshifter: { easy: 30, hard: 80, unit: "walls" },
     weatherwizard: { easy: 3, hard: 6, unit: "days" },
     inkbridge: { easy: 4, hard: 8, unit: "levels" },
     mirrortwins: { easy: 5, hard: 15, unit: "level" },

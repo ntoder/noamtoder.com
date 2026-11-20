@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A satisfying chain-reaction puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Domino Chain · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.dcbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:12px auto 0}.dcbar .btn{padding:8px 16px}.dcbar .ghost{background:#262a4d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Domino <span>Chain</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1/6</b><small>Level</small></div><div class="stat"><b id="left">10</b><small>Dominoes left</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Domino Chain</h2>
+                <p id="startText">Tap the ground to stand up a domino. Tap a domino again to remove it. You only have a few, so space them out!<br>When you're ready, press ▶ Push. Each domino must reach the next one when it falls. The last one has to hit the golden bell 🔔. Careful with gaps and steps!</p>
+                <button class="btn" id="startBtn">🁢 Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>All done!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Start again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">The faint dashed curve shows how far a domino reaches when it falls. The next domino must be inside it.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Domino Chain — place a limited number of dominoes across steps and gaps, then push the first one and ring the bell
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dominochainBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const DH = 64, DW = 12, REACH = DH * 0.92;
+        // ground: list of [x0, x1, y] platforms; gaps between are holes. bell at end
+        const LV = [
+            { g: [[40, 760, 420]], n: 10, bell: 720 },
+            { g: [[40, 380, 420], [440, 760, 420]], n: 10, bell: 720 },
+            { g: [[40, 300, 440], [300, 520, 410], [520, 760, 380]], n: 12, bell: 730 },
+            { g: [[40, 260, 380], [300, 500, 430], [540, 760, 400]], n: 12, bell: 720 },
+            { g: [[40, 200, 420], [240, 320, 420], [360, 440, 420], [480, 760, 420]], n: 13, bell: 730 },
+            { g: [[40, 220, 460], [220, 400, 420], [400, 560, 380], [600, 760, 440]], n: 13, bell: 720 },
+        ];
+        let lv, doms, phase, state = "ready", hover = null, winT = 0, total = 0, bellT = 0, fallT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        const groundAt = (x) => { for (const [a, b, y] of LV[lv].g) if (x >= a + 4 && x <= b - 4) return y; return null; };
+        function load(i) { lv = i; doms = []; phase = "build"; winT = 0; bellT = 0; Kit.stat("level", `${i + 1}/${LV.length}`); Kit.stat("left", LV[i].n); state = "play"; }
+        function start() { total = 0; load(Math.min(LV.length - 1, +(localStorage.getItem("dominochainLevel") || 0))); Kit.hide("start"); Kit.hide("over"); }
+        function place(x) {
+            if (phase !== "build" || state !== "play") return; const y = groundAt(x); if (y === null) { beep(120, 0.06, "square", 0.03); return; }
+            const near = doms.findIndex((d) => Math.abs(d.x - x) < DW + 2); if (near >= 0) { doms.splice(near, 1); Kit.stat("left", LV[lv].n - doms.length); beep(300, 0.03, "sine", 0.02); return; }
+            if (doms.length >= LV[lv].n || x > LV[lv].bell - 20) return; doms.push({ x, y, a: 0, va: 0, falling: false, done: false }); doms.sort((p, q) => p.x - q.x); Kit.stat("left", LV[lv].n - doms.length); beep(500, 0.03, "triangle", 0.03);
+        }
+        function push() { if (phase !== "build" || !doms.length) return; phase = "run"; doms[0].falling = true; doms[0].va = 1.2; fallT = 0; beep(300, 0.05, "square", 0.03); }
+        function reset() { if (phase === "run" || phase === "fail") { for (const d of doms) { d.a = 0; d.va = 0; d.falling = false; d.done = false; } phase = "build"; } }
+        function tip(d) { return [d.x + Math.sin(d.a) * DH, d.y - Math.cos(d.a) * DH]; }
+        function update(dt) {
+            if (phase !== "run") return; fallT += dt;
+            for (let i = 0; i < doms.length; i++) {
+                const d = doms[i]; if (!d.falling || d.done) continue; d.va += 9 * Math.sin(Math.max(0.05, d.a)) * dt; d.a += d.va * dt;
+                const nx = doms[i + 1]; let stop = Math.PI / 2;
+                if (nx && !nx.hit) { const dx = nx.x - d.x, dy = d.y - nx.y; // next domino's top height relative
+                    const [tx, ty] = tip(d); if (tx >= nx.x - DW / 2 && ty <= nx.y && ty >= nx.y - DH) { nx.hit = true; nx.falling = true; nx.va = Math.max(1.4, d.va * 0.7); beep(600 + i * 25, 0.03, "square", 0.03); } }
+                if (nx && nx.falling && nx.a < 1.3) { const maxA = Math.asin(Math.min(1, Math.max(-1, (nx.x - d.x - DW + Math.sin(nx.a) * DH * 0.3) / DH))); stop = Math.max(0.2, Math.min(stop, maxA + 0.1)); }
+                const ground = d.y; if (d.a >= stop) { d.a = stop; d.va = 0; if (stop >= Math.PI / 2 - 0.01) d.done = true; }
+            }
+            const last = doms[doms.length - 1], [tx, ty] = tip(last), L = LV[lv];
+            if (last.falling && tx >= L.bell - 24 && !winT) win();
+            if (fallT > 6 && !winT && phase === "run") { phase = "fail"; beep(150, 0.3, "sawtooth", 0.04); }
+        }
+        function win() { winT = 1.8; bellT = 1.5; phase = "won"; const left = LV[lv].n - doms.length; const stars = left >= 3 ? 3 : left >= 1 ? 2 : 1; total += stars; winT.stars = stars; tune([1047, 1319, 1568, 2093], 0.1, "triangle", 0.05); Kit.save(stars * 15); Kit.setBest(BEST, lv + 1); localStorage.setItem("dominochainLevel", lv + 1); load.stars = stars; }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ffe9cf"); g.addColorStop(1, "#ffd3a8"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (lv === undefined) return; const L = LV[lv];
+            ctx.fillStyle = "#4a7ad9"; ctx.fillRect(0, H - 40, W, 40);
+            for (const [a, b, y] of L.g) { ctx.fillStyle = "#8a5a2b"; ctx.fillRect(a, y, b - a, H - y); ctx.fillStyle = "#7cc46a"; ctx.fillRect(a, y, b - a, 8); }
+            // bell
+            const by = groundAt(L.bell) ?? 420; ctx.fillStyle = "#6b4a2a"; ctx.fillRect(L.bell + 10, by - 110, 6, 110); ctx.fillRect(L.bell - 20, by - 112, 36, 6); ctx.save(); ctx.translate(L.bell - 4, by - 104); ctx.rotate(Math.sin(bellT * 25) * bellT * 0.3); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(-16, 40); ctx.quadraticCurveTo(-16, 0, 0, 0); ctx.quadraticCurveTo(16, 0, 16, 40); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#d9963a"; ctx.beginPath(); ctx.arc(0, 42, 5, 0, 7); ctx.fill(); ctx.restore();
+            for (const d of doms) { ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.a); ctx.fillStyle = "#1a1a2a"; Kit.rr(ctx, -DW / 2, -DH, DW, DH, 3); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, -DH * 0.25, 2, 0, 7); ctx.arc(0, -DH * 0.7, 2, 0, 7); ctx.fill(); ctx.fillRect(-DW / 2 + 2, -DH / 2, DW - 4, 1.5); ctx.restore(); }
+            if (hover && phase === "build") { const y = groundAt(hover); if (y !== null) { ctx.globalAlpha = 0.35; ctx.fillStyle = "#1a1a2a"; ctx.fillRect(hover - DW / 2, y - DH, DW, DH); ctx.globalAlpha = 1; ctx.strokeStyle = "#ff4d6d55"; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.arc(hover, y, REACH, -Math.PI / 2, 0); ctx.stroke(); ctx.setLineDash([]); } }
+            Kit.text(ctx, `${T("Level", "שלב")} ${lv + 1}`, 20, 34, 20, "#3a2a1a", "left");
+            Kit.text(ctx, phase === "build" ? T("Tap the ground to place dominoes (tap one to remove it), then ▶ Push", "הקישו על הקרקע כדי להניח דומינו (הקשה על אחד מסירה אותו), ואז ▶ דחיפה") : phase === "fail" ? T("The chain stopped! Press ⟲ to adjust.", "השרשרת נעצרה! לחצו ⟲ כדי לתקן.") : "", W / 2, 70, 15, "#3a2a1a", "center");
+            if (phase === "won") Kit.text(ctx, "⭐".repeat(load.stars) + "☆".repeat(3 - load.stars), W / 2, 200, 54, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointermove", (e) => (hover = Kit.point(cv, e).x));
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); hover = p.x; place(p.x); });
+        const bar = document.createElement("div"); bar.className = "dcbar"; bar.innerHTML = `<button id="pushBtn" class="btn">${T("▶ Push", "▶ דחיפה")}</button><button id="resetBtn" class="btn ghost">${T("⟲ Stand them up", "⟲ להעמיד מחדש")}</button><button id="clearBtn" class="btn ghost">${T("🗑 Clear", "🗑 ניקוי")}</button>`; cv.parentElement.after(bar);
+        $("pushBtn").onclick = push; $("resetBtn").onclick = reset; $("clearBtn").onclick = () => lv !== undefined && load(lv);
+        Kit.onKeys({ Space: "push", KeyR: "reset", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "push") (phase === "build" ? push() : reset()); if (a === "reset") reset(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { localStorage.setItem("dominochainLevel", 0); start(); };
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); if (bellT > 0) bellT -= dt; if (winT) { winT -= dt; if (winT <= 0) { winT = 0; if (lv + 1 >= LV.length) { state = "over"; $("overText").innerHTML = `${T("You rang every bell!", "צלצלתם בכל הפעמונים!")} 🔔 ⭐ ${total}`; Kit.show("over"); } else load(lv + 1); } } draw(); }).start();
+        if (window.__test) window.__test.dc = { get s() { return { state, lv, phase, n: doms && doms.length }; }, start, load, place, push };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Domino Chain</h2><p>A satisfying chain-reaction puzzle. Each level is a stretch of ground with steps up, steps down and gaps, and a golden bell at the far end. You have a limited box of dominoes. Stand them up wherever you like, then push the first one and watch the chain race along. If every domino reaches the next, the last one rings the bell. Use fewer dominoes for more stars.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap the ground</td><td>Place / remove a domino</td></tr><tr><td>Space / ▶ Push</td><td>Push the first domino</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>A falling domino reaches almost its own height ahead.</li><li>Stepping up shortens the reach; stepping down makes it easier.</li><li>Leftover dominoes earn extra stars.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Domino Chain</h3><p>Domino Chain is about spacing. A falling domino can only knock over the next one if it's within reach, a little less than its own height. Too close together wastes dominoes; too far apart and the chain stops.</p><p>Steps change everything. If the next domino stands on higher ground, the falling one hits it lower down and has less reach, so place them closer. Going down a step is easier.</p><p>Gaps can be bridged: a domino at the very edge of one platform can fall across a narrow gap and hit one standing on the far edge. If the chain stops, press ⟲ to stand them back up and adjust.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Ring the first bell.</li><li><b>Getting good:</b> Get 3 stars on a level.</li><li><b>Expert:</b> Finish all 6 levels.</li></ul><h3>Did you know?</h3><p>Each domino can knock over another one about 1.5 times bigger. Scientists have shown that a chain of growing dominoes could topple something as tall as a skyscraper.</p><h3>Questions players ask</h3><h4>How do I remove a domino?</h4><p>Tap it again.</p><h4>The chain stopped. What now?</h4><p>Press ⟲ Stand them up, move a domino closer, and push again.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/EchoBat/echobat">Echo Bat</a><a href="/GoldMiner/goldminer">Gold Miner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
