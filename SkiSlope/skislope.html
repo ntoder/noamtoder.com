@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A snowy downhill game inspired by an old computer classic. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Ski Slope · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Ski <span>Slope</span></h1>
+        <div class="stats"><div class="stat"><b id="dist">0 m</b><small>Distance</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="560" height="680"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Ski Slope</h2>
+                <p id="startText">⬅ ➡ (or tap the left and right side of the screen) to turn. Going straight down is fastest!<br>Ski between the red flags for points, hit the blue ramps to jump, and dodge trees and rocks. After 2,000 m… something starts chasing you.</p>
+                <button class="btn" id="startBtn">▶ Ski</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Ski again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button></div>
+    <p class="hint">Turning slows you down. Line up early and make small turns so you stay fast when the yeti comes.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Ski Slope — steer down the mountain through flags, dodge trees and rocks, avoid the yeti!
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "skislopeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SX = W / 2, SY = 180;
+        let sk, objs, dist, score, gates, state = "ready", fx = Kit.particles(), crash = 0, yeti = null, trail = [], spawnY;
+        Kit.stat("best", Kit.best(BEST));
+        function start() { sk = { x: 0, dir: 0, v: 200 }; objs = []; dist = 0; score = 0; gates = 0; crash = 0; yeti = null; trail = []; spawnY = H; state = "play"; Kit.stat("score", 0); Kit.stat("dist", "0 m"); Kit.hide("start"); Kit.hide("over"); }
+        function spawnRow(y) {
+            const n = Kit.randi(2, 5);
+            for (let i = 0; i < n; i++) objs.push({ x: sk.x + Kit.rand(-W, W), y, k: Kit.pick(["tree", "tree", "tree", "rock", "bump"]) });
+            if (Math.random() < 0.45) { const gx = sk.x + Kit.rand(-W * 0.4, W * 0.4), gw = Math.max(70, 140 - dist / 60); objs.push({ x: gx, y: y + 40, k: "gate", w: gw }); }
+            if (Math.random() < 0.12) objs.push({ x: sk.x + Kit.rand(-W * 0.4, W * 0.4), y: y + 80, k: "jump" });
+        }
+        function update(dt) {
+            if (crash > 0) { crash -= dt; if (crash <= 0 && !yeti?.caught) { sk.v = 120; } if (yeti && yeti.caught && crash <= 0) gameOver(); }
+            const k = Kit.keys; if (crash <= 0) { if (k.has("left")) sk.dir = Math.max(-2, sk.dir - 4 * dt); else if (k.has("right")) sk.dir = Math.min(2, sk.dir + 4 * dt); else if (!k.has("hold")) sk.dir *= 1 - dt * 1.2; }
+            const ang = sk.dir * 0.6, maxV = 260 + dist / 15, air = sk.air > 0;
+            if (crash <= 0) sk.v += ((maxV * Math.cos(ang) ** 2) - sk.v) * dt * 0.8;
+            const vy = crash > 0 ? 0 : sk.v * Math.cos(ang), vx = crash > 0 ? 0 : sk.v * Math.sin(ang);
+            sk.x += vx * dt; dist += (vy * dt) / 10; if (air) sk.air -= dt;
+            for (const o of objs) o.y -= vy * dt;
+            spawnY -= vy * dt; while (spawnY < H + 200) { spawnRow(spawnY + 100); spawnY += Kit.rand(90, 150); }
+            if (crash <= 0 && !air) for (const o of objs) {
+                const dx = o.x - sk.x, dy = o.y - SY;
+                if (o.k === "gate") { if (!o.done && dy < 0) { o.done = true; if (Math.abs(dx) < o.w / 2) { gates++; score += 50 + gates * 5; tune([880, 1175], 0.05, "triangle", 0.04); o.ok = true; } else o.miss = true; } continue; }
+                if (Math.abs(dy) > 14) continue;
+                if (o.k === "jump" && Math.abs(dx) < 26) { sk.air = 0.9; beep(300, 0.3, "sine", 0.04, 400); score += 25; continue; }
+                if (o.k === "bump" && Math.abs(dx) < 18 && !o.hit) { o.hit = true; sk.v *= 0.7; beep(150, 0.05, "square", 0.03); continue; }
+                if ((o.k === "tree" && Math.abs(dx) < 16) || (o.k === "rock" && Math.abs(dx) < 18)) { crash = 1; sk.v = 0; fx.burst(SX, SY, "#ffffff", 25, 3); beep(90, 0.3, "sawtooth", 0.06); score = Math.max(0, score - 20); }
+            }
+            objs = objs.filter((o) => o.y > -60);
+            if (crash <= 0 && Math.abs(sk.dir) < 1.9) trail.push({ x: sk.x, y: SY }); trail.forEach((t) => (t.y -= vy * dt)); trail = trail.filter((t) => t.y > -10).slice(-200);
+            // yeti appears after 2000 m
+            if (!yeti && dist > 2000) { yeti = { x: sk.x + W, y: SY - 300, caught: false }; beep(80, 1, "sawtooth", 0.06, 40); }
+            if (yeti && !yeti.caught) { const s = 290 + (dist - 2000) / 20; const dx = sk.x - yeti.x, dy = SY - yeti.y, d = Math.hypot(dx, dy); yeti.x += (dx / d) * s * dt; yeti.y += (dy / d) * s * dt - vy * dt; if (d < 24) { yeti.caught = true; crash = 1.5; beep(60, 1, "sawtooth", 0.08); } }
+            score += vy * dt * 0.02;
+            Kit.stat("score", Math.floor(score)); Kit.stat("dist", Math.floor(dist) + " m");
+        }
+        function gameOver() { state = "over"; const sc = Math.floor(score); Kit.save(sc); const best = Kit.setBest(BEST, sc); $("overText").innerHTML = `${T("The yeti got you!", "היטי תפס אתכם!")} 🦍<br>${Math.floor(dist)} m · ${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#f4f8ff"; ctx.fillRect(0, 0, W, H);
+            if (!sk) return;
+            const ox = SX - sk.x;
+            ctx.strokeStyle = "#d8e2f2"; ctx.lineWidth = 2; ctx.beginPath(); trail.forEach((t, i) => (i ? ctx.lineTo(t.x + ox - 4, t.y + 10) : ctx.moveTo(t.x + ox - 4, t.y + 10))); ctx.stroke(); ctx.beginPath(); trail.forEach((t, i) => (i ? ctx.lineTo(t.x + ox + 4, t.y + 10) : ctx.moveTo(t.x + ox + 4, t.y + 10))); ctx.stroke();
+            const sorted = [...objs].sort((a, b) => a.y - b.y);
+            for (const o of sorted) {
+                const x = o.x + ox, y = o.y; if (x < -150 || x > W + 150) continue;
+                if (o.k === "tree") { ctx.fillStyle = "#6b4a2a"; ctx.fillRect(x - 3, y, 6, 10); ctx.fillStyle = "#1f7a4a"; ctx.beginPath(); ctx.moveTo(x, y - 36); ctx.lineTo(x + 16, y + 2); ctx.lineTo(x - 16, y + 2); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x, y - 36); ctx.lineTo(x + 6, y - 22); ctx.lineTo(x - 6, y - 22); ctx.fill(); }
+                else if (o.k === "rock") { ctx.fillStyle = "#8a8fa3"; ctx.beginPath(); ctx.ellipse(x, y, 16, 10, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(x - 4, y - 6, 8, 3, 0, 0, 7); ctx.fill(); }
+                else if (o.k === "bump") { ctx.fillStyle = "#dfe8f6"; ctx.beginPath(); ctx.ellipse(x, y, 18, 6, 0, Math.PI, 0); ctx.fill(); }
+                else if (o.k === "jump") { ctx.fillStyle = "#9bd0ff"; ctx.beginPath(); ctx.moveTo(x - 24, y + 6); ctx.lineTo(x + 24, y + 6); ctx.lineTo(x + 18, y - 8); ctx.lineTo(x - 18, y - 8); ctx.fill(); }
+                else if (o.k === "gate") { const c = o.ok ? "#2ee6a0" : o.miss ? "#999" : "#ff4d6d"; for (const s of [-1, 1]) { ctx.fillStyle = "#555"; ctx.fillRect(x + (s * o.w) / 2 - 1, y - 26, 3, 28); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x + (s * o.w) / 2 + 1, y - 26); ctx.lineTo(x + (s * o.w) / 2 + 1 - s * 16, y - 20); ctx.lineTo(x + (s * o.w) / 2 + 1, y - 14); ctx.fill(); } }
+            }
+            // skier
+            const air = sk.air > 0, lift = air ? Math.sin((0.9 - sk.air) / 0.9 * Math.PI) * 24 : 0;
+            ctx.save(); ctx.translate(SX, SY - lift); if (air) { ctx.fillStyle = "#0001"; ctx.beginPath(); ctx.ellipse(0, lift + 12, 14, 4, 0, 0, 7); ctx.fill(); }
+            if (crash > 0 && !(yeti && yeti.caught)) { ctx.rotate(1.4); }
+            ctx.rotate(-sk.dir * 0.35);
+            ctx.strokeStyle = "#ff4d6d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(-6, 16); ctx.moveTo(6, -2); ctx.lineTo(6, 16); ctx.stroke();
+            ctx.fillStyle = "#2a74ff"; Kit.rr(ctx, -8, -14, 16, 18, 5); ctx.fill(); ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(0, -20, 7, 0, 7); ctx.fill(); ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(0, -23, 7, Math.PI, 0); ctx.fill();
+            ctx.strokeStyle = "#555"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-10, -6); ctx.lineTo(-14, 10); ctx.moveTo(10, -6); ctx.lineTo(14, 10); ctx.stroke();
+            ctx.restore();
+            if (yeti) { const x = yeti.x + ox, y = yeti.y; ctx.fillStyle = "#e8eef8"; ctx.beginPath(); ctx.ellipse(x, y, 20, 26, 0, 0, 7); ctx.fill(); ctx.strokeStyle = "#b8c4d8"; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = "#8aa0c0"; ctx.beginPath(); ctx.ellipse(x, y - 10, 10, 8, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#000"; ctx.fillRect(x - 5, y - 13, 3, 3); ctx.fillRect(x + 2, y - 13, 3, 3); ctx.fillStyle = "#d62b3a"; ctx.fillRect(x - 4, y - 6, 8, 3); }
+            fx.draw(ctx);
+            Kit.text(ctx, `${Math.floor(dist)} m`, 20, 34, 18, "#1a2a4a", "left");
+            Kit.text(ctx, `🚩 ${gates}`, W - 20, 34, 18, "#1a2a4a", "right");
+            if (dist > 1800 && !yeti) Kit.text(ctx, T("Something is coming… 👣", "משהו מתקרב… 👣"), W / 2, H - 30, 16, "#8a8fa3", "center");
+        }
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", ArrowDown: "hold", KeyS: "hold", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons();
+        let tp = null;
+        cv.addEventListener("pointerdown", (e) => { tp = e.pointerId; const p = Kit.point(cv, e); Kit.keys.add(p.x < W / 2 ? "left" : "right"); });
+        window.addEventListener("pointerup", () => { Kit.keys.delete("left"); Kit.keys.delete("right"); });
+        cv.style.touchAction = "none";
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.ski = { get s() { return { state, dist, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Ski Slope</h2><p>A snowy downhill game inspired by an old computer classic. Your skier races down an endless mountain. Steer left and right around trees and rocks, ski through flag gates for points, and launch off ramps to fly over obstacles. Crashing slows you down. Once you pass 2,000 metres, a yeti comes charging after you, and it gets faster the further you go.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ or A D</td><td>Turn</td></tr><tr><td>⬇ or S</td><td>Hold your direction</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Skiing straight down is the fastest.</li><li>Ramps make you jump over everything for a moment.</li><li>Each flag gate in a row is worth more.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Ski Slope</h3><p>Ski Slope is about keeping your speed. Skiing straight down the hill is fastest, and every turn slows you. Look ahead and steer early with small taps, instead of last-second sharp turns that bleed speed.</p><p>Flag gates give lots of points, and each one is worth a bit more than the last. They get narrower the further you go. If a gate would force a sharp turn near a tree, skip it. A crash costs more than a missed gate.</p><p>After 2,000 metres the yeti appears and chases you. It's fast, but it can't jump, so blue ramps are your friend. Keep going as straight as you can, and don't crash, because a crash gives the yeti time to catch up.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Ski 1,000 metres.</li><li><b>Getting good:</b> Pass 20 flag gates.</li><li><b>Expert:</b> Escape the yeti for 500 metres.</li></ul><h3>Did you know?</h3><p>Downhill ski racers can reach speeds of over 130 km/h, faster than cars on most motorways.</p><h3>Questions players ask</h3><h4>What's the fastest way down?</h4><p>Pointing straight downhill. Turning slows you.</p><h4>Can I escape the yeti?</h4><p>For a while! Stay fast and use ramps, but it gets faster the further you go.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SlidePuzzle/slidepuzzle">Slide Puzzle</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

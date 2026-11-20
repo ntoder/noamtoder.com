@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic dice game for one player. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Dice Five · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Dice <span>Five</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="580" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Dice Five</h2>
+                <p id="startText">Each turn you get up to 3 rolls. After a roll, tap dice to HOLD them, then roll the rest again.<br>When you're happy, tap a box on the score card to score it. Every box can be used once, so 13 turns in all. Five of the same is DICE FIVE: 50 points!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Try to get at least three of each number in the top section (63 points) for the +35 bonus.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Dice Five — Yahtzee-style: 5 dice, 3 rolls per turn, fill 13 boxes
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dicefiveBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CATS = [["1s", "1"], ["2s", "2"], ["3s", "3"], ["4s", "4"], ["5s", "5"], ["6s", "6"], ["3 of a kind", "3 זהים"], ["4 of a kind", "4 זהים"], ["Full house", "פול האוס"], ["Small straight", "רצף קטן"], ["Large straight", "רצף גדול"], ["DICE FIVE!", "חמישייה!"], ["Chance", "צ'אנס"]];
+        let dice, held, rollsLeft, scores, state = "ready", anim = 0, bonusFive = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function start() { dice = [1, 2, 3, 4, 5]; held = [0, 0, 0, 0, 0]; scores = Array(13).fill(null); rollsLeft = 3; bonusFive = 0; state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); roll(); }
+        function roll() { if (rollsLeft <= 0 || anim > 0) return; rollsLeft--; anim = 0.5; beep(300, 0.04, "square", 0.03); }
+        function counts(d) { const c = [0, 0, 0, 0, 0, 0, 0]; d.forEach((v) => c[v]++); return c; }
+        function value(i, d) {
+            const c = counts(d), sum = d.reduce((a, b) => a + b, 0), mx = Math.max(...c);
+            const has = (run) => run.every((v) => c[v]);
+            if (i < 6) return c[i + 1] * (i + 1);
+            if (i === 6) return mx >= 3 ? sum : 0; if (i === 7) return mx >= 4 ? sum : 0;
+            if (i === 8) return c.includes(3) && c.includes(2) ? 25 : 0;
+            if (i === 9) return has([1, 2, 3, 4]) || has([2, 3, 4, 5]) || has([3, 4, 5, 6]) ? 30 : 0;
+            if (i === 10) return has([1, 2, 3, 4, 5]) || has([2, 3, 4, 5, 6]) ? 40 : 0;
+            if (i === 11) return mx === 5 ? 50 : 0; return sum;
+        }
+        const upper = () => scores.slice(0, 6).reduce((a, b) => a + (b || 0), 0);
+        const total = () => scores.reduce((a, b) => a + (b || 0), 0) + (upper() >= 63 ? 35 : 0) + bonusFive;
+        function pick(i) {
+            if (state !== "play" || scores[i] !== null || anim > 0 || rollsLeft === 3) return;
+            if (Math.max(...counts(dice)) === 5 && scores[11] === 50) { bonusFive += 100; tune([784, 988, 1175, 1568], 0.08, "square", 0.05); }
+            const v = value(i, dice); scores[i] = v; v ? tune([523, 784], 0.07, "triangle", 0.04) : beep(200, 0.1, "sine", 0.03);
+            Kit.stat("score", total());
+            if (scores.every((s) => s !== null)) return end();
+            held = [0, 0, 0, 0, 0]; rollsLeft = 3; roll();
+        }
+        function end() { state = "over"; const t = total(); Kit.save(t); const best = Kit.setBest(BEST, t); $("overText").innerHTML = `${T("Final score", "ניקוד סופי")}: <b>${t}</b>${upper() >= 63 ? "<br>" + T("Including +35 upper bonus!", "כולל בונוס 35!") : ""}<br>${T("Best", "שיא")}: ${best}`; Kit.show("over"); }
+        const DX = (i) => 60 + i * 100, DY = 70, DS = 80, RX = 30, RY = 230, RH = 34;
+        function drawDie(x, y, s, v, h) {
+            ctx.fillStyle = "#0004"; Kit.rr(ctx, x + 3, y + 5, s, s, 14); ctx.fill();
+            ctx.fillStyle = h ? "#ffe9a8" : "#fff"; Kit.rr(ctx, x, y, s, s, 14); ctx.fill(); if (h) { ctx.strokeStyle = "#ff9a3c"; ctx.lineWidth = 4; ctx.stroke(); }
+            const P = { 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]], 4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], 6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] }[v];
+            ctx.fillStyle = v === 1 ? "#d62b3a" : "#1a1a2a"; for (const [a, b] of P) { ctx.beginPath(); ctx.arc(x + s * (0.25 + a * 0.25), y + s * (0.25 + b * 0.25), s * 0.085, 0, 7); ctx.fill(); }
+        }
+        function draw() {
+            ctx.fillStyle = "#1a5a3a"; ctx.fillRect(0, 0, W, H);
+            if (!dice) return;
+            for (let i = 0; i < 5; i++) { const sh = anim > 0 && !held[i] ? Kit.rand(-4, 4) : 0; drawDie(DX(i) + sh, DY + sh, DS, dice[i], held[i]); if (held[i]) Kit.text(ctx, T("HELD", "שמור"), DX(i) + DS / 2, DY + DS + 22, 13, "#ffc94d", "center"); }
+            const can = rollsLeft > 0 && state === "play";
+            ctx.fillStyle = can ? "#ff9a3c" : "#ffffff22"; Kit.rr(ctx, W / 2 - 110, 182, 220, 40, 12); ctx.fill();
+            Kit.text(ctx, `🎲 ${T("Roll", "הטלה")} (${rollsLeft} ${T("left", "נשארו")})`, W / 2, 209, 17, "#fff", "center");
+            Kit.text(ctx, T("Tap dice to hold them", "הקישו על קוביות כדי לשמור"), 20, 30, 14, "#ffffffaa", "left");
+            for (let i = 0; i < 13; i++) {
+                const col = i < 7 ? 0 : 1, row = i < 7 ? i : i - 7, x = RX + col * 280, y = RY + row * (RH + 6), w = 260;
+                const done = scores[i] !== null, v = done ? scores[i] : value(i, dice);
+                ctx.fillStyle = done ? "#0f3a26" : "#ffffff18"; Kit.rr(ctx, x, y, w, RH, 8); ctx.fill();
+                Kit.text(ctx, T(CATS[i][0], CATS[i][1]), x + 12, y + 23, 15, done ? "#ffffff88" : "#fff", "left");
+                Kit.text(ctx, String(v), x + w - 14, y + 23, 17, done ? "#ffffff88" : v ? "#ffc94d" : "#ffffff55", "right");
+            }
+            const up = upper();
+            Kit.text(ctx, `${T("Upper bonus", "בונוס עליון")}: ${up}/63 ${up >= 63 ? "✓ +35" : ""}`, RX + 12, RY + 7 * (RH + 6) + 18, 14, up >= 63 ? "#2ee6a0" : "#ffffffaa", "left");
+            Kit.text(ctx, `${T("Total", "סה\"כ")}: ${total()}`, W - 40, RY + 6 * (RH + 6) + 26, 22, "#fff", "right");
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            const p = Kit.point(cv, e); if (state !== "play") return;
+            for (let i = 0; i < 5; i++) if (p.x > DX(i) && p.x < DX(i) + DS && p.y > DY && p.y < DY + DS && rollsLeft < 3) { held[i] ^= 1; beep(600, 0.03, "sine", 0.02); return; }
+            if (p.y > 182 && p.y < 222 && Math.abs(p.x - W / 2) < 110) return roll();
+            for (let i = 0; i < 13; i++) { const col = i < 7 ? 0 : 1, row = i < 7 ? i : i - 7, x = RX + col * 280, y = RY + row * (RH + 6); if (p.x > x && p.x < x + 260 && p.y > y && p.y < y + RH) return pick(i); }
+        });
+        Kit.onKeys({ Space: "roll", Digit1: "h0", Digit2: "h1", Digit3: "h2", Digit4: "h3", Digit5: "h4", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "roll") roll(); else if (a[0] === "h" && rollsLeft < 3) held[+a[1]] ^= 1; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (anim > 0) { anim -= dt; for (let i = 0; i < 5; i++) if (!held[i]) dice[i] = Kit.randi(1, 6); if (anim <= 0) { if (Math.max(...counts(dice)) === 5) tune([523, 659, 784, 1047], 0.06, "square", 0.04); } } draw(); }).start();
+        if (window.__test) window.__test.dice = { get s() { return { state, scores, rollsLeft }; }, start, pick, roll };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Dice Five</h2><p>A classic dice game for one player. Roll five dice up to three times a turn, holding the ones you want to keep. Then choose a box on the score card: the top half scores ones through sixes, the bottom half scores poker-style combinations like a full house, straights and five of a kind. Each box can only be filled once, so sometimes you have to take a zero. Plan well to get the highest total.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a die or 1–5</td><td>Hold or release it</td></tr><tr><td>Space</td><td>Roll</td></tr><tr><td>Tap a box</td><td>Score it</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Getting 63 in the top section earns a 35-point bonus.</li><li>Chance is a safety net for a bad turn.</li><li>Each extra Dice Five after the first gives +100!</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Dice Five</h3><p>Dice Five is about choosing what to keep. After your first roll, look for the strongest start: a pair or three of a kind points toward the top section and the 'of a kind' boxes, while 2-3-4 points toward the straights. Hold those dice and reroll the rest.</p><p>The top section has a hidden prize: if your ones-through-sixes add up to 63 or more, you get 35 bonus points. That's three of each number. Getting four 5s or 6s early gives you room to be short somewhere else.</p><p>Every box must be filled, so sometimes you have to put a zero somewhere. When a turn goes badly, put the zero in a box that's hard to get anyway, like Dice Five or the 1s. Save Chance for an emergency.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 150 points.</li><li><b>Getting good:</b> Earn the upper bonus.</li><li><b>Expert:</b> Roll a Dice Five.</li></ul><h3>Did you know?</h3><p>The chance of rolling five of the same number in a single roll of five dice is 6 in 7,776, or about 1 in 1,300.</p><h3>Questions players ask</h3><h4>What's a full house?</h4><p>Three of one number and two of another, like 4-4-4-2-2. It's worth 25.</p><h4>What's the difference between the straights?</h4><p>A small straight is 4 numbers in a row (30 points), a large straight is 5 in a row (40 points).</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/HelixDrop/helixdrop">Helix Drop</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A calm creative toy for when you just want to make something pretty. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Fireworks · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.fwbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:12px auto 0}.fwbar .seg button{font-size:20px;padding:6px 10px}.fwbar .btn{padding:8px 16px}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Fire<span>works</span></h1>
+        <div class="stats"><div class="stat"><b id="count">0</b><small>Fireworks</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="760" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Fireworks</h2>
+                <p id="startText">No score, no timer. Just fireworks!<br>Tap or click anywhere in the sky to launch one there. Pick a shape and colour below the sky, or press Big show and sit back.</p>
+                <button class="btn" id="startBtn">✨ Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Fireworks</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Try a heart in red, a willow in gold, or a crackle in any colour. Tap fast for a finale!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Fireworks — a relaxing creative toy: tap to launch fireworks, pick shapes and colours, play a show
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "fireworksBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SHAPES = ["peony", "ring", "heart", "star", "willow", "crackle"];
+        const startEl = $("startBtn"); if (startEl) startEl.onclick = () => Kit.hide("start");
+        let rockets = [], sparks = [], shape = "peony", hue = -1, show = 0, launched = 0, stars, auto = 0;
+        const bar = document.createElement("div"); bar.className = "fwbar";
+        bar.innerHTML = `<span class="seg" id="shapes">${[["peony", "🌸"], ["ring", "⭕"], ["heart", "❤️"], ["star", "⭐"], ["willow", "🌿"], ["crackle", "✨"]].map(([k, e], i) => `<button data-s="${k}" class="${i ? "" : "on"}" title="${k}">${e}</button>`).join("")}</span><span class="seg" id="colors">${[[-1, "🌈"], [0, "🔴"], [40, "🟠"], [55, "🟡"], [130, "🟢"], [210, "🔵"], [280, "🟣"]].map(([h, e], i) => `<button data-h="${h}" class="${i ? "" : "on"}">${e}</button>`).join("")}</span><button id="showBtn" class="btn">${T("🎆 Big show", "🎆 מופע גדול")}</button>`;
+        cv.parentElement.after(bar);
+        for (const b of document.querySelectorAll("#shapes button")) b.onclick = () => { document.querySelectorAll("#shapes button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); shape = b.dataset.s; };
+        for (const b of document.querySelectorAll("#colors button")) b.onclick = () => { document.querySelectorAll("#colors button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); hue = +b.dataset.h; };
+        stars = Array.from({ length: 120 }, () => [Math.random() * W, Math.random() * H * 0.8, Math.random()]);
+        function launch(tx, ty, sh = shape, h = hue) { const x = W / 2 + Kit.rand(-60, 60); rockets.push({ x, y: H, tx, ty, vx: (tx - x) / 1.0, vy: (ty - H) / 1.0, t: 0, sh, h: h < 0 ? Kit.randi(0, 360) : h }); launched++; Kit.stat("count", launched); beep(200, 0.6, "sawtooth", 0.015, 600); }
+        function burst(r) {
+            const n = r.sh === "crackle" ? 60 : 110, cols = (k) => `hsl(${(r.h + (r.sh === "peony" ? k % 3 * 25 : 0)) % 360},95%,${60 + Math.random() * 20}%)`;
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2; let vx, vy, sp = 190;
+                if (r.sh === "peony" || r.sh === "crackle" || r.sh === "willow") { const s = sp * Math.sqrt(Math.random()) * (r.sh === "willow" ? 0.8 : 1); vx = Math.cos(a) * s; vy = Math.sin(a) * s; }
+                else if (r.sh === "ring") { vx = Math.cos(a) * sp; vy = Math.sin(a) * sp * 0.55; }
+                else if (r.sh === "heart") { const t = a; vx = 16 * Math.sin(t) ** 3 * 11; vy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * 11; }
+                else { const k = Math.abs(((i % (n / 5)) / (n / 5)) * 2 - 1), rr = sp * (0.45 + 0.55 * k); vx = Math.cos(a) * rr; vy = Math.sin(a) * rr; }
+                sparks.push({ x: r.x, y: r.y, vx, vy, life: r.sh === "willow" ? 2.6 : 1.6 + Math.random() * 0.4, max: 2, c: cols(i), g: r.sh === "willow" ? 60 : 110, drag: r.sh === "willow" ? 0.985 : 0.975, crackle: r.sh === "crackle" });
+            }
+            beep(80, 0.5, "sawtooth", 0.06, -40); setTimeout(() => beep(1200 + Math.random() * 600, 0.03, "square", 0.01), 300);
+        }
+        function step(dt) {
+            for (const r of rockets) { r.t += dt; r.x += r.vx * dt; r.y += r.vy * dt; if (Math.random() < 0.8) sparks.push({ x: r.x, y: r.y, vx: Kit.rand(-20, 20), vy: Kit.rand(20, 60), life: 0.4, max: 0.4, c: "#ffd9a0", g: 0, drag: 0.95 }); if (r.t >= 1) { r.done = true; burst(r); } }
+            rockets = rockets.filter((r) => !r.done);
+            for (const s of sparks) { s.vx *= s.drag; s.vy = s.vy * s.drag + s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.crackle && s.life < 0.6 && !s.cr && Math.random() < 0.02) { s.cr = 1; for (let k = 0; k < 5; k++) sparks.push({ x: s.x, y: s.y, vx: Kit.rand(-60, 60), vy: Kit.rand(-60, 60), life: 0.3, max: 0.3, c: "#fff", g: 0, drag: 0.9 }); } }
+            sparks = sparks.filter((s) => s.life > 0).slice(-5000);
+            if (show > 0) { show -= dt; auto -= dt; if (auto <= 0) { auto = Kit.rand(0.15, 0.6); launch(Kit.rand(80, W - 80), Kit.rand(80, H * 0.5), Kit.pick(SHAPES), -1); } }
+        }
+        function draw() {
+            ctx.fillStyle = "rgba(6,8,24,0.28)"; ctx.fillRect(0, 0, W, H);
+            for (const [x, y, b] of stars) { ctx.fillStyle = `rgba(255,255,255,${0.15 + b * 0.3})`; ctx.fillRect(x, y, 1.5, 1.5); }
+            ctx.globalCompositeOperation = "lighter";
+            for (const s of sparks) { const a = Math.max(0, s.life / s.max); ctx.fillStyle = s.c; ctx.globalAlpha = a; ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3); }
+            ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+            // city skyline
+            ctx.fillStyle = "#04050f"; let x = 0, i = 0; while (x < W) { const w = 30 + ((i * 37) % 50), h = 40 + ((i * 53) % 90); ctx.fillRect(x, H - h, w, h); ctx.fillStyle = "#ffd95a55"; for (let wy = H - h + 10; wy < H - 10; wy += 14) for (let wx = x + 6; wx < x + w - 6; wx += 10) if ((wx * wy + i) % 7 < 2) ctx.fillRect(wx, wy, 4, 6); ctx.fillStyle = "#04050f"; x += w + 2; i++; }
+            if (!launched) Kit.text(ctx, T("Tap the sky! ✨", "הקישו על השמיים! ✨"), W / 2, H / 2, 30, "#ffffffcc", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); launch(p.x, Math.min(p.y, H - 140)); });
+        $("showBtn").onclick = () => { show = 12; auto = 0; };
+        Kit.onKeys({ Space: "go" }, () => launch(Kit.rand(80, W - 80), Kit.rand(80, H * 0.5)));
+        Kit.loop((dt) => { step(dt); draw(); }).start();
+        if (window.__test) window.__test.fw = { get s() { return { launched, sparks: sparks.length }; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Fireworks</h2><p>A calm creative toy for when you just want to make something pretty. Tap the night sky over the city and a rocket shoots up and bursts right where you tapped. Choose from six shapes, including peony, ring, heart, star, golden willow and crackle, and pick a colour or let the rainbow choose. Press Big show for an automatic display.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap or click the sky</td><td>Launch a firework</td></tr><tr><td>Space</td><td>Launch a random one</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Willows fall slowly like golden rain.</li><li>Crackles pop again as they fade.</li><li>Tap lots of times quickly for a grand finale.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Fireworks</h3><p>Fireworks has no way to win or lose. It's a toy for relaxing and making something beautiful. Tap anywhere in the sky and a firework will fly up and burst exactly there.</p><p>Mix shapes and colours to make your own show. Real fireworks shows often start with single bursts, build up with rings and stars, and end with a fast finale of many rockets at once.</p><p>If you want to just watch, press Big show and the sky fills with random fireworks for a few seconds.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Launch 20 fireworks.</li><li><b>Getting good:</b> Make a heart in every colour.</li><li><b>Expert:</b> Launch 100 fireworks.</li></ul><h3>Did you know?</h3><p>Firework colours come from metals: strontium makes red, copper makes blue, sodium makes yellow and barium makes green.</p><h3>Questions players ask</h3><h4>Is there a score?</h4><p>No. Fireworks is a relaxing toy. The counter just shows how many you've launched.</p><h4>Can I choose the colour?</h4><p>Yes, use the colour buttons under the sky. The rainbow button picks a random colour each time.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/Hanoi/hanoi">Tower of Hanoi</a><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

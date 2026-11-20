@@ -95,6 +95,10 @@ export const GAMES = {
     jetpackdash: { name: "Jetpack Dash", path: "/JetpackDash/jetpack", img: "/thumbs/jetpackdash.png", tags: ["arcade", "runner"], desc: "Hold to fly with your jetpack. Dodge zappers and missiles!", isNew: true },
     archery: { name: "Archery", path: "/Archery/archery", img: "/thumbs/archery.png", tags: ["sports"], desc: "Pull back your bow, mind the wind and hit the bullseye.", isNew: true },
     snakesladders: { name: "Snakes & Ladders", path: "/SnakesLadders/snakesladders", img: "/thumbs/snakesladders.png", tags: ["board", "2 players"], desc: "Roll the die, climb the ladders, dodge the snakes. First to 100 wins!", isNew: true },
+    balloonpop: { name: "Balloon Pop", path: "/BalloonPop/balloonpop", img: "/thumbs/balloonpop.png", tags: ["arcade"], desc: "Pop as many balloons as you can in 60 seconds. Don't pop the bombs!", isNew: true },
+    skislope: { name: "Ski Slope", path: "/SkiSlope/skislope", img: "/thumbs/skislope.png", tags: ["arcade", "sports"], desc: "Ski down the mountain through the flags. Watch out for the yeti!", isNew: true },
+    dicefive: { name: "Dice Five", path: "/DiceFive/dicefive", img: "/thumbs/dicefive.png", tags: ["board", "dice"], desc: "Roll five dice, keep the best and fill every box on the score card.", isNew: true },
+    fireworks: { name: "Fireworks", path: "/Fireworks/fireworks", img: "/thumbs/fireworks.png", tags: ["creative", "relaxing"], desc: "A relaxing fireworks toy. Tap the sky to light it up!", isNew: true },
 };
 
 // Games that only count plays (no score)
