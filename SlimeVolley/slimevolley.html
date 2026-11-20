@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A bouncy volleyball game with two blobby slimes. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Slime Volley · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Slime <span>Volley</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 – 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Wins</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="820" height="440"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Slime Volley</h2>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>You're the blue slime. Move with ⬅ ➡ (or A D) and jump with ⬆ (or W / Space). Bounce the ball over the net!<br>If the ball lands on your side, the other slime scores. First to 7 points wins. In 2-player mode, Blue uses A D W and Red uses the arrow keys.</p>
+                <button class="btn" id="startBtn">🏐 Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🏐 Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Hit the ball with the side of your slime to send it at an angle. Jump to spike it down hard!</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Slime Volley — two slimes, one ball, a net. First to 7. vs computer or 2 players
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "slimevolleyBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const FLOOR = H - 60, NETH = 90, NETW = 10, SR = 50, BR = 13, G = 1100, WIN = 7;
+        let p1, p2, ball, score, state = "ready", two = false, serveT = 0, server = 0, fx = Kit.particles(), msg = "";
+        document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
+        Kit.stat("best", Kit.best(BEST));
+        function slime(x, c) { return { x, y: FLOOR, vx: 0, vy: 0, c }; }
+        function serve(side) { ball = { x: side === 0 ? W * 0.25 + Kit.rand(-12, 12) : W * 0.75 + Kit.rand(-12, 12), y: H * 0.3, vx: 0, vy: 0 }; p1.x = W * 0.25; p2.x = W * 0.75; p1.y = p2.y = FLOOR; p1.vy = p2.vy = 0; serveT = 0.9; }
+        function start() { p1 = slime(W * 0.25, "#2a74ff"); p2 = slime(W * 0.75, "#ff4d6d"); score = [0, 0]; state = "play"; msg = ""; serve(0); Kit.stat("score", "0 – 0"); Kit.hide("start"); Kit.hide("over"); }
+        function control(s, left, right, jump, minX, maxX, dt) {
+            s.vx = (right ? 1 : 0) - (left ? 1 : 0); s.x += s.vx * 380 * dt;
+            if (jump && s.y >= FLOOR) { s.vy = -560; beep(300, 0.04, "sine", 0.02, 200); }
+            s.vy += G * dt; s.y += s.vy * dt; if (s.y > FLOOR) { s.y = FLOOR; s.vy = 0; }
+            s.x = Math.max(minX + SR, Math.min(maxX - SR, s.x));
+        }
+        function ai(dt) {
+            // predict where the ball lands on my side
+            let bx = ball.x, by = ball.y, vx = ball.vx, vy = ball.vy;
+            for (let i = 0; i < 200 && by < FLOOR - 20; i++) { vy += G * 0.01; bx += vx * 0.01; by += vy * 0.01; if (bx < BR || bx > W - BR) vx = -vx; }
+            let target = bx > W / 2 ? bx + 26 : W * 0.75; if (ball.x > W / 2 && ball.vx === 0 && ball.vy === 0) target = ball.x + 26;
+            const left = p2.x > target + 8, right = p2.x < target - 8;
+            const jump = ball.x > W / 2 && Math.abs(ball.x - p2.x) < 70 && ball.y > FLOOR - 220 && ball.y < FLOOR - 90 && ball.vy > -100;
+            control(p2, left, right, jump, W / 2 + NETW / 2, W, dt);
+        }
+        function bounce(s) {
+            const dx = ball.x - s.x, dy = ball.y - s.y, d = Math.hypot(dx, dy);
+            if (d < SR + BR && dy < 0) { const nx = dx / d, ny = dy / d; ball.x = s.x + nx * (SR + BR); ball.y = s.y + ny * (SR + BR); const rvx = ball.vx - s.vx * 380, rvy = ball.vy - s.vy, vn = rvx * nx + rvy * ny; if (vn < 0) { ball.vx -= 2 * vn * nx; ball.vy -= 2 * vn * ny; } ball.vx += s.vx * 120 + nx * 220; ball.vy = Math.min(ball.vy, -450); const sp = Math.hypot(ball.vx, ball.vy); if (sp > 900) { ball.vx *= 900 / sp; ball.vy *= 900 / sp; } beep(500, 0.03, "square", 0.03); }
+        }
+        function point(side) {
+            score[side]++; Kit.stat("score", `${score[0]} – ${score[1]}`); fx.burst(ball.x, FLOOR, side === 0 ? "#2a74ff" : "#ff4d6d", 30, 4);
+            side === 0 ? tune([659, 880], 0.06, "square", 0.04) : beep(200, 0.2, "sawtooth", 0.04);
+            if (score[side] >= WIN) { state = "over"; const iw = side === 0; if (!two && iw) { Kit.save(100); Kit.setBest(BEST, (Kit.best(BEST) || 0) + 1); } setTimeout(() => { $("overText").innerHTML = `${two ? (iw ? T("🔵 Blue wins!", "🔵 הכחול ניצח!") : T("🔴 Red wins!", "🔴 האדום ניצח!")) : iw ? T("🏆 You win!", "🏆 ניצחתם!") : T("😢 The computer wins", "😢 המחשב ניצח")}<br>${score[0]} – ${score[1]}`; Kit.show("over"); }, 700); return; }
+            msg = side === 0 ? (two ? T("Point to Blue!", "נקודה לכחול!") : T("Your point!", "נקודה שלכם!")) : two ? T("Point to Red!", "נקודה לאדום!") : T("Computer's point", "נקודה למחשב"); setTimeout(() => (msg = ""), 900);
+            serve(side);
+        }
+        function update(dt) {
+            const k = Kit.keys;
+            if (two) { control(p1, k.has("a.left"), k.has("a.right"), k.has("a.up"), 0, W / 2 - NETW / 2, dt); control(p2, k.has("b.left"), k.has("b.right"), k.has("b.up"), W / 2 + NETW / 2, W, dt); }
+            else { control(p1, k.has("a.left") || k.has("b.left"), k.has("a.right") || k.has("b.right"), k.has("a.up") || k.has("b.up"), 0, W / 2 - NETW / 2, dt); ai(dt); }
+            if (serveT > 0) { serveT -= dt; return; }
+            const n = 3, h = dt / n;
+            for (let i = 0; i < n; i++) {
+                ball.vy += G * 0.55 * h; ball.x += ball.vx * h; ball.y += ball.vy * h;
+                if (ball.x < BR) { ball.x = BR; ball.vx = Math.abs(ball.vx); } if (ball.x > W - BR) { ball.x = W - BR; ball.vx = -Math.abs(ball.vx); } if (ball.y < BR) { ball.y = BR; ball.vy = Math.abs(ball.vy); }
+                // net
+                if (Math.abs(ball.x - W / 2) < NETW / 2 + BR && ball.y > FLOOR - NETH - BR) { if (ball.y < FLOOR - NETH && ball.vy > 0) { ball.y = FLOOR - NETH - BR; ball.vy = -Math.abs(ball.vy) * 0.8; } else { ball.x = W / 2 + Math.sign(ball.x - W / 2 || 1) * (NETW / 2 + BR); ball.vx = -ball.vx * 0.8; } }
+                bounce(p1); bounce(p2);
+                if (ball.y > FLOOR - BR) return point(ball.x < W / 2 ? 1 : 0);
+            }
+        }
+        function drawSlime(s, lookAt) {
+            ctx.fillStyle = s.c; ctx.beginPath(); ctx.arc(s.x, s.y, SR, Math.PI, 0); ctx.closePath(); ctx.fill();
+            const ex = s.x + (s === p1 ? 22 : -22), ey = s.y - 28, a = Math.atan2(lookAt.y - ey, lookAt.x - ex);
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ex, ey, 10, 0, 7); ctx.fill(); ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(ex + Math.cos(a) * 4, ey + Math.sin(a) * 4, 5, 0, 7); ctx.fill();
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#5ec8ff"); g.addColorStop(1, "#c8ecff"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#f3d38a"; ctx.fillRect(0, FLOOR, W, H - FLOOR); ctx.fillStyle = "#e2bd6a"; for (let x = 0; x < W; x += 30) ctx.fillRect(x, FLOOR + 10 + (x % 60) / 6, 14, 3);
+            ctx.fillStyle = "#fff"; ctx.fillRect(W / 2 - NETW / 2, FLOOR - NETH, NETW, NETH); ctx.fillStyle = "#555"; ctx.fillRect(W / 2 - 2, FLOOR - NETH, 4, NETH);
+            if (!p1) return;
+            drawSlime(p1, ball); drawSlime(p2, ball);
+            ctx.fillStyle = "#0002"; ctx.beginPath(); ctx.ellipse(ball.x, FLOOR + 4, 14 * Math.max(0.3, 1 - (FLOOR - ball.y) / 500), 4, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, 7); ctx.fill(); ctx.strokeStyle = "#d9963a"; ctx.lineWidth = 2; ctx.stroke();
+            fx.draw(ctx);
+            Kit.text(ctx, `${score[0]}`, W / 4, 70, 48, "#2a74ff", "center", "'Press Start 2P', monospace", 400); Kit.text(ctx, `${score[1]}`, (W * 3) / 4, 70, 48, "#ff4d6d", "center", "'Press Start 2P', monospace", 400);
+            if (msg) Kit.text(ctx, msg, W / 2, H / 2 - 60, 26, "#1a2a4a", "center");
+        }
+        Kit.onKeys({ KeyA: "a.left", KeyD: "a.right", KeyW: "a.up", Space: "a.up", ArrowLeft: "b.left", ArrowRight: "b.right", ArrowUp: "b.up", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        let tp = {}; cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (p.y < H / 2) Kit.keys.add("a.up"); else Kit.keys.add(p.x < (p1 ? p1.x : W / 4) ? "a.left" : "a.right"); });
+        window.addEventListener("pointerup", () => { ["a.up", "a.left", "a.right"].forEach((k) => Kit.keys.delete(k)); });
+        cv.style.touchAction = "none";
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.slime = { get s() { return { state, score, ball: ball && [Math.round(ball.x), Math.round(ball.y), Math.round(ball.vx), Math.round(ball.vy)], p2: p2 && Math.round(p2.x), serveT }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Slime Volley</h2><p>A bouncy volleyball game with two blobby slimes. Each slime guards its half of the beach. Move under the ball and bump it back over the net: where it touches your slime decides which way it flies, and moving or jumping as you hit it adds power. If the ball touches the sand on your side, your opponent scores. First to seven wins. Play against the computer or a friend on the same keyboard.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ / A D</td><td>Move</td></tr><tr><td>⬆ / W / Space</td><td>Jump</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hit the ball with the front of your slime to send it over.</li><li>Jumping into the ball near the net makes a hard spike.</li><li>Stay near the middle of your half so you can reach anywhere.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Slime Volley</h3><p>Slime Volley is all about where the ball touches your slime. Your slime is a half-circle, so the ball bounces off at an angle: hit it with the side facing the net to send it forward, or with the top to pop it straight up.</p><p>Moving while you hit adds speed. Running toward the net as the ball lands on you gives a flatter, faster shot that's hard to return. Jumping near the net and hitting the ball as it comes over is a spike.</p><p>Positioning wins points. Get back to the middle of your half after each hit, and watch the ball's shadow on the sand: it shows where the ball is going to land.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score your first point.</li><li><b>Getting good:</b> Beat the computer.</li><li><b>Expert:</b> Win 7–0!</li></ul><h3>Did you know?</h3><p>Beach volleyball became an Olympic sport in 1996. Teams have just two players, compared with six in indoor volleyball.</p><h3>Questions players ask</h3><h4>How do I play with a friend?</h4><p>Choose 👥 2 Players. Blue uses A, D and W; Red uses the arrow keys.</p><h4>Can the ball hit the net?</h4><p>Yes, it bounces off the net and the top of the net.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SnakesLadders/snakesladders">Snakes & Ladders</a><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

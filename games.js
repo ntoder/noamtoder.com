@@ -120,6 +120,7 @@ export const GAMES = {
     turbokart: { name: "Turbo Kart", path: "/TurboKart/turbokart", img: "/thumbs/turbokart.png", tags: ["sports", "arcade"], desc: "Race three computer karts for 3 laps. Hit the boost arrows!", isNew: true },
     spotthedifference: { name: "Spot the Difference", path: "/SpotTheDifference/spotdiff", img: "/thumbs/spotthedifference.png", tags: ["puzzle", "brain"], desc: "Two pictures, five differences. Can you find them all in time?", isNew: true },
     ninemensmorris: { name: "Nine Men's Morris", path: "/NineMensMorris/morris", img: "/thumbs/ninemensmorris.png", tags: ["board", "strategy", "2p"], desc: "An ancient strategy game: line up three to capture your rival's pieces.", isNew: true },
+    slimevolley: { name: "Slime Volley", path: "/SlimeVolley/slimevolley", img: "/thumbs/slimevolley.png", tags: ["sports", "2p"], desc: "Bounce the ball over the net with your slime. First to 7 wins!", isNew: true },
 };
 
 // Games that only count plays (no score)
