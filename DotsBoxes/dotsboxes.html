@@ -25,7 +25,7 @@
             <canvas id="c" width="600" height="640"></canvas>
             <div class="overlay" id="start"><div>
                 <h2>Dots and Boxes</h2>
-                <p id="startText">Take turns drawing a line between two dots. If your line closes a box, you win that box and get another turn!<br>Whoever owns the most boxes at the end wins.</p>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>Take turns drawing a line between two dots. If your line closes a box, you win that box and get another turn!<br>Whoever owns the most boxes at the end wins.</p>
                 <button class="btn" id="startBtn">▶ Play</button>
             </div></div>
             <div class="overlay hidden" id="over"><div>
@@ -48,6 +48,7 @@
         const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dotsboxesBest";
         const N = 5, GAP = 90, OX = (W - N * GAP) / 2, OY = 130;
         const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let two = false; document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
         let hl, vl, box, turn, state = "ready", score, aiT = 0, hover = null, lastLine = null;
         Kit.stat("best", Kit.best(BEST));
         // hl[r][c]: horizontal line from dot (r,c) to (r,c+1); vl[r][c]: vertical from (r,c) to (r+1,c)
@@ -97,7 +98,7 @@
             state = "over"; stats();
             const [y, c] = score, sc = y > c ? 600 + (y - c) * 30 : y * 20;
             Kit.save(sc); const best = Kit.setBest(BEST, sc);
-            $("overText").innerHTML = `<b style="font-size:20px">${y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 Draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
+            $("overText").innerHTML = `<b style="font-size:20px">${two && y !== c ? (y > c ? T("🔵 Blue wins!", "🔵 הכחול ניצח!") : T("🔴 Red wins!", "🔴 האדום ניצח!")) : y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 Draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
             tune(y > c ? [523, 659, 784, 1047] : [392, 330, 262], 0.13, "triangle", 0.05);
             setTimeout(() => Kit.show("over"), 700); return true;
         }
@@ -110,20 +111,20 @@
         function draw() {
             ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
             if (!hl) return;
-            Kit.text(ctx, state === "play" ? (turn === 1 ? T("Your turn", "התור שלכם") : T("Computer's turn", "תור המחשב")) : "", W / 2, 50, 22, turn === 1 ? "#4da3ff" : "#ff4d6d", "center");
+            Kit.text(ctx, state === "play" ? (two ? (turn === 1 ? T("Blue's turn", "תור הכחול") : T("Red's turn", "תור האדום")) : turn === 1 ? T("Your turn", "התור שלכם") : T("Computer's turn", "תור המחשב")) : "", W / 2, 50, 22, turn === 1 ? "#4da3ff" : "#ff4d6d", "center");
             Kit.text(ctx, T("Close a box to score and go again", "סגרו ריבוע כדי לקבל נקודה ותור נוסף"), W / 2, 86, 14, "#9aa0c8", "center");
             for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (box[r][c]) { ctx.fillStyle = box[r][c] === 1 ? "#4da3ff55" : "#ff4d6d55"; ctx.fillRect(OX + c * GAP + 4, OY + r * GAP + 4, GAP - 8, GAP - 8); Kit.text(ctx, box[r][c] === 1 ? "🙂" : "🤖", OX + c * GAP + GAP / 2, OY + r * GAP + GAP / 2, 28, "#fff", "center"); }
             const seg = (x1, y1, x2, y2, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
             for (let r = 0; r <= N; r++) for (let c = 0; c < N; c++) { const v = hl[r][c]; if (v) seg(OX + c * GAP, OY + r * GAP, OX + (c + 1) * GAP, OY + r * GAP, v === 1 ? "#4da3ff" : "#ff4d6d", lastLine && lastLine.h && lastLine.r === r && lastLine.c === c ? 9 : 7); }
             for (let r = 0; r < N; r++) for (let c = 0; c <= N; c++) { const v = vl[r][c]; if (v) seg(OX + c * GAP, OY + r * GAP, OX + c * GAP, OY + (r + 1) * GAP, v === 1 ? "#4da3ff" : "#ff4d6d", lastLine && !lastLine.h && lastLine.r === r && lastLine.c === c ? 9 : 7); }
-            if (hover && turn === 1 && state === "play") { const l = hover; if (l.h) seg(OX + l.c * GAP, OY + l.r * GAP, OX + (l.c + 1) * GAP, OY + l.r * GAP, "#ffffff44", 7); else seg(OX + l.c * GAP, OY + l.r * GAP, OX + l.c * GAP, OY + (l.r + 1) * GAP, "#ffffff44", 7); }
+            if (hover && (turn === 1 || two) && state === "play") { const l = hover; if (l.h) seg(OX + l.c * GAP, OY + l.r * GAP, OX + (l.c + 1) * GAP, OY + l.r * GAP, "#ffffff44", 7); else seg(OX + l.c * GAP, OY + l.r * GAP, OX + l.c * GAP, OY + (l.r + 1) * GAP, "#ffffff44", 7); }
             for (let r = 0; r <= N; r++) for (let c = 0; c <= N; c++) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(OX + c * GAP, OY + r * GAP, 7, 0, 7); ctx.fill(); }
         }
         cv.addEventListener("pointermove", (e) => { hover = nearest(Kit.point(cv, e)); });
-        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || turn !== 1) return; const l = nearest(Kit.point(cv, e)); if (l) draw1(l); });
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || (turn !== 1 && !two)) return; const l = nearest(Kit.point(cv, e)); if (l) draw1(l); });
         Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
         $("startBtn").onclick = start; $("againBtn").onclick = start;
-        Kit.loop((dt) => { if (state === "play" && turn === -1) { aiT += dt; if (aiT > 0.5) { aiT = 0; aiMove(); } } draw(); }).start();
+        Kit.loop((dt) => { if (state === "play" && turn === -1 && !two) { aiT += dt; if (aiT > 0.5) { aiT = 0; aiMove(); } } draw(); }).start();
         if (window.__test) window.__test.dots = { get s() { return { score, turn, state }; }, aiMove, start };
     })();
     </script>
@@ -157,7 +158,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
 .gh-guide a{color:#2ee6c9}
 </style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Dots and Boxes</h3><p>In the beginning, the safe move is any line that doesn't make a box with three sides. As long as both players play safely, nobody scores. Sooner or later, though, every remaining move gives something away, and that's when the real game starts.</p><p>By then the board has turned into chains, rows of boxes that are connected. When one box in a chain is opened, the other player can take the whole chain. So when you're forced to give something away, give away the shortest chain.</p><p>Expert players use a trick: when taking a long chain, they leave the last two boxes for the opponent by drawing the line that splits them. The opponent takes two boxes but then has to open the next chain. Try it against the computer!</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win by never drawing the third side of a box.</li><li><b>Getting good:</b> Count chains and always give away the shortest one.</li><li><b>Expert:</b> Use the 'leave two boxes' trick to stay in control.</li></ul><h3>Did you know?</h3><p>Dots and Boxes was first described in 1889 by the French mathematician Édouard Lucas, who also invented the Tower of Hanoi puzzle.</p><h3>Questions players ask</h3><h4>Why do I get another turn?</h4><p>Closing a box always gives you an extra move. You can chain several boxes in one turn.</p><h4>How big is the board?</h4><p>Five by five boxes, so 25 boxes in total.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
-        <section><h3>More games</h3><div class="gh-more"><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/Fireworks/fireworks">Fireworks</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/HigherLower/higherlower">Higher or Lower</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>

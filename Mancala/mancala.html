@@ -25,7 +25,7 @@
             <canvas id="c" width="760" height="520"></canvas>
             <div class="overlay" id="start"><div>
                 <h2>Mancala</h2>
-                <p id="startText">Pick a pit on your side (the bottom row). Its stones are dropped one by one into the next pits, going right and around the board.<br>Land your last stone in your store (the big pit on the right) to go again. Land it in an empty pit on your side to capture the stones across from it!</p>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>Pick a pit on your side (the bottom row). Its stones are dropped one by one into the next pits, going right and around the board.<br>Land your last stone in your store (the big pit on the right) to go again. Land it in an empty pit on your side to capture the stones across from it!</p>
                 <button class="btn" id="startBtn">▶ Play</button>
             </div></div>
             <div class="overlay hidden" id="over"><div>
@@ -48,6 +48,7 @@
         const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "mancalaBest";
         const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
         // pits 0-5 = you (bottom, left to right), 6 = your store, 7-12 = computer (top, right to left), 13 = its store
+        let two = false; document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
         let pits, turn, state = "ready", anim = null, aiT = 0, msg = "", hl = -1;
         Kit.stat("best", Kit.best(BEST));
         const PW = 88, PY1 = 380, PY2 = 210, PX = (i) => 120 + i * PW;
@@ -96,7 +97,7 @@
         function end() {
             state = "over"; stats(); const y = pits[6], c = pits[13];
             const sc = y > c ? 500 + (y - c) * 20 : y * 8; Kit.save(sc); const best = Kit.setBest(BEST, sc);
-            $("overText").innerHTML = `<b style="font-size:20px">${y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 Draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
+            $("overText").innerHTML = `<b style="font-size:20px">${two && y !== c ? (y > c ? T("🏆 Player 1 wins!", "🏆 שחקן 1 ניצח!") : T("🏆 Player 2 wins!", "🏆 שחקן 2 ניצח!")) : y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 Draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
             tune(y > c ? [523, 659, 784, 1047] : [392, 330, 262], 0.13, "triangle", 0.05); setTimeout(() => Kit.show("over"), 700);
         }
         function start() { pits = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0]; turn = 0; state = "play"; msg = ""; anim = null; stats(); Kit.hide("start"); Kit.hide("over"); }
@@ -115,15 +116,15 @@
                 if (i === hl) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.stroke(); }
                 stones(x, y, view[i], store ? 40 : 38);
             }
-            Kit.text(ctx, T("🤖 Computer", "🤖 המחשב"), W / 2, 112, 15, "#ff8fa3", "center"); Kit.text(ctx, T("🙂 You", "🙂 אתם"), W / 2, 486, 15, "#9fcbff", "center");
-            Kit.text(ctx, state === "play" ? (turn === 0 ? T("Your turn: pick a pit on your side", "התור שלכם: בחרו גומה בצד שלכם") : T("Computer's turn", "תור המחשב")) : "", W / 2, 40, 20, "#ffc94d", "center");
+            Kit.text(ctx, (two ? T("👤 Player 2", "👤 שחקן 2") : T("🤖 Computer", "🤖 המחשב")), W / 2, 112, 15, "#ff8fa3", "center"); Kit.text(ctx, (two ? T("👤 Player 1", "👤 שחקן 1") : T("🙂 You", "🙂 אתם")), W / 2, 486, 15, "#9fcbff", "center");
+            Kit.text(ctx, state === "play" ? (two ? (turn === 0 ? T("Player 1: pick a pit on the bottom row", "שחקן 1: בחרו גומה בשורה התחתונה") : T("Player 2: pick a pit on the top row", "שחקן 2: בחרו גומה בשורה העליונה")) : turn === 0 ? T("Your turn: pick a pit on your side", "התור שלכם: בחרו גומה בצד שלכם") : T("Computer's turn", "תור המחשב")) : "", W / 2, 40, 20, "#ffc94d", "center");
             if (msg) Kit.text(ctx, msg, W / 2, 76, 16, "#2ee6a0", "center");
         }
-        cv.addEventListener("pointermove", (e) => { const p = Kit.point(cv, e); hl = -1; for (let i = 0; i < 6; i++) { const [x, y] = pos(i); if (Math.hypot(p.x - x, p.y - y) < 40 && pits && pits[i] && turn === 0) hl = i; } });
+        cv.addEventListener("pointermove", (e) => { const p = Kit.point(cv, e); hl = -1; for (let i = 0; i < 6; i++) { const [x, y] = pos(i); if (Math.hypot(p.x - x, p.y - y) < 40 && pits && pits[i] && turn === 0) hl = i; } if (two && pits && turn === 1) for (let i = 7; i < 13; i++) { const [x, y] = pos(i); if (Math.hypot(p.x - x, p.y - y) < 40 && pits[i]) hl = i; } });
         cv.addEventListener("pointerdown", (e) => {
-            if (state !== "play" || turn !== 0 || anim) return;
-            const p = Kit.point(cv, e);
-            for (let i = 0; i < 6; i++) { const [x, y] = pos(i); if (Math.hypot(p.x - x, p.y - y) < 42 && pits[i]) return move(i); }
+            if (state !== "play" || (turn !== 0 && !two) || anim) return;
+            const p = Kit.point(cv, e), base = turn === 0 ? 0 : 7;
+            for (let i = base; i < base + 6; i++) { const [x, y] = pos(i); if (Math.hypot(p.x - x, p.y - y) < 42 && pits[i]) return move(i); }
         });
         Kit.onKeys({ Digit1: "1", Digit2: "2", Digit3: "3", Digit4: "4", Digit5: "5", Digit6: "6", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") return start(); const i = +a - 1; if (state === "play" && turn === 0 && !anim && pits[i]) move(i); });
         $("startBtn").onclick = start; $("againBtn").onclick = start;
@@ -133,7 +134,7 @@
                 const v = anim.from.slice(); v[anim.src] = anim.from[anim.src] - n; for (let k = 0; k < n; k++) v[anim.path[k]]++;
                 anim.view = v; if (Math.floor(anim.t) !== anim.lastN) { anim.lastN = Math.floor(anim.t); if (n <= anim.path.length) beep(400 + n * 30, 0.025, "sine", 0.025); }
                 if (anim.t > anim.path.length + 0.6) { const d = anim.done; anim = null; d(); }
-            } else if (state === "play" && turn === 1) { aiT += dt; if (aiT > 0.7) { aiT = -99; const i = aiPick(); if (i >= 0) move(i); } }
+            } else if (state === "play" && turn === 1 && !two) { aiT += dt; if (aiT > 0.7) { aiT = -99; const i = aiPick(); if (i >= 0) move(i); } }
             draw();
         }).start();
         if (window.__test) window.__test.mancala = { get s() { return { pits, turn, state }; }, move, start };
@@ -169,7 +170,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
 .gh-guide a{color:#2ee6c9}
 </style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Mancala</h3><p>The best move in Mancala is often the free turn. If a pit has exactly as many stones as it is away from your store, your last stone lands in the store and you play again. Count from the right: the rightmost pit needs one stone, the next needs two, and so on. Chaining free turns is how strong players race ahead.</p><p>Captures are the other big source of points. When your last stone lands in an empty pit on your side, you take it plus everything in the pit directly across. So keep an eye on empty pits and on big piles on the computer's side.</p><p>Defence matters too. Before you move, check whether you're leaving a big pile across from an empty pit on the computer's side. If you are, the computer may capture it on its next turn.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win by using free turns whenever you see one.</li><li><b>Getting good:</b> Start setting up captures with empty pits.</li><li><b>Expert:</b> Protect your big piles and think a move ahead.</li></ul><h3>Did you know?</h3><p>Mancala-type games have been played for over a thousand years across Africa and Asia. There are hundreds of local versions with different numbers of pits and rules.</p><h3>Questions players ask</h3><h4>What happens at the end?</h4><p>When one side has no stones left, the other player puts all their remaining stones in their own store.</p><h4>Do stones go into the computer's store?</h4><p>No, you skip the other player's store when you sow.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
-        <section><h3>More games</h3><div class="gh-more"><a href="/Reversi/reversi">Reversi</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/MemoryGrid/memorygrid">Memory Grid</a><a href="/NeonSlope/neonslope">Neon Slope</a><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>
