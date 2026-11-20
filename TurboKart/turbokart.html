@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A top-down kart racer. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Turbo Kart · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Turbo <span>Kart</span></h1>
+        <div class="stats"><div class="stat"><b id="lap">1/3</b><small>Lap</small></div><div class="stat"><b id="pos">-</b><small>Place</small></div><div class="stat"><b id="best">-</b><small>Best win</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="860" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Turbo Kart</h2>
+                <p id="startText">⬆ (or W) to drive, ⬅ ➡ to steer, ⬇ to brake and reverse. You're the blue kart with the white ring.<br>Stay on the road (grass slows you down) and drive over the yellow arrows for a speed boost. First to finish 3 laps wins!</p>
+                <button class="btn" id="startBtn">🏁 Race</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Race over!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🏁 Race again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="down">⬇</button><button data-k="up">⬆</button><button data-k="right">➡</button></div>
+    <p class="hint">Slow down a little before sharp corners. Cutting across the grass is usually slower than staying on the road.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Turbo Kart — top-down racing: 3 laps against 3 computer karts, boost pads, grass slows you
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "turbokartBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const TRACKS = [
+            [[150, 120], [650, 110], [760, 220], [700, 330], [470, 330], [420, 430], [700, 470], [720, 560], [160, 560], [90, 440], [200, 330], [90, 220]],
+            [[120, 300], [200, 120], [420, 160], [520, 80], [760, 140], [740, 320], [560, 300], [560, 460], [760, 520], [600, 590], [260, 560], [300, 420], [140, 470]],
+        ];
+        const TW = 74, LAPS = 3;
+        let path, karts, me, state = "ready", count = 0, time = 0, fx = Kit.particles(), track = 0, boosts, finishOrder;
+        Kit.stat("best", Kit.best(BEST) ? Kit.best(BEST) + "s" : "-");
+        function smooth(pts) { const out = []; for (let i = 0; i < pts.length; i++) { const p0 = pts[(i - 1 + pts.length) % pts.length], p1 = pts[i], p2 = pts[(i + 1) % pts.length], p3 = pts[(i + 2) % pts.length]; for (let t = 0; t < 1; t += 0.05) { const t2 = t * t, t3 = t2 * t; out.push([0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3), 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)]); } } return out; }
+        function nearest(x, y, hint) { let bi = 0, bd = 1e9; const N = path.length; const range = hint == null ? N : 40; for (let k = -range; k <= range; k++) { const i = hint == null ? (k + range) % N : (hint + k + N) % N; const d = (path[i][0] - x) ** 2 + (path[i][1] - y) ** 2; if (d < bd) { bd = d; bi = i; } } return [bi, Math.sqrt(bd)]; }
+        function start() {
+            track = (track + 1) % TRACKS.length; path = smooth(TRACKS[track]);
+            boosts = [Math.floor(path.length * 0.3), Math.floor(path.length * 0.62), Math.floor(path.length * 0.85)];
+            const p0 = path[0], p1 = path[3], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), nx = -Math.sin(a), ny = Math.cos(a);
+            const cols = ["#2a74ff", "#ff4d6d", "#2ee6a0", "#ffc94d"];
+            karts = cols.map((c, i) => { const row = Math.floor(i / 2), side = i % 2 ? 1 : -1, bx = p0[0] - Math.cos(a) * (30 + row * 44) + nx * side * 18, by = p0[1] - Math.sin(a) * (30 + row * 44) + ny * side * 18; return { x: bx, y: by, a, v: 0, c, cpu: i > 0, idx: path.length - 3, lap: 0, prog: 0, skill: 0.88 + i * 0.03 + Math.random() * 0.04, boost: 0, done: false, name: i ? `CPU ${i}` : T("You", "אתם") }; });
+            me = karts[0]; count = 3.5; time = 0; finishOrder = []; state = "play"; Kit.stat("lap", `1/${LAPS}`); Kit.stat("pos", "-"); Kit.hide("start"); Kit.hide("over");
+        }
+        function drive(k, dt, steer, gas) {
+            const [ni, off] = nearest(k.x, k.y, k.idx); const prev = k.idx; k.idx = ni;
+            const N = path.length; let d = ni - prev; if (d < -N / 2) { k.lap++; } else if (d > N / 2) k.lap--;
+            k.prog = k.lap * N + ni;
+            const grass = off > TW / 2, maxV = (grass ? 110 : 300) * (k.boost > 0 ? 1.45 : 1) * (k.cpu ? k.skill : 1);
+            k.v += (gas > 0 ? 260 : gas < 0 ? -300 : -120) * dt; k.v = Math.max(-80, Math.min(maxV, k.v)); if (k.v > maxV) k.v = maxV;
+            k.a += steer * dt * 3.1 * Math.min(1, Math.abs(k.v) / 120) * Math.sign(k.v || 1);
+            k.x += Math.cos(k.a) * k.v * dt; k.y += Math.sin(k.a) * k.v * dt; k.x = Math.max(10, Math.min(W - 10, k.x)); k.y = Math.max(10, Math.min(H - 10, k.y));
+            if (k.boost > 0) k.boost -= dt;
+            if (!grass && boosts.some((b) => Math.abs(((ni - b + N) % N)) < 3) && k.boost <= 0.2) { k.boost = 1.2; if (!k.cpu) tune([660, 990], 0.04, "square", 0.03); }
+            if (grass && !k.cpu && Math.random() < 0.3) fx.burst(k.x, k.y, "#5a8a3a", 1, 1);
+            if (k.lap >= LAPS && !k.done) { k.done = true; finishOrder.push(k); if (k === me) finish(); }
+        }
+        function update(dt) {
+            if (count > 0) { const c0 = Math.ceil(count); count -= dt; if (Math.ceil(count) !== c0 && count > 0) beep(440, 0.15, "square", 0.04); if (count <= 0) beep(880, 0.3, "square", 0.05); return; }
+            time += dt;
+            const kk = Kit.keys; drive(me, dt, (kk.has("right") ? 1 : 0) - (kk.has("left") ? 1 : 0), kk.has("up") ? 1 : kk.has("down") ? -1 : 0);
+            for (const k of karts) {
+                if (!k.cpu) continue; const N = path.length, look = path[(k.idx + 12) % N], ta = Math.atan2(look[1] - k.y, look[0] - k.x); let da = ta - k.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+                drive(k, dt, Math.max(-1, Math.min(1, da * 2.5)), Math.abs(da) > 0.9 ? -1 : 1);
+            }
+            for (const a of karts) for (const b of karts) { if (a === b) continue; const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy); if (d < 22 && d > 0) { const push = (22 - d) / 2; a.x -= (dx / d) * push; a.y -= (dy / d) * push; b.x += (dx / d) * push; b.y += (dy / d) * push; a.v *= 0.97; } }
+            const order = [...karts].sort((a, b) => (b.done ? 1e9 - finishOrder.indexOf(b) : b.prog) - (a.done ? 1e9 - finishOrder.indexOf(a) : a.prog));
+            Kit.stat("pos", `${order.indexOf(me) + 1}/4`); Kit.stat("lap", `${Math.min(LAPS, Math.max(1, me.lap + 1))}/${LAPS}`);
+        }
+        function finish() {
+            state = "over"; const pos = finishOrder.indexOf(me) + 1, t = time.toFixed(1); tune(pos === 1 ? [523, 659, 784, 1047, 1319] : [523, 659, 784], 0.09, "square", 0.05);
+            Kit.save([0, 300, 150, 80, 40][pos]); const prev = +Kit.best(BEST) || 0; if (pos === 1 && (!prev || +t < prev)) { localStorage.setItem(BEST, t); Kit.stat("best", t + "s"); }
+            setTimeout(() => { $("overText").innerHTML = `${["", "🥇 " + T("1st place!", "מקום ראשון!"), "🥈 " + T("2nd place", "מקום שני"), "🥉 " + T("3rd place", "מקום שלישי"), T("4th place", "מקום רביעי")][pos]}<br>${T("Time", "זמן")}: ${t}s`; Kit.show("over"); }, 600);
+        }
+        function draw() {
+            ctx.fillStyle = "#4f8f3a"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#5a9a44"; for (let i = 0; i < 60; i++) { ctx.beginPath(); ctx.arc((i * 151) % W, (i * 89) % H, 14, 0, 7); ctx.fill(); }
+            if (!path) return;
+            ctx.lineJoin = "round"; ctx.lineCap = "round";
+            const line = (w, c, dash) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); path.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]); };
+            line(TW + 12, "#d62b3a", [14, 14]); line(TW + 12, "#ffffff", [14, 14]); ctx.lineDashOffset = 14; line(TW + 12, "#d62b3a", [14, 14]); ctx.lineDashOffset = 0;
+            line(TW, "#5a5f70"); line(2, "#ffffff55", [12, 18]);
+            // start line
+            const p0 = path[0], p1 = path[2], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]); ctx.save(); ctx.translate(p0[0], p0[1]); ctx.rotate(a); for (let i = -TW / 2; i < TW / 2; i += 8) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i / 8 + j) % 2 ? "#fff" : "#111"; ctx.fillRect(j * 8 - 8, i, 8, 8); } ctx.restore();
+            for (const b of boosts) { const [x, y] = path[b], [x2, y2] = path[(b + 2) % path.length], ang = Math.atan2(y2 - y, x2 - x); ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = "#ffc94d"; for (let k = 0; k < 2; k++) { ctx.beginPath(); ctx.moveTo(-10 + k * 12, -14); ctx.lineTo(4 + k * 12, 0); ctx.lineTo(-10 + k * 12, 14); ctx.lineTo(-4 + k * 12, 0); ctx.fill(); } ctx.restore(); }
+            fx.draw(ctx);
+            for (const k of karts) { ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(k.a); ctx.fillStyle = "#0005"; Kit.rr(ctx, -12, -8, 26, 18, 5); ctx.fill(); ctx.fillStyle = "#1a1a2a"; ctx.fillRect(-11, -11, 7, 4); ctx.fillRect(-11, 7, 7, 4); ctx.fillRect(6, -11, 7, 4); ctx.fillRect(6, 7, 7, 4); ctx.fillStyle = k.c; Kit.rr(ctx, -13, -8, 26, 16, 5); ctx.fill(); ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(-2, 0, 5, 0, 7); ctx.fill(); if (k.boost > 0) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(-13, -4); ctx.lineTo(-24 - Math.random() * 8, 0); ctx.lineTo(-13, 4); ctx.fill(); } ctx.restore(); if (k === me) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(k.x, k.y, 18, 0, 7); ctx.stroke(); } }
+            if (state === "play" && count > 0) Kit.text(ctx, count > 0.5 ? String(Math.ceil(count - 0.5) || "GO!") : "GO!", W / 2, H / 2, 72, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (state === "play") Kit.text(ctx, `${time.toFixed(1)}s`, W - 16, 30, 18, "#fff", "right");
+        }
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.04)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.kart = { get s() { return { state, time, lap: me && me.lap, laps: karts && karts.map((k) => k.lap) }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Turbo Kart</h2><p>A top-down kart racer. You and three computer drivers line up on the grid, the lights count down, and it's three laps to the finish. The road is grey with red-and-white kerbs; the grass slows you right down. Yellow arrow pads give you a short turbo boost. Bump other karts out of the way, take the racing line, and try to cross the line first. The track changes every race.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ / W</td><td>Accelerate</td></tr><tr><td>⬇ / S</td><td>Brake / reverse</td></tr><tr><td>⬅ ➡ / A D</td><td>Steer</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Take the inside of corners for a shorter route.</li><li>Boost arrows give 1.2 seconds of extra speed.</li><li>The computer karts aren't perfect: catch them on the corners.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Turbo Kart</h3><p>Turbo Kart is about keeping your speed up. The grass cuts your top speed by more than half, so going off the road costs a lot of time. On sharp corners, ease off the accelerator for a moment before turning, then speed up again on the way out.</p><p>The racing line helps. Approach a corner from the outside, cut to the inside at the middle of the bend, and drift back out as you leave it. It's the smoothest and fastest path.</p><p>Boost arrows are placed on straights. Steer to drive right over them. A boost at the start of a straight lasts all the way down it, which is a great way to overtake.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Finish a race.</li><li><b>Getting good:</b> Finish on the podium (top 3).</li><li><b>Expert:</b> Win a race.</li></ul><h3>Did you know?</h3><p>Go-karts were invented in 1956 in California by Art Ingels, who built one from scrap metal and a lawnmower engine.</p><h3>Questions players ask</h3><h4>How do I boost?</h4><p>Drive over the yellow arrows on the road.</p><h4>Are there different tracks?</h4><p>Yes, the track changes each race.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

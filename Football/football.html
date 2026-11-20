@@ -40,6 +40,7 @@
     </div>
     <div class="touch"><button data-k="pass">⇢ Pass</button><button data-k="through">⤳ Through</button><button data-k="loft">⤴ Lob</button><button data-k="shoot">⚽ Shoot</button><button data-k="switch">⇄ Switch</button><button data-k="sprint">⚡ Sprint</button></div>
     <p class="hint">Pass the ball around to pull defenders out of position, then play a through ball (W) to a striker making a run. Hold D longer for a harder shot, but too much power sends it over the bar.</p>
+    <script src="/gamepad.js" defer></script>
     <script src="/game-kit.js"></script>
     <script>
     (() => {
@@ -132,6 +133,10 @@
         }
         function setup(myId, oppId) {
             const mk = (pre, color, label, joy) => (testAuto ? null : { pre, color, label, joy, act: null, charge: 0, chargeKind: null, pend: null });
+            window.GAMEPAD_MAP = two() ? [
+                { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", a: "KeyC", b: "KeyV", x: "KeyB", y: "KeyF", lb: "KeyQ", rb: "KeyE", lt: "ShiftLeft", rt: "ShiftLeft", start: "Enter" },
+                { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "Period", b: "Slash", x: "Comma", y: "Semicolon", lb: "KeyL", rb: "KeyK", lt: "ShiftRight", rt: "ShiftRight", start: "Enter" },
+            ] : null;
             teams = two() ? [makeTeam(byId(myId), 1, mk("a.", "#ffc94d", "P1", true)), makeTeam(byId(oppId), -1, mk("b.", "#4de8ff", "P2", false))]
                 : [makeTeam(byId(myId), 1, mk("", "#ffc94d", "", true)), makeTeam(byId(oppId), -1, null)];
             if (colorDist(teams[0].kit[0], teams[1].kit[0]) < 150) teams[1].kit = teams[1].t.alt;
@@ -1512,7 +1517,7 @@ body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:aut
 .gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
 .gh-guide a{color:#2ee6c9}
 </style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Noam Football</h3><p>The fastest way to improve at Noam Football is to stop dribbling into crowds. Computer defenders press the ball carrier and a second defender covers behind, so running straight at goal usually ends in a lost ball. Instead, pass early to a teammate in space with S, and keep moving the ball until a gap opens. Watch the radar at the bottom of the screen: it shows where your teammates are, even when they are off camera.</p><p>Most goals come from three moves. First, the through ball: when one of your strikers sprints behind the defence, press W and the pass is played into the space in front of them. Second, the cross: get to the wing near the corner flag and press A, and your strikers will attack the ball in the box and try a header. Third, the shot across the keeper: hold D for power and hold up or down as you release it to aim for a corner. Too much power sends the ball over the bar, so release before the bar turns red.</p><p>In defence, patience wins the ball back. Hold S to chase the ball carrier, then tap S again when you are right next to them for a standing tackle. The slide tackle (D) covers more ground, but if you miss, your player is on the floor for a moment and the attacker is through. Press Q to switch to the defender closest to the ball, and try to stay between the ball and your goal.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play on Amateur with a strong team. Learn to pass with S, shoot with D, and switch players with Q.</li><li><b>Getting good:</b> Move up to Pro. Use through balls and crosses, and stop diving into slide tackles.</li><li><b>Expert:</b> On Legend the computer reacts quickly and tackles hard. Pass in triangles, play one-twos, and only shoot when you have a clear sight of goal.</li></ul><h3>Did you know?</h3><p>The first official international football match was played on 30 November 1872 in Glasgow, between Scotland and England. Around 4,000 people watched, and the game finished 0-0.</p><h3>Questions players ask</h3><h4>Which player am I controlling?</h4><p>The one with the yellow arrow and ring. The small bar above shows how much energy they have left for sprinting.</p><h4>How do I win the Noam Cup?</h4><p>Choose Noam Cup on the start screen and win three knockout matches in a row: quarter-final, semi-final and final. If a match ends level, it goes to penalties.</p><h4>How do penalties work?</h4><p>When you shoot, aim with the arrow keys and hold D for power. When the computer shoots, you're the keeper: press left or right before the kick to dive.</p><h4>Can I play on a phone?</h4><p>Yes. Drag on the left side of the pitch to run, and use the buttons under the game to pass, shoot, lob and switch players.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
-        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+        <section><h3>More games</h3><div class="gh-more"><a href="/Pool/pool">Noam Pool</a><a href="/BlockFit/blockfit">Block Fit</a><a href="/RoadHopper/roadhopper">Road Hopper</a><a href="/">All games →</a></div></section>
     </div>
     <div data-ad="banner"></div>
     <script>

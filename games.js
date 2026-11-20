@@ -117,6 +117,7 @@ export const GAMES = {
     bombmaze: { name: "Bomb Maze", path: "/BombMaze/bombmaze", img: "/thumbs/bombmaze.png", tags: ["arcade", "strategy"], desc: "Drop bombs, blast through crates and knock out every robot.", isNew: true },
     castlesmash: { name: "Castle Smash", path: "/CastleSmash/castlesmash", img: "/thumbs/castlesmash.png", tags: ["arcade", "physics"], desc: "Fling stones with a slingshot and topple the goblins' castles.", isNew: true },
     jigsaw: { name: "Jigsaw", path: "/Jigsaw/jigsaw", img: "/thumbs/jigsaw.png", tags: ["puzzle", "relaxing"], desc: "Drag real jigsaw pieces into place. A new painted picture every time!", isNew: true },
+    turbokart: { name: "Turbo Kart", path: "/TurboKart/turbokart", img: "/thumbs/turbokart.png", tags: ["sports", "arcade"], desc: "Race three computer karts for 3 laps. Hit the boost arrows!", isNew: true },
 };
 
 // Games that only count plays (no score)
