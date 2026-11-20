@@ -109,6 +109,8 @@ export const GAMES = {
     targetrush: { name: "Target Rush", path: "/TargetRush/targetrush", img: "/thumbs/targetrush.png", tags: ["arcade", "brain"], desc: "Click the targets before they vanish. How sharp is your aim?", isNew: true },
     sandbox: { name: "Sand Box", path: "/SandBox/sandbox", img: "/thumbs/sandbox.png", tags: ["creative", "physics"], desc: "Pour sand, water, lava and fire and watch them mix and react.", isNew: true },
     blackhole: { name: "Black Hole", path: "/BlackHole/blackhole", img: "/thumbs/blackhole.png", tags: ["arcade"], desc: "Be a hole in the ground. Swallow flowers, cars, houses… the whole city!", isNew: true },
+    parkingpro: { name: "Parking Pro", path: "/ParkingPro/parking", img: "/thumbs/parkingpro.png", tags: ["puzzle", "sports"], desc: "Steer carefully and park in the glowing spot without a scratch.", isNew: true },
+    neonslope: { name: "Neon Slope", path: "/NeonSlope/neonslope", img: "/thumbs/neonslope.png", tags: ["arcade", "runner"], desc: "Roll down an endless glowing track. Dodge the blocks and jump the gaps!", isNew: true },
 };
 
 // Games that only count plays (no score)

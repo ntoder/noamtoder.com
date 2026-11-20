@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A careful-driving puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Parking Pro · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Parking <span>Pro</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="stars">0</b><small>Stars</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="780" height="540"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Parking Pro</h2>
+                <p id="startText">⬆ drive forward, ⬇ reverse, ⬅ ➡ steer, Space to brake.<br>Get the whole car inside the green spot, lined up straight, and hold still for a second. Don't touch other cars, cones or walls! Faster parking earns more ⭐.</p>
+                <button class="btn" id="startBtn">▶ Start driving</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>All parked!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="down">⬇</button><button data-k="up">⬆</button><button data-k="right">➡</button></div>
+    <p class="hint">Cars steer from the front wheels, so the back of the car cuts corners. Leave room on the inside of each turn.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Parking Pro — drive a car with real steering into the glowing parking spot without hitting anything
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "parkingBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CL = 52, CWD = 26;
+        let car, obst, spot, level, stars, state = "ready", hold = 0, crashT = 0, fx = Kit.particles(), timer;
+        Kit.stat("best", Kit.best(BEST));
+        const LEVELS = [
+            () => ({ car: [120, 400, 0], spot: [600, 400, 0], obst: [] }),
+            () => ({ car: [120, 440, 0], spot: [520, 200, -Math.PI / 2], obst: around(520, 200, -Math.PI / 2, 70, 2) }),
+            () => ({ car: [120, 140, 0], spot: [420, 400, Math.PI / 2], obst: [...around(420, 400, Math.PI / 2, 62, 3), ...cones(260, 270, 6)] }),
+            () => ({ car: [100, 300, 0], spot: [460, 110, 0], obst: [...parallel(460, 110), ...cones(230, 380, 8)] }),
+            () => ({ car: [680, 460, Math.PI], spot: [160, 150, Math.PI / 2], obst: [...around(160, 150, Math.PI / 2, 62, 4), ...around(420, 460, -Math.PI / 2, 62, 2), ...cones(380, 300, 5)] }),
+            () => ({ car: [100, 460, -Math.PI / 2], spot: [560, 110, Math.PI], obst: [...parallel(560, 110), { x: 400, y: 330, w: 260, h: 30, a: 0, wall: true }, ...cones(250, 230, 4)] }),
+        ];
+        const COLS = ["#ff4d6d", "#ffc94d", "#2ee6a0", "#a64dff", "#ff9a3c"];
+        function around(x, y, a, gap, n) { const o = []; for (let k = -n; k <= n; k++) { if (!k) continue; const cx = x + k * gap; if (cx < 30 || cx > W - 30) continue; o.push({ x: cx, y, w: CL, h: CWD, a, col: Kit.pick(COLS) }); } return o; }
+        function parallel(x, y) { const o = []; for (let cx = x - 110; cx > 20; cx -= 100) o.push({ x: cx, y, w: CL + 16, h: CWD, a: 0, col: Kit.pick(COLS) }); for (let cx = x + 110; cx < W - 20; cx += 100) o.push({ x: cx, y, w: CL + 16, h: CWD, a: 0, col: Kit.pick(COLS) }); return o; }
+        function cones(x, y, n) { const o = []; for (let i = 0; i < n; i++) o.push({ x: x + i * 26, y, w: 12, h: 12, a: 0, cone: true }); return o; }
+        function load() {
+            const L = LEVELS[(level - 1) % LEVELS.length]();
+            car = { x: L.car[0], y: L.car[1], a: L.car[2], v: 0, steer: 0 }; spot = { x: L.spot[0], y: L.spot[1], a: L.spot[2] }; obst = L.obst; hold = 0; crashT = 0; timer = 0; Kit.stat("level", level);
+        }
+        function start() { level = 1; stars = 0; state = "play"; load(); Kit.stat("stars", 0); Kit.hide("start"); Kit.hide("over"); }
+        function corners(o, pad = 0) { const c = Math.cos(o.a), s = Math.sin(o.a), hw = o.w / 2 + pad, hh = o.h / 2 + pad; return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [o.x + x * c - y * s, o.y + x * s + y * c]); }
+        function overlap(A, B) { for (const P of [A, B]) for (let i = 0; i < 4; i++) { const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % 4], nx = y2 - y1, ny = x1 - x2; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const [x, y] of A) { const d = x * nx + y * ny; a0 = Math.min(a0, d); a1 = Math.max(a1, d); } for (const [x, y] of B) { const d = x * nx + y * ny; b0 = Math.min(b0, d); b1 = Math.max(b1, d); } if (a1 < b0 || b1 < a0) return false; } return true; }
+        function update(dt) {
+            timer += dt;
+            if (crashT > 0) { crashT -= dt; if (crashT <= 0) load(); return; }
+            const k = Kit.keys, acc = k.has("up") ? 260 : k.has("down") ? -200 : 0;
+            car.v += acc * dt; car.v *= k.has("brake") ? 0.9 : acc ? 0.995 : 0.97; car.v = Math.max(-140, Math.min(220, car.v));
+            const st = (k.has("left") ? -1 : 0) + (k.has("right") ? 1 : 0); car.steer += (st * 0.6 - car.steer) * Math.min(1, dt * 8);
+            car.a += (car.v / 44) * Math.tan(car.steer) * dt; car.x += Math.cos(car.a) * car.v * dt; car.y += Math.sin(car.a) * car.v * dt;
+            const body = corners({ x: car.x, y: car.y, w: CL, h: CWD, a: car.a });
+            const out = body.some(([x, y]) => x < 0 || y < 0 || x > W || y > H);
+            if (out || obst.some((o) => overlap(body, corners(o)))) { crashT = 1.2; car.v = 0; fx.burst(car.x, car.y, "#ffc94d", 30, 4); beep(90, 0.4, "sawtooth", 0.06); stars = Math.max(0, stars); return; }
+            const inSpot = corners({ x: spot.x, y: spot.y, w: CL + 18, h: CWD + 14, a: spot.a }), inside = body.every(([x, y]) => pointIn([x, y], inSpot));
+            let da = Math.abs(((car.a - spot.a) % Math.PI + Math.PI * 1.5) % Math.PI - Math.PI / 2);
+            if (inside && Math.abs(car.v) < 15 && da < 0.25) { hold += dt; if (hold > 1) win(); } else hold = 0;
+        }
+        function pointIn(p, poly) { let c = false; for (let i = 0, j = 3; i < 4; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c; } return c; }
+        function win() {
+            const s = timer < 12 ? 3 : timer < 25 ? 2 : 1; stars += s; Kit.stat("stars", stars); tune([523, 659, 784, 1047], 0.08, "square", 0.05); fx.burst(spot.x, spot.y, "#2ee6a0", 40, 4);
+            Kit.save(stars * 20); Kit.setBest(BEST, stars);
+            if (level >= LEVELS.length) { state = "over"; setTimeout(() => { $("overText").innerHTML = `${T("You parked every car! You're a Parking Pro!", "חניתם את כל המכוניות! אתם מקצוענים!")}<br>⭐ ${stars} / ${LEVELS.length * 3}`; Kit.show("over"); }, 700); return; }
+            level++; crashT = 0; hold = 0; setTimeout(load, 700); car.v = 0; state = "play"; pauseT = 0.7;
+        }
+        let pauseT = 0;
+        function carDraw(x, y, a, col, w = CL, h = CWD) { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = "#0004"; Kit.rr(ctx, -w / 2 + 2, -h / 2 + 3, w, h, 7); ctx.fill(); ctx.fillStyle = col; Kit.rr(ctx, -w / 2, -h / 2, w, h, 7); ctx.fill(); ctx.fillStyle = "#cfe8ff"; Kit.rr(ctx, w * 0.08, -h / 2 + 3, w * 0.22, h - 6, 3); ctx.fill(); Kit.rr(ctx, -w * 0.36, -h / 2 + 3, w * 0.16, h - 6, 3); ctx.fill(); ctx.fillStyle = "#fff8b0"; ctx.fillRect(w / 2 - 3, -h / 2 + 2, 3, 5); ctx.fillRect(w / 2 - 3, h / 2 - 7, 3, 5); ctx.restore(); }
+        function draw() {
+            ctx.fillStyle = "#4a4f5e"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#555b6c"; for (let i = 0; i < 30; i++) ctx.fillRect((i * 173) % W, (i * 97) % H, 30, 2);
+            if (!car) return;
+            const sc = corners({ x: spot.x, y: spot.y, w: CL + 18, h: CWD + 14, a: spot.a }); ctx.fillStyle = hold > 0 ? `rgba(46,230,160,${0.3 + hold * 0.5})` : "rgba(46,230,160,0.22)"; ctx.strokeStyle = "#2ee6a0"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath(); sc.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+            Kit.text(ctx, "P", spot.x, spot.y + 8, 22, "#2ee6a0", "center");
+            for (const o of obst) { if (o.cone) { ctx.fillStyle = "#ff8a1f"; ctx.beginPath(); ctx.moveTo(o.x, o.y - 9); ctx.lineTo(o.x + 7, o.y + 7); ctx.lineTo(o.x - 7, o.y + 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(o.x - 4, o.y - 1, 8, 3); } else if (o.wall) { ctx.save(); ctx.translate(o.x, o.y); ctx.fillStyle = "#8a8fa3"; ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h); ctx.restore(); } else carDraw(o.x, o.y, o.a, o.col, o.w, o.h); }
+            if (crashT <= 0 || Math.floor(crashT * 10) % 2) carDraw(car.x, car.y, car.a, "#2a74ff");
+            fx.draw(ctx);
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}/${LEVELS.length}`, 16, 30, 18, "#fff", "left");
+            Kit.text(ctx, `${timer.toFixed(1)}s`, W - 16, 30, 18, "#fff", "right");
+            if (hold > 0) Kit.text(ctx, T("Hold still…", "עמדו במקום…"), W / 2, 40, 20, "#2ee6a0", "center");
+            if (crashT > 0) Kit.text(ctx, T("Crash! Try again", "התנגשות! נסו שוב"), W / 2, H / 2, 30, "#ffc94d", "center");
+        }
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Space: "brake", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (pauseT > 0) pauseT -= dt; else if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.park = { get s() { return { state, level, stars }; }, start, go: (n) => { level = n; load(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Parking Pro</h2><p>A careful-driving puzzle. Each level gives you a car and a glowing parking spot somewhere in a busy car park. Drive and steer like a real car (it can't turn on the spot) and slide into the space between the other cars. The car must be completely inside the lines, lined up straight and stopped. Six levels take you from an easy empty lot to tight parallel parking. Park fast for three stars.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬆ / W</td><td>Drive forward</td></tr><tr><td>⬇ / S</td><td>Reverse</td></tr><tr><td>⬅ ➡ / A D</td><td>Steer</td></tr><tr><td>Space</td><td>Brake</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Go slowly. You can always reverse and try again.</li><li>Reversing into a space is often easier.</li><li>You can be facing either way in the spot.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Parking Pro</h3><p>Parking Pro uses real car steering: the car only turns while it's moving, and the back wheels follow a tighter curve than the front. That means the back of the car swings in, so give corners extra room.</p><p>Slow is smooth. Tap the arrow keys instead of holding them, and use Space to brake. A crash sends you back to the start of the level, which costs much more time than going carefully.</p><p>For parallel parking, drive past the gap, stop, then reverse while steering towards the space. When the back of the car is in, steer the other way to straighten up. It's exactly how real drivers do it.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Park in the first 3 levels.</li><li><b>Getting good:</b> Earn 3 stars on any level.</li><li><b>Expert:</b> Finish all 6 levels.</li></ul><h3>Did you know?</h3><p>Some modern cars can park themselves. They use sensors to measure the space and steer automatically, while the driver controls the speed.</p><h3>Questions players ask</h3><h4>Why doesn't it count as parked?</h4><p>The whole car must be inside the green spot, almost straight, and stopped for a second.</p><h4>Can I park facing backwards?</h4><p>Yes, either direction counts.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/Reversi/reversi">Reversi</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

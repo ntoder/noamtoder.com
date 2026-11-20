@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast 3D-style runner in glowing neon. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Neon Slope · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Neon <span>Slope</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="720" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Neon Slope</h2>
+                <p id="startText">⬅ ➡ (or A D, or drag) to roll left and right. Space or ⬆ to jump.<br>Dodge the glowing blocks and jump over the gaps in the track. Grab 💎 gems for bonus points. It keeps getting faster!</p>
+                <button class="btn" id="startBtn">▶ Roll</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="jump">⤒</button><button data-k="right">➡</button></div>
+    <p class="hint">Keep near the middle of the track so you can dodge either way.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Neon Slope — pseudo-3D: a ball rolls down an endless neon track; steer to dodge blocks and gaps
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "neonslopeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const LANES = 5, FOV = 260, CAMH = 120, HZ = H * 0.32, SEG = 60;
+        let x, vx, z, speed, rows, score, state = "ready", fx = Kit.particles(), hue = 190, jumpT = 0, gems;
+        Kit.stat("best", Kit.best(BEST));
+        function genRow(i) {
+            const r = { z: i * SEG, blocks: [], hole: false, gem: -1 };
+            if (i < 12) return r;
+            const d = Math.min(1, i / 400), p = Math.random();
+            if (i % 3 === 0 && p < 0.55 + d * 0.3) { const n = Kit.randi(1, Math.min(4, 1 + Math.floor(d * 4) + 1)); const lanes = [...Array(LANES).keys()].sort(() => Math.random() - 0.5).slice(0, n); r.blocks = lanes; }
+            else if (i % 17 === 0 && i > 60) r.hole = true;
+            else if (Math.random() < 0.08) r.gem = Kit.randi(0, LANES - 1);
+            return r;
+        }
+        function start() { x = 0; vx = 0; z = 0; speed = 520; score = 0; gems = 0; jumpT = 0; rows = []; for (let i = 0; i < 60; i++) rows.push(genRow(i)); state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        const laneX = (l) => (l - (LANES - 1) / 2) * 1; // in lane units
+        function proj(wx, wz, wy = 0) { const dz = wz - z + 100; const s = FOV / Math.max(1, dz); return [W / 2 + wx * 90 * s, HZ + (CAMH - wy) * s, s]; }
+        function jump() { if (state === "play" && jumpT <= 0) { jumpT = 0.75; beep(400, 0.15, "sine", 0.04, 400); } }
+        function update(dt) {
+            speed = 520 + Math.min(700, z / 60); z += speed * dt; score = Math.floor(z / 100) + gems * 25; Kit.stat("score", score);
+            const k = Kit.keys; const ax = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0); vx += ax * 22 * dt; vx *= 0.88; x += vx * dt * 2.2; x = Math.max(-2.2, Math.min(2.2, x));
+            if (dragX !== null) { x += (dragX - x) * Math.min(1, dt * 12); }
+            if (jumpT > 0) jumpT -= dt;
+            hue = (190 + z / 80) % 360;
+            while (rows[0].z < z - SEG * 2) { rows.shift(); rows.push(genRow(rows[rows.length - 1].z / SEG + 1)); }
+            const air = jumpT > 0;
+            for (const r of rows) {
+                if (Math.abs(r.z - (z + 100)) > SEG / 2) continue;
+                if (r.gem >= 0 && Math.abs(laneX(r.gem) - x) < 0.5 && !air) { r.gem = -1; gems++; tune([1175, 1568], 0.04, "square", 0.03); }
+                if (air) continue;
+                if (r.hole && Math.abs(r.z - (z + 100)) < SEG * 0.3) return die(T("You fell into a gap!", "נפלתם לבור!"));
+                for (const l of r.blocks) if (Math.abs(laneX(l) - x) < 0.72 && Math.abs(r.z - (z + 100)) < 18) return die(T("You hit a block!", "נתקלתם בקובייה!"));
+            }
+        }
+        function die(why) { state = "over"; fx.burst(W / 2 + 0, H - 110, `hsl(${hue},100%,60%)`, 40, 5); beep(90, 0.5, "sawtooth", 0.07); Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${why}<br>${score} ${T("points", "נקודות")} · 💎 ${gems} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 600); }
+        function quad(a, b, c, d, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c); ctx.lineTo(...d); ctx.fill(); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#05010f"); g.addColorStop(0.32, `hsl(${hue + 60},70%,18%)`); g.addColorStop(1, "#05010f"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = `hsla(${hue + 40},90%,60%,0.6)`; ctx.beginPath(); ctx.arc(W / 2, HZ, 70, Math.PI, 0); ctx.fill();
+            if (!rows) return;
+            const hw = LANES / 2 + 0.1;
+            for (let i = rows.length - 1; i >= 0; i--) {
+                const r = rows[i]; if (r.z < z - 30) continue;
+                const z0 = r.z - SEG / 2, z1 = r.z + SEG / 2;
+                const a = proj(-hw, z0), b = proj(hw, z0), c = proj(hw, z1), d = proj(-hw, z1);
+                if (!r.hole) { quad([a[0], a[1]], [b[0], b[1]], [c[0], c[1]], [d[0], d[1]], (Math.round(r.z / SEG)) % 2 ? "#0d0a24" : "#130f33"); ctx.strokeStyle = `hsl(${hue},100%,60%)`; ctx.lineWidth = Math.max(1, a[2] * 4); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(d[0], d[1]); ctx.moveTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.stroke(); }
+                if (r.gem >= 0) { const [gx, gy, s] = proj(laneX(r.gem), r.z, 18); ctx.fillStyle = "#7dfcff"; ctx.beginPath(); ctx.moveTo(gx, gy - 14 * s); ctx.lineTo(gx + 10 * s, gy); ctx.lineTo(gx, gy + 14 * s); ctx.lineTo(gx - 10 * s, gy); ctx.fill(); }
+                for (const l of r.blocks) {
+                    const lx = laneX(l), w = 0.42, h = 40; const f0 = proj(lx - w, r.z - 10), f1 = proj(lx + w, r.z - 10), t0 = proj(lx - w, r.z - 10, h), t1 = proj(lx + w, r.z - 10, h), b0 = proj(lx - w, r.z + 10, h), b1 = proj(lx + w, r.z + 10, h);
+                    quad([t0[0], t0[1]], [t1[0], t1[1]], [b1[0], b1[1]], [b0[0], b0[1]], `hsl(${hue + 150},90%,70%)`);
+                    quad([f0[0], f0[1]], [f1[0], f1[1]], [t1[0], t1[1]], [t0[0], t0[1]], `hsl(${hue + 150},90%,50%)`);
+                }
+            }
+            if (state === "play") { const lift = jumpT > 0 ? Math.sin((1 - jumpT / 0.75) * Math.PI) * 60 : 0; const [bx, by, s] = proj(x, z + 100, 14 + lift); ctx.fillStyle = "#0006"; const [sx, sy] = proj(x, z + 100, 0); ctx.beginPath(); ctx.ellipse(sx, sy, 16 * s * 1.2, 5 * s, 0, 0, 7); ctx.fill(); const gr = ctx.createRadialGradient(bx - 5, by - 5, 2, bx, by, 16 * s); gr.addColorStop(0, "#fff"); gr.addColorStop(1, `hsl(${hue},100%,55%)`); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bx, by, 16 * s, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), W / 2, 50, 28, "#fff", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, `💎 ${gems}`, W - 20, 40, 18, "#7dfcff", "right");
+        }
+        let dragX = null;
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); dragX = ((p.x - W / 2) / (W / 2)) * 2.4; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (dragX !== null) { const p = Kit.point(cv, e); dragX = ((p.x - W / 2) / (W / 2)) * 2.4; } });
+        cv.addEventListener("pointerup", () => (dragX = null));
+        cv.addEventListener("dblclick", jump);
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Space: "jump", ArrowUp: "jump", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "jump") jump(); });
+        Kit.touchButtons((k) => k === "jump" && jump());
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.04)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.ns = { get s() { return { state, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Neon Slope</h2><p>A fast 3D-style runner in glowing neon. Your ball rolls down an endless track that stretches into the distance. Rows of blocks block some lanes, and every so often there's a gap in the track that you must jump. Collect diamonds along the way. The ball speeds up the further you go, and the colours shift as you travel deeper.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ or A D</td><td>Steer</td></tr><tr><td>Space or ⬆</td><td>Jump</td></tr><tr><td>Drag</td><td>Steer (touch)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Jumping clears blocks too, but you can't steer much in the air.</li><li>Gaps come every so often, so always be ready to jump.</li><li>Each 💎 is worth 25 points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Neon Slope</h3><p>Neon Slope is about looking ahead. Blocks appear far down the track and grow as they get closer. Pick the open lane early and drift into it smoothly instead of swerving at the last moment.</p><p>Gaps in the track can only be crossed by jumping. Time your jump so you take off just before the gap. A jump also carries you over blocks, which is a handy escape when a wall of blocks leaves only a hard-to-reach lane.</p><p>The speed keeps rising, so small movements matter more and more. Stay near the middle when you can, because from there every lane is close.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 200 points.</li><li><b>Getting good:</b> Collect 10 gems in one run.</li><li><b>Expert:</b> Score 1,000 points.</li></ul><h3>Did you know?</h3><p>Neon signs glow because electricity passes through a gas inside a glass tube. Pure neon glows red-orange; other colours come from other gases or coatings.</p><h3>Questions players ask</h3><h4>How do I cross the gaps?</h4><p>Jump with Space, ⬆ or the ⤒ button just before you reach them.</p><h4>Does it end?</h4><p>No, the track is endless and keeps getting faster.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PaintTerritory/paintland">Paint Territory</a><a href="/PianoTiles/pianotiles">Piano Tiles</a><a href="/Plinko/plinko">Plinko</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
