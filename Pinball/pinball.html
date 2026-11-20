@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A neon pinball table. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Pinball · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Pin<span>ball</span></h1>
+        <div class="stats"><div class="stat"><b id="balls">3</b><small>Balls</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="420" height="780"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Pinball</h2>
+                <p id="startText">Hold ⬇ or Space to pull the plunger, let go to launch the ball.<br>⬅ / Z / Left Shift = left flipper, ➡ / M / Right Shift = right flipper. On a phone, tap the left or right half of the screen.<br>Hit all 4 green targets for a score multiplier, and light all 3 top lanes for +5000!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Don't flip wildly. Wait for the ball to roll down the flipper and hit it near the tip for a strong shot.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Pinball — flippers, bumpers, slingshot walls, lanes and a launcher. 3 balls
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "pinballBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const G = 900, BR = 9;
+        const walls = [], bumpers = [], targets = [], lanes = [];
+        function seg(x1, y1, x2, y2, kick = 0, col = "#5cc8ff") { walls.push({ x1, y1, x2, y2, kick, col }); }
+        // outer shape
+        seg(20, 120, 20, 600); seg(20, 600, 120, 690); seg(380, 120, 380, 600); seg(380, 600, 280, 690);
+        seg(380, 120, 380, 750, 0, "#333"); seg(410, 120, 410, 760, 0, "#5cc8ff");
+        for (let i = 0; i < 12; i++) { const a0 = Math.PI + (i / 12) * Math.PI, a1 = Math.PI + ((i + 1) / 12) * Math.PI; seg(215 + Math.cos(a0) * 195, 120 + Math.sin(a0) * 100, 215 + Math.cos(a1) * 195, 120 + Math.sin(a1) * 100); }
+        seg(380, 150, 360, 135, 0); // guide into table from launcher
+        // slingshots
+        seg(70, 520, 110, 610, 520, "#ff4dd2"); seg(70, 520, 70, 590); seg(70, 590, 110, 610);
+        seg(330, 520, 290, 610, 520, "#ff4dd2"); seg(330, 520, 330, 590); seg(330, 590, 290, 610);
+        bumpers.push({ x: 140, y: 220, r: 24, lit: 0 }, { x: 260, y: 220, r: 24, lit: 0 }, { x: 200, y: 300, r: 24, lit: 0 });
+        for (let i = 0; i < 4; i++) targets.push({ x: 60 + i * 0, y: 300 + i * 40, w: 8, h: 26, up: true, i });
+        for (let i = 0; i < 3; i++) lanes.push({ x: 150 + i * 50, y: 90, on: false });
+        const fl = [{ x: 120, y: 690, len: 70, dir: 1, a: 0.5, rest: 0.5, up: -0.45, key: "left" }, { x: 280, y: 690, len: 70, dir: -1, a: 0.5, rest: 0.5, up: -0.45, key: "right" }];
+        let ball, balls = 3, score = 0, mult = 1, state = "ready", plunger = 0, charging = false, fx = Kit.particles(), msg = null, saveT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function newBall() { ball = { x: 395, y: 720, vx: 0, vy: 0, inLane: true }; saveT = 0; }
+        function start() { balls = 3; score = 0; mult = 1; targets.forEach((t) => (t.up = true)); lanes.forEach((l) => (l.on = false)); newBall(); state = "play"; Kit.stat("score", 0); Kit.stat("balls", 3); Kit.hide("start"); Kit.hide("over"); }
+        function add(p) { score += p * mult; Kit.stat("score", score); }
+        function flipEnd(f) { const ang = f.dir > 0 ? f.a : Math.PI - f.a; return [f.x + Math.cos(ang) * f.len, f.y + Math.sin(ang) * f.len]; }
+        function collideSeg(x1, y1, x2, y2, r, kick, fv) {
+            const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy; let t = ((ball.x - x1) * dx + (ball.y - y1) * dy) / L2; t = Math.max(0, Math.min(1, t));
+            const px = x1 + t * dx, py = y1 + t * dy, ox = ball.x - px, oy = ball.y - py, d = Math.hypot(ox, oy);
+            if (d >= r || d === 0) return false;
+            const nx = ox / d, ny = oy / d; ball.x = px + nx * r; ball.y = py + ny * r;
+            let rvx = ball.vx - (fv ? fv[0] * t : 0), rvy = ball.vy - (fv ? fv[1] * t : 0); const vn = rvx * nx + rvy * ny;
+            if (vn < 0) { ball.vx -= (1.55) * vn * nx; ball.vy -= (1.55) * vn * ny; if (kick) { ball.vx += nx * kick; ball.vy += ny * kick; } }
+            if (fv) { ball.vx += fv[0] * t * 0.9; ball.vy += fv[1] * t * 0.9; }
+            return true;
+        }
+        function physics(dt) {
+            const k = Kit.keys;
+            for (const f of fl) { const prev = f.a; const tgt = k.has(f.key) ? f.up : f.rest; f.a += Math.sign(tgt - f.a) * Math.min(Math.abs(tgt - f.a), dt * 22); f.w = (f.a - prev) / dt; }
+            if (ball.inLane) { if (charging) plunger = Math.min(1, plunger + dt * 1.2); ball.x = 395; ball.y = 720 + plunger * 30; ball.vx = ball.vy = 0; return; }
+            ball.vy += G * dt; const sp = Math.hypot(ball.vx, ball.vy); if (sp > 1500) { ball.vx *= 1500 / sp; ball.vy *= 1500 / sp; }
+            ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+            for (const w of walls) if (collideSeg(w.x1, w.y1, w.x2, w.y2, BR, w.kick)) { if (w.kick) { add(10); beep(700, 0.04, "square", 0.03); w.lit = 0.2; } }
+            for (const f of fl) { const [ex, ey] = flipEnd(f); const ang = f.dir > 0 ? f.a : Math.PI - f.a; const omega = f.w * f.dir; const vtip = [-Math.sin(ang) * omega * f.len, Math.cos(ang) * omega * f.len]; collideSeg(f.x, f.y, ex, ey, BR + 6, 0, f.w < 0 ? vtip : null); }
+            for (const b of bumpers) { const dx = ball.x - b.x, dy = ball.y - b.y, d = Math.hypot(dx, dy); if (d < b.r + BR) { const nx = dx / d, ny = dy / d; ball.x = b.x + nx * (b.r + BR); ball.y = b.y + ny * (b.r + BR); const vn = ball.vx * nx + ball.vy * ny; ball.vx -= 2 * vn * nx; ball.vy -= 2 * vn * ny; ball.vx += nx * 380; ball.vy += ny * 380; b.lit = 0.25; add(100); beep(400 + Math.random() * 200, 0.06, "square", 0.04); fx.burst(b.x + nx * b.r, b.y + ny * b.r, "#ffc94d", 6, 2); } }
+            for (const t of targets) if (t.up && Math.abs(ball.x - t.x) < BR + t.w / 2 && Math.abs(ball.y - t.y) < BR + t.h / 2) { t.up = false; ball.vx = Math.abs(ball.vx) + 100; add(250); beep(900, 0.06, "triangle", 0.04); if (targets.every((q) => !q.up)) { mult = Math.min(5, mult + 1); msg = { t: 2, s: `${T("MULTIPLIER", "מכפיל")} x${mult}!` }; tune([523, 659, 784, 1047], 0.07, "square", 0.05); setTimeout(() => targets.forEach((q) => (q.up = true)), 1500); } }
+            for (const l of lanes) if (!l.on && Math.abs(ball.x - l.x) < 14 && Math.abs(ball.y - l.y) < 16) { l.on = true; add(500); beep(1200, 0.05, "square", 0.03); if (lanes.every((q) => q.on)) { add(5000); msg = { t: 2, s: T("ALL LANES! +5000", "כל המסלולים! +5000") }; tune([784, 988, 1175, 1568], 0.08, "square", 0.05); lanes.forEach((q) => (q.on = false)); } }
+            if (ball.x > 380 && ball.x < 410 && ball.y < 760 && ball.y > 140 && !ball.inLane && ball.vy > 0 && ball.y > 600) { /* fell back into the plunger lane */ ball.inLane = true; plunger = 0; }
+            if (ball.y > H + 20) { saveT = 0; balls--; Kit.stat("balls", balls); beep(120, 0.5, "sawtooth", 0.05); if (balls <= 0) return end(); msg = { t: 1.5, s: T("Ball lost!", "כדור אבד!") }; mult = 1; newBall(); }
+        }
+        function update(dt) { const n = 6; for (let i = 0; i < n; i++) { physics(dt / n); if (state !== "play") return; } for (const b of bumpers) b.lit = Math.max(0, b.lit - dt); for (const w of walls) if (w.lit) w.lit = Math.max(0, w.lit - dt); }
+        function end() { state = "over"; Kit.save(Math.floor(score / 50)); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Game over!", "המשחק נגמר!")}<br>${score.toLocaleString()} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best.toLocaleString()}`; Kit.show("over"); }
+        function launch() { if (!ball || !ball.inLane) return; ball.inLane = false; ball.vy = -900 - plunger * 900; ball.vx = 0; ball.y = 700; plunger = 0; beep(200, 0.15, "sawtooth", 0.05, 400); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a0f3a"); g.addColorStop(1, "#0a0820"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#ffffff08"; for (let i = 0; i < 20; i++) { ctx.beginPath(); ctx.arc(200, 420, 30 + i * 20, 0, 7); ctx.fill(); }
+            ctx.lineCap = "round";
+            for (const w of walls) { ctx.strokeStyle = w.lit ? "#fff" : w.col; ctx.lineWidth = w.kick ? 6 : 4; ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); }
+            for (const b of bumpers) { ctx.fillStyle = b.lit > 0 ? "#fff" : "#ff4d6d"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.fillStyle = b.lit > 0 ? "#ffc94d" : "#ffc94d"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.55, 0, 7); ctx.fill(); Kit.text(ctx, "100", b.x, b.y + 4, 10, "#1a0f3a", "center"); }
+            for (const t of targets) { ctx.fillStyle = t.up ? "#2ee6a0" : "#2ee6a033"; ctx.fillRect(t.x - t.w / 2, t.y - t.h / 2, t.w, t.h); }
+            for (const l of lanes) { ctx.fillStyle = l.on ? "#ffc94d" : "#ffffff22"; ctx.beginPath(); ctx.arc(l.x, l.y, 8, 0, 7); ctx.fill(); }
+            for (const f of fl) { const [ex, ey] = flipEnd(f); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, 7); ctx.fill(); }
+            ctx.fillStyle = "#c0c0d0"; ctx.fillRect(386, 735 + plunger * 30, 18, 40);
+            if (ball) { const gr = ctx.createRadialGradient(ball.x - 3, ball.y - 3, 1, ball.x, ball.y, BR); gr.addColorStop(0, "#fff"); gr.addColorStop(1, "#8a8fa3"); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, score.toLocaleString(), 200, 40, 22, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (mult > 1) Kit.text(ctx, `x${mult}`, 360, 40, 18, "#ff4dd2", "center");
+            for (let i = 0; i < balls; i++) { ctx.fillStyle = "#c0c0d0"; ctx.beginPath(); ctx.arc(30 + i * 18, 40, 6, 0, 7); ctx.fill(); }
+            if (ball && ball.inLane && state === "play") Kit.text(ctx, T("Hold ⬇ / Space, let go to launch", "החזיקו ⬇ / רווח, עזבו כדי לשגר"), 200, 760, 13, "#ffffffaa", "center");
+            if (msg && msg.t > 0) Kit.text(ctx, msg.s, 200, 420, 22, "#ffc94d", "center");
+        }
+        Kit.onKeys({ ArrowLeft: "left", KeyZ: "left", KeyA: "left", ShiftLeft: "left", ArrowRight: "right", KeyM: "right", KeyD: "right", ShiftRight: "right", ArrowDown: "plunge", Space: "plunge", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "plunge" && ball && ball.inLane) charging = true; if (a === "left" || a === "right") beep(150, 0.03, "square", 0.02); }, (a) => { if (a === "plunge" && charging) { charging = false; launch(); } });
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play") return; const p = Kit.point(cv, e); if (ball && ball.inLane) { charging = true; return; } Kit.keys.add(p.x < W / 2 ? "left" : "right"); });
+        window.addEventListener("pointerup", () => { Kit.keys.delete("left"); Kit.keys.delete("right"); if (charging) { charging = false; launch(); } });
+        cv.style.touchAction = "none";
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); if (msg) msg.t -= dt; fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.pin = { get s() { return { state, score, balls, ball: ball && { x: Math.round(ball.x), y: Math.round(ball.y), lane: ball.inLane } }; }, start, launch: () => { plunger = 0.8; launch(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Pinball</h2><p>A neon pinball table. Launch the ball with the plunger, then keep it in play with the two flippers at the bottom. Round bumpers kick the ball away for 100 points each, the pink slingshots fire it across the table, green drop targets on the left build up your multiplier, and the three lights at the top give a big bonus when you light them all. You have three balls.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬇ or Space (hold)</td><td>Pull the plunger</td></tr><tr><td>⬅ / Z / Left Shift</td><td>Left flipper</td></tr><tr><td>➡ / M / Right Shift</td><td>Right flipper</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The multiplier multiplies every point you score.</li><li>Losing a ball resets the multiplier.</li><li>A full plunger pull shoots the ball all the way to the top lanes.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Pinball</h3><p>In pinball, control beats speed. When the ball comes down toward a flipper, you can hold the flipper up and let the ball roll onto it and stop. This is called a 'cradle'. From there you can aim a careful shot instead of a random flick.</p><p>Where the ball hits the flipper decides where it goes. Hitting near the tip sends it across the table to the other side; hitting near the base sends it higher up the same side. Practise aiming at the green targets on the left to build your multiplier.</p><p>Don't flip both flippers at once all the time, because it leaves a gap in the middle. Watch the ball and flip only the one it's heading for.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 10,000 points.</li><li><b>Getting good:</b> Reach a x3 multiplier.</li><li><b>Expert:</b> Score 80,000 points.</li></ul><h3>Did you know?</h3><p>Pinball machines were banned in several big American cities from the 1940s to the 1970s, because people thought they were gambling. Flippers were added in 1947 to prove they needed skill.</p><h3>Questions players ask</h3><h4>How do I launch the ball?</h4><p>Hold ⬇ or Space to pull the plunger back, then let go. Longer pull = stronger launch.</p><h4>How does the multiplier work?</h4><p>Knock down all four green targets to add +1 to your multiplier, up to x5. Losing a ball resets it.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/ReactionTest/reaction">Reaction Test</a><a href="/SkiSlope/skislope">Ski Slope</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
