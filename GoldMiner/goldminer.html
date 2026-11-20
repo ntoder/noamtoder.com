@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic grabbing game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Gold Miner · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Gold <span>Miner</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="money">$0</b><small>Money</small></div><div class="stat"><b id="target">$650</b><small>Target</small></div><div class="stat"><b id="dyn">🧨</b><small>Dynamite</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Gold Miner</h2>
+                <p id="startText">The claw swings back and forth. Tap, click, Space or ⬇ to drop it and grab what it hits.<br>Big gold is worth a lot but is slow to pull up. Rocks are heavy and nearly worthless: blow them up with dynamite (tap again or press ⬆ while pulling). Mystery bags can hold anything! Reach the money target before the clock runs out.</p>
+                <button class="btn" id="startBtn">⛏️ Dig</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">⛏️ Dig again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Diamonds are small but worth the most, and they're light. Grab them first!</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Gold Miner — swing the claw, grab gold and gems before time runs out; reach each level's target
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "goldminerBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const OX = W / 2, OY = 92, GROUND = 130;
+        const KINDS = { gold1: { r: 14, v: 50, w: 1.4, c: "#ffc94d" }, gold2: { r: 26, v: 150, w: 2.6, c: "#ffc94d" }, gold3: { r: 42, v: 500, w: 4.5, c: "#ffc94d" }, rock1: { r: 18, v: 11, w: 2.4, c: "#8a8fa3" }, rock2: { r: 30, v: 20, w: 4.2, c: "#8a8fa3" }, gem: { r: 11, v: 600, w: 0.9, c: "#5cc8ff" }, bag: { r: 16, v: 0, w: 1.2, c: "#c08a4a" }, bone: { r: 16, v: 7, w: 1.1, c: "#eee" } };
+        let items, claw, money, target, level, time, state = "ready", pops = [], strength = 1, dyn = 0, fx = Kit.particles(), between = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function build() {
+            items = []; const place = (k, n) => { for (let i = 0; i < n; i++) { const r = KINDS[k].r; let x, y, ok, t = 0; do { x = Kit.rand(40 + r, W - 40 - r); y = Kit.rand(GROUND + 70 + r, H - 20 - r); ok = items.every((o) => Math.hypot(o.x - x, o.y - y) > o.r + r + 8); } while (!ok && ++t < 80); if (ok) items.push({ k, x, y, r, ...KINDS[k] }); } };
+            place("gold3", 1 + Math.floor(level / 3)); place("gold2", 3); place("gold1", 5); place("rock2", 2 + Math.floor(level / 2)); place("rock1", 3); place("gem", Math.min(4, Math.floor(level / 2))); place("bag", 2); place("bone", 1);
+            target = 300 + level * 350 + (level - 1) * level * 60; time = 60; claw = { a: 0, dir: 1, len: 40, state: "swing", hold: null }; Kit.stat("level", level); Kit.stat("target", "$" + target);
+        }
+        function start() { level = 1; money = 0; dyn = 1; strength = 1; state = "play"; between = 0; build(); Kit.stat("money", "$0"); Kit.hide("start"); Kit.hide("over"); }
+        function fire() { if (state !== "play" || claw.state !== "swing" || between) return; claw.state = "out"; beep(220, 0.08, "square", 0.03, 120); }
+        function blast() { if (claw.state === "back" && claw.hold && dyn > 0) { dyn--; Kit.stat("dyn", "🧨".repeat(dyn) || "–"); fx.burst(claw.hold.x, claw.hold.y, "#ff7a3c", 30, 5); beep(70, 0.4, "sawtooth", 0.07); claw.hold = null; } }
+        function tip() { return [OX + Math.sin(claw.a) * claw.len, OY + Math.cos(claw.a) * claw.len]; }
+        function update(dt) {
+            if (between) return;
+            time -= dt; if (time <= 0) return endLevel();
+            if (claw.state === "swing") { claw.a += claw.dir * dt * 1.6; if (Math.abs(claw.a) > 1.25) claw.dir *= -1; }
+            else if (claw.state === "out") {
+                claw.len += 420 * dt; const [x, y] = tip();
+                if (x < 0 || x > W || y > H) claw.state = "back";
+                for (const it of items) if (Math.hypot(it.x - x, it.y - y) < it.r + 6) { claw.hold = it; items = items.filter((o) => o !== it); claw.state = "back"; beep(160, 0.06, "square", 0.04); break; }
+            } else if (claw.state === "back") {
+                const w = claw.hold ? claw.hold.w : 0.5; claw.len -= (380 / w) * strength * dt;
+                if (claw.hold) { const [x, y] = tip(); claw.hold.x = x + Math.sin(claw.a) * claw.hold.r * 0.7; claw.hold.y = y + Math.cos(claw.a) * claw.hold.r * 0.7; }
+                if (claw.len <= 40) {
+                    claw.len = 40; claw.state = "swing";
+                    if (claw.hold) { let v = claw.hold.v, label = `+$${v}`; if (claw.hold.k === "bag") { const r = Math.random(); if (r < 0.3) { dyn++; label = "🧨 +1"; Kit.stat("dyn", "🧨".repeat(dyn)); } else if (r < 0.45) { strength = 1.6; label = T("💪 Strength!", "💪 כוח!"); } else { v = Kit.pick([50, 100, 200, 400, 700]); label = `+$${v}`; } }
+                        money += v; Kit.stat("money", "$" + money); pops.push({ s: label, t: 1 }); v >= 300 ? tune([784, 1047, 1319], 0.06, "square", 0.05) : v > 30 ? beep(880, 0.08, "triangle", 0.04) : beep(220, 0.08, "triangle", 0.03); claw.hold = null; }
+                }
+            }
+            if (!items.some((i) => i.v > 30) && claw.state === "swing") time = Math.min(time, 0.01);
+        }
+        function endLevel() {
+            if (money >= target) { between = 1; tune([523, 659, 784, 1047], 0.08, "square", 0.05); Kit.save(Math.floor(money / 20)); Kit.setBest(BEST, money); setTimeout(() => { level++; between = 0; strength = 1; build(); }, 1800); }
+            else { state = "over"; Kit.save(Math.floor(money / 20)); const best = Kit.setBest(BEST, money); $("overText").innerHTML = `${T("You didn't reach the target", "לא הגעתם ליעד")} ($${target}).<br>${T("Level", "שלב")} ${level} · $${money} · ${T("best", "שיא")} $${best}`; Kit.show("over"); }
+        }
+        function drawItem(it) {
+            const { x, y, r } = it;
+            if (it.k.startsWith("gold")) { ctx.fillStyle = "#e0a52a"; ctx.beginPath(); for (let i = 0; i < 9; i++) { const a = (i / 9) * 7, rr = r * (0.82 + ((i * 37) % 7) / 30); ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.fill(); ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, 7); ctx.fill(); }
+            else if (it.k.startsWith("rock")) { ctx.fillStyle = "#6a6f80"; ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * 7, rr = r * (0.85 + ((i * 53) % 5) / 25); ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.fill(); ctx.fillStyle = "#8a8fa3"; ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.35, 0, 7); ctx.fill(); }
+            else if (it.k === "gem") { ctx.fillStyle = "#5cc8ff"; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.fill(); ctx.fillStyle = "#fff8"; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.4, y); ctx.lineTo(x, y); ctx.fill(); }
+            else if (it.k === "bag") { ctx.fillStyle = "#c08a4a"; ctx.beginPath(); ctx.arc(x, y + 3, r, 0, 7); ctx.fill(); ctx.fillStyle = "#8a5a2b"; ctx.fillRect(x - 6, y - r - 2, 12, 6); Kit.text(ctx, "?", x, y + 9, 16, "#fff", "center"); }
+            else { ctx.strokeStyle = "#eee"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.stroke(); ctx.fillStyle = "#eee"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(x + s * r, y - 4, 5, 0, 7); ctx.arc(x + s * r, y + 4, 5, 0, 7); ctx.fill(); } }
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, GROUND); g.addColorStop(0, "#8fd3ff"); g.addColorStop(1, "#d4f0ff"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, GROUND);
+            const e = ctx.createLinearGradient(0, GROUND, 0, H); e.addColorStop(0, "#a8743e"); e.addColorStop(1, "#5a3b22"); ctx.fillStyle = e; ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.fillStyle = "#7cc46a"; ctx.fillRect(0, GROUND - 6, W, 8);
+            ctx.fillStyle = "#00000014"; for (let i = 0; i < 50; i++) { ctx.beginPath(); ctx.arc((i * 137) % W, GROUND + 20 + ((i * 89) % (H - GROUND)), 3 + (i % 4), 0, 7); ctx.fill(); }
+            if (!items) return;
+            for (const it of items) drawItem(it);
+            // miner & winch
+            ctx.fillStyle = "#6b4a2a"; ctx.fillRect(OX - 40, OY - 30, 80, 24); ctx.fillStyle = "#8a6d3b"; ctx.beginPath(); ctx.arc(OX, OY - 18, 14, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(OX + 52, OY - 46, 12, 0, 7); ctx.fill(); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(OX + 52, OY - 50, 12, Math.PI, 0); ctx.fill(); ctx.fillStyle = "#2a74ff"; Kit.rr(ctx, OX + 40, OY - 34, 24, 28, 6); ctx.fill();
+            const [tx, ty] = tip(); ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(OX, OY - 10); ctx.lineTo(tx, ty); ctx.stroke();
+            if (claw.hold) drawItem(claw.hold);
+            ctx.save(); ctx.translate(tx, ty); ctx.rotate(-claw.a); ctx.strokeStyle = "#444"; ctx.lineWidth = 4; const open = claw.hold ? 0.2 : 0.6; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-12 * Math.sin(open + 0.4), 14); ctx.lineTo(-4, 22); ctx.moveTo(0, 0); ctx.lineTo(12 * Math.sin(open + 0.4), 14); ctx.lineTo(4, 22); ctx.stroke(); ctx.restore();
+            Kit.text(ctx, `$${money}`, 20, 34, 22, "#1a6a2a", "left", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, `${T("Target", "יעד")} $${target}`, 20, 62, 14, "#1a2a4a", "left");
+            Kit.text(ctx, `⏱ ${Math.ceil(Math.max(0, time))}`, W - 20, 34, 22, time < 10 ? "#d62b3a" : "#1a2a4a", "right");
+            Kit.text(ctx, "🧨".repeat(dyn), W - 20, 62, 16, "#000", "right");
+            for (const p of pops) Kit.text(ctx, p.s, OX, OY - 50 - (1 - p.t) * 40, 22, "#1a6a2a", "center");
+            fx.draw(ctx);
+            if (between) Kit.text(ctx, T("Target reached! ⛏️", "הגעתם ליעד! ⛏️"), W / 2, H / 2, 32, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (claw && claw.state === "back" && claw.hold) blast(); else fire(); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowDown: "go", Space: "go", ArrowUp: "blast", KeyX: "blast", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "go") fire(); if (a === "blast") blast(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); pops.forEach((p) => (p.t -= dt)); pops = pops.filter((p) => p.t > 0); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.gm = { get s() { return { state, money, level, claw: claw && claw.state }; }, start, fire };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Gold Miner</h2><p>A classic grabbing game. Your miner has a swinging claw on a long rope. Drop it at the right moment and it shoots down, grabbing whatever it touches: gold nuggets, sparkling diamonds, worthless rocks, old bones, or mystery bags. Heavy things take a long time to reel in, which wastes precious seconds, so choose your targets carefully. Collect enough money before the timer runs out to reach the next, harder level.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap / Space / ⬇</td><td>Drop the claw</td></tr><tr><td>Tap again / ⬆ / X</td><td>Use dynamite</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Big gold = big money, but slow to pull.</li><li>Use dynamite on rocks you grab by mistake.</li><li>Mystery bags can give money, dynamite or super strength.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Gold Miner</h3><p>Gold Miner is about value per second. Every grab costs time, and heavy things cost a lot more. A big gold nugget is worth it, but a big rock wastes ten seconds for almost nothing. Wait for the claw to swing to a good target before you drop it.</p><p>Diamonds are the best treasure: tiny, light and worth the most. Small gold is quick but cheap. Mystery bags are a gamble, but they can give extra dynamite or a strength boost that makes you reel everything in faster.</p><p>If you grab a rock, use dynamite to blow it up and get the claw back quickly. You start with one stick, and bags can give you more.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Reach level 3.</li><li><b>Getting good:</b> Grab a diamond.</li><li><b>Expert:</b> Reach level 6.</li></ul><h3>Did you know?</h3><p>The California Gold Rush began in 1848. Over the next few years about 300,000 people travelled there hoping to find gold.</p><h3>Questions players ask</h3><h4>How do I use dynamite?</h4><p>While the claw is pulling something up, tap again or press ⬆. It destroys what you're holding.</p><h4>What happens when time runs out?</h4><p>If you've reached the target you go to the next level. Otherwise the game ends.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/Hanoi/hanoi">Tower of Hanoi</a><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

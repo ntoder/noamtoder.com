@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A much deeper version of tic-tac-toe. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Ultimate Tic-Tac-Toe · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Ultimate <span>Tic-Tac-Toe</span></h1>
+        <div class="stats"><div class="stat"><b id="best">0</b><small>Wins</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Ultimate Tic-Tac-Toe</h2>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>The big board is made of 9 small tic-tac-toe boards. Win a small board to claim that square of the big board. Get three big squares in a row to win!<br>The twist: the square you pick inside a small board decides which small board your opponent must play in next. The glowing board shows where you can play.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Before you move, look at the board you'd be sending your opponent to. Don't send them where they can win!</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Ultimate Tic-Tac-Toe — nine small boards; where you play decides which board your opponent must play in next
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "ultimatetttBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const S = 540, OX = (W - S) / 2, OY = 70, B = S / 3, C = B / 3;
+        const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+        let cells, big, turn, forced, state = "ready", two = false, last = null, busy = false, diff = 1;
+        document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
+        Kit.stat("best", Kit.best(BEST));
+        function start() { cells = Array.from({ length: 9 }, () => Array(9).fill(0)); big = Array(9).fill(0); turn = 1; forced = -1; last = null; busy = false; state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        const win3 = (a) => { for (const [x, y, z] of LINES) if (a[x] && a[x] !== 3 && a[x] === a[y] && a[y] === a[z]) return a[x]; return a.every((v) => v) ? 3 : 0; };
+        function legal(cs = cells, bg = big, f = forced) { const out = []; const boards = f >= 0 && !bg[f] ? [f] : [...Array(9).keys()].filter((b) => !bg[b]); for (const b of boards) for (let i = 0; i < 9; i++) if (!cs[b][i]) out.push([b, i]); return out; }
+        function play(b, i) {
+            cells[b][i] = turn; last = [b, i]; beep(turn === 1 ? 520 : 390, 0.06, "triangle", 0.04);
+            const w = win3(cells[b]); if (w && !big[b]) { big[b] = w; if (w !== 3) tune([659, 880], 0.06, "square", 0.04); }
+            forced = big[i] ? -1 : i; turn = -turn;
+            if (real || !legal().length) return finish(real);
+            if (!two && turn === -1) { busy = true; setTimeout(cpu, 450); }
+        }
+        function winBig() { for (const [x, y, z] of LINES) if ((big[x] === 1 || big[x] === -1) && big[x] === big[y] && big[y] === big[z]) return big[x]; if (big.every((v) => v)) { const a = big.filter((v) => v === 1).length, c = big.filter((v) => v === -1).length; return a > c ? 1 : c > a ? -1 : 3; } return 0; }
+        function finish(w) { state = "over"; busy = false; tune(w === 1 || (two && w === -1) ? [523, 659, 784, 1047] : [392, 330, 262], 0.1, "triangle", 0.05); if (!two && w === 1) { Kit.save(100); Kit.setBest(BEST, (Kit.best(BEST) || 0) + 1); } setTimeout(() => { $("overText").innerHTML = w === 3 || !w ? T("🤝 It's a draw", "🤝 תיקו") : two ? (w === 1 ? T("❌ X wins!", "❌ איקס ניצח!") : T("⭕ O wins!", "⭕ עיגול ניצח!")) : w === 1 ? T("🏆 You win!", "🏆 ניצחתם!") : T("😢 The computer wins", "😢 המחשב ניצח"); Kit.show("over"); }, 900); }
+        function evalMove(b, i, p) {
+            const cs = cells.map((r) => r.slice()), bg = big.slice(); cs[b][i] = p; let s = Math.random() * 2;
+            const w = win3(cs[b]); if (w === p) { bg[b] = p; s += 30; for (const L of LINES) if (L.includes(b)) { const v = L.map((k) => bg[k]); if (v.filter((x) => x === p).length === 3) s += 1000; if (v.filter((x) => x === p).length === 2 && !v.includes(-p)) s += 15; } }
+            const opp = cs[b].slice(); opp[i] = -p; if (win3(opp) === -p) s += 18; // block
+            for (const L of LINES) if (L.includes(i)) { const v = L.map((k) => cs[b][k]); if (v.filter((x) => x === p).length === 2 && !v.includes(-p)) s += 4; }
+            if (i === 4) s += 2;
+            // sending opponent: bad if they can win that board or get a free choice
+            const nb = bg[i] ? -1 : i; if (nb < 0) s -= 12; else { for (let k = 0; k < 9; k++) if (!cs[nb][k]) { const t = cs[nb].slice(); t[k] = -p; if (win3(t) === -p) { s -= 14; break; } } }
+            return s;
+        }
+        function cpu() { if (state !== "play") return; let best = null, bs = -1e9; for (const [b, i] of legal()) { const s = evalMove(b, i, -1); if (s > bs) { bs = s; best = [b, i]; } } busy = false; play(best[0], best[1]); }
+        function tap(px, py) {
+            if (state !== "play" || busy || (!two && turn === -1)) return;
+            const b = Math.floor((px - OX) / B) + 3 * Math.floor((py - OY) / B), bx = (px - OX) % B, by = (py - OY) % B; if (px < OX || py < OY || px > OX + S || py > OY + S) return;
+            const i = Math.floor(bx / C) + 3 * Math.floor(by / C);
+            if (legal().some(([lb, li]) => lb === b && li === i)) play(b, i); else beep(150, 0.05, "square", 0.02);
+        }
+        function mark(v, x, y, s, lw) { ctx.lineWidth = lw; ctx.lineCap = "round"; if (v === 1) { ctx.strokeStyle = "#ff4d6d"; ctx.beginPath(); ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s); ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s); ctx.stroke(); } else if (v === -1) { ctx.strokeStyle = "#5cc8ff"; ctx.beginPath(); ctx.arc(x, y, s, 0, 7); ctx.stroke(); } }
+        function draw() {
+            ctx.fillStyle = "#14172e"; ctx.fillRect(0, 0, W, H);
+            if (!cells) return;
+            const allowed = state === "play" ? new Set(legal().map(([b]) => b)) : new Set();
+            for (let b = 0; b < 9; b++) {
+                const x0 = OX + (b % 3) * B, y0 = OY + Math.floor(b / 3) * B;
+                if (allowed.has(b) && (two || turn === 1)) { ctx.fillStyle = turn === 1 ? "#ff4d6d22" : "#5cc8ff22"; ctx.fillRect(x0 + 4, y0 + 4, B - 8, B - 8); }
+                ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 2; for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x0 + k * C, y0 + 10); ctx.lineTo(x0 + k * C, y0 + B - 10); ctx.moveTo(x0 + 10, y0 + k * C); ctx.lineTo(x0 + B - 10, y0 + k * C); ctx.stroke(); }
+                for (let i = 0; i < 9; i++) if (cells[b][i]) { const cx = x0 + (i % 3) * C + C / 2, cy = y0 + Math.floor(i / 3) * C + C / 2; mark(cells[b][i], cx, cy, C * 0.28, 5); if (last && last[0] === b && last[1] === i) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 2; ctx.strokeRect(cx - C / 2 + 4, cy - C / 2 + 4, C - 8, C - 8); } }
+                if (big[b] === 1 || big[b] === -1) { ctx.fillStyle = "#14172ecc"; ctx.fillRect(x0 + 4, y0 + 4, B - 8, B - 8); mark(big[b], x0 + B / 2, y0 + B / 2, B * 0.32, 14); }
+            }
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 5; for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(OX + k * B, OY); ctx.lineTo(OX + k * B, OY + S); ctx.moveTo(OX, OY + k * B); ctx.lineTo(OX + S, OY + k * B); ctx.stroke(); }
+            const who = two ? (turn === 1 ? T("❌ X's turn", "❌ תור האיקס") : T("⭕ O's turn", "⭕ תור העיגול")) : turn === 1 ? T("Your turn (❌)", "התור שלכם (❌)") : T("Computer is thinking…", "המחשב חושב…");
+            Kit.text(ctx, state === "play" ? who + (forced >= 0 && !big[forced] ? T(" · play in the glowing board", " · שחקו בלוח המואר") : T(" · play in any open board", " · שחקו בכל לוח פתוח")) : "", W / 2, 44, 18, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); tap(p.x, p.y); });
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.uttt = { get s() { return { state, turn, forced, big }; }, start, auto: () => { const go = () => { if (state !== "play") return; if (turn === 1 && !busy) { const m = Kit.pick(legal()); play(m[0], m[1]); } setTimeout(go, 120); }; go(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Ultimate Tic-Tac-Toe</h2><p>A much deeper version of tic-tac-toe. The board is a big 3×3 grid, and every square of it is a small tic-tac-toe game. Win a small game to claim its square on the big board, and get three big squares in a row to win the whole thing. The clever rule: wherever you play inside a small board, your opponent's next move must be in the matching small board. If that board is already finished, they can play anywhere. Play against the computer or a friend.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a square</td><td>Place your mark</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Every move is also a choice of where your opponent goes next.</li><li>Sending your rival to a finished board gives them a free choice: avoid it.</li><li>The centre board is the most valuable.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Ultimate Tic-Tac-Toe</h3><p>Ultimate Tic-Tac-Toe is about two things at once: winning small boards, and controlling where your opponent plays. Every square you choose sends them to a matching board. Before you move, check that board. Can they win it immediately? Then don't send them there.</p><p>Free moves are powerful. If you send your opponent to a board that's already won or full, they can play anywhere, which usually means they'll pick the best spot on the whole board. Try never to give them that.</p><p>Like normal tic-tac-toe, the centre board and the corners are the most valuable on the big board. Sometimes it's worth letting your opponent win a side board if it lets you take the centre.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a small board.</li><li><b>Getting good:</b> Beat the computer.</li><li><b>Expert:</b> Win against a friend.</li></ul><h3>Did you know?</h3><p>Ultimate Tic-Tac-Toe became popular among maths students in the 2010s. Unlike normal tic-tac-toe, nobody has worked out a perfect strategy for it yet.</p><h3>Questions players ask</h3><h4>Where can I play?</h4><p>In the glowing board. It's decided by where your opponent played last. If that board is finished, any open board glows.</p><h4>What if a small board is a tie?</h4><p>Nobody gets that big square.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/WaterSort/watersort">Water Sort</a><a href="/ZombieSurvival/zombies">Zombie Survival</a><a href="/Game2048/2048">2048</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

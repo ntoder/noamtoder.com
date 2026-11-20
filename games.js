@@ -123,6 +123,8 @@ export const GAMES = {
     slimevolley: { name: "Slime Volley", path: "/SlimeVolley/slimevolley", img: "/thumbs/slimevolley.png", tags: ["sports", "2p"], desc: "Bounce the ball over the net with your slime. First to 7 wins!", isNew: true },
     dodge: { name: "Dodge!", path: "/Dodge/dodge", img: "/thumbs/dodge.png", tags: ["arcade"], desc: "Dodge balls, lasers and homing stars. How long can you survive?", isNew: true },
     watersort: { name: "Water Sort", path: "/WaterSort/watersort", img: "/thumbs/watersort.png", tags: ["puzzle", "relaxing"], desc: "Pour coloured water between tubes until every tube is one colour.", isNew: true },
+    goldminer: { name: "Gold Miner", path: "/GoldMiner/goldminer", img: "/thumbs/goldminer.png", tags: ["arcade"], desc: "Swing the claw, grab gold and gems, and hit each level's money target.", isNew: true },
+    ultimatetictactoe: { name: "Ultimate Tic-Tac-Toe", path: "/UltimateTicTacToe/ultimatettt", img: "/thumbs/ultimatetictactoe.png", tags: ["board", "strategy", "2p"], desc: "Tic-tac-toe made of nine tic-tac-toes. Every move sends your rival somewhere!", isNew: true },
 };
 
 // Games that only count plays (no score)
