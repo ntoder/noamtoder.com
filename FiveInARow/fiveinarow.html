@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic strategy game played on a 15 by 15 grid, also known as Gomoku. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Five in a Row · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Five <span>in a Row</span></h1>
+        <div class="stats"><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Five in a Row</h2>
+                <p id="startText">Take turns placing stones on the board. The first player to get five stones in a straight line, across, down or diagonally, wins!<br>You play black and go first.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Block the computer when it has three in a row with both ends open. If you wait until four, it's usually too late.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Five in a Row — get five stones in a line before the computer does
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "gomokuBest";
+        const N = 15, CS = 38, OX = (W - (N - 1) * CS) / 2, OY = 90;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let b, turn, state = "ready", last = null, win = null, aiT = 0, moves = 0;
+        Kit.stat("best", Kit.best(BEST));
+        const DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+        function line(r, c, p) {
+            for (const [dr, dc] of DIRS) {
+                const cells = [[r, c]];
+                for (const s of [1, -1]) { let rr = r + dr * s, cc = c + dc * s; while (inside(rr, cc) && b[rr][cc] === p) { cells.push([rr, cc]); rr += dr * s; cc += dc * s; } }
+                if (cells.length >= 5) return cells;
+            }
+            return null;
+        }
+        // score a point for player p: longer, more open lines are worth more
+        function scoreAt(r, c, p) {
+            let total = 0;
+            for (const [dr, dc] of DIRS) {
+                let cnt = 1, open = 0;
+                for (const s of [1, -1]) { let rr = r + dr * s, cc = c + dc * s; while (inside(rr, cc) && b[rr][cc] === p) { cnt++; rr += dr * s; cc += dc * s; } if (inside(rr, cc) && !b[rr][cc]) open++; }
+                if (cnt >= 5) total += 1e6;
+                else if (cnt === 4) total += open === 2 ? 1e5 : open ? 1e4 : 0;
+                else if (cnt === 3) total += open === 2 ? 5000 : open ? 400 : 0;
+                else if (cnt === 2) total += open === 2 ? 200 : open ? 30 : 0;
+                else total += open * 2;
+            }
+            return total;
+        }
+        function aiMove() {
+            let best = null, bs = -1;
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+                if (b[r][c]) continue;
+                let near = false; for (let dr = -2; dr <= 2 && !near; dr++) for (let dc = -2; dc <= 2; dc++) if (inside(r + dr, c + dc) && b[r + dr][c + dc]) { near = true; break; }
+                if (!near) continue;
+                const s = scoreAt(r, c, -1) * 1.1 + scoreAt(r, c, 1) + Math.random() * 5;
+                if (s > bs) { bs = s; best = [r, c]; }
+            }
+            if (!best) best = [7, 7];
+            place(best[0], best[1]);
+        }
+        function place(r, c) {
+            if (b[r][c] || state !== "play") return false;
+            b[r][c] = turn; last = [r, c]; moves++; beep(turn === 1 ? 600 : 420, 0.05, "triangle", 0.04);
+            const l = line(r, c, turn);
+            if (l) { win = l; return end(turn === 1); }
+            if (moves >= N * N) return end(null);
+            turn = -turn; aiT = 0; return true;
+        }
+        function end(youWin) {
+            state = "over";
+            const sc = youWin ? 1000 + Math.max(0, 120 - moves) * 8 : youWin === null ? 200 : moves * 2;
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `<b style="font-size:20px">${youWin ? T("🏆 Five in a row! You win!", "🏆 חמש ברצף! ניצחתם!") : youWin === null ? T("🤝 Draw", "🤝 תיקו") : T("😢 The computer got five", "😢 למחשב יש חמש")}</b><br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
+            tune(youWin ? [523, 659, 784, 1047] : [392, 330, 262], 0.13, "triangle", 0.05);
+            setTimeout(() => Kit.show("over"), 1100); return true;
+        }
+        function start() { b = Array.from({ length: N }, () => new Array(N).fill(0)); turn = 1; last = null; win = null; moves = 0; state = "play"; Kit.hide("start"); Kit.hide("over"); }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#e8bf7a"; Kit.rr(ctx, OX - 26, OY - 26, (N - 1) * CS + 52, (N - 1) * CS + 52, 12); ctx.fill();
+            ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 1.2;
+            for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.moveTo(OX + i * CS, OY); ctx.lineTo(OX + i * CS, OY + (N - 1) * CS); ctx.moveTo(OX, OY + i * CS); ctx.lineTo(OX + (N - 1) * CS, OY + i * CS); ctx.stroke(); }
+            for (const [r, c] of [[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]]) { ctx.fillStyle = "#8a5a2b"; ctx.beginPath(); ctx.arc(OX + c * CS, OY + r * CS, 3.5, 0, 7); ctx.fill(); }
+            if (!b) return;
+            Kit.text(ctx, state === "play" ? (turn === 1 ? T("Your turn (black)", "התור שלכם (שחור)") : T("Computer is thinking…", "המחשב חושב…")) : "", W / 2, 40, 20, "#ffc94d", "center");
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+                const v = b[r][c]; if (!v) continue;
+                const x = OX + c * CS, y = OY + r * CS, g = ctx.createRadialGradient(x - 5, y - 6, 2, x, y, CS * 0.45);
+                g.addColorStop(0, v === 1 ? "#666" : "#fff"); g.addColorStop(1, v === 1 ? "#111" : "#d6d6d6");
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, CS * 0.44, 0, 7); ctx.fill();
+                if (last && last[0] === r && last[1] === c) { ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill(); }
+            }
+            if (win) { ctx.strokeStyle = "#ff4d6d"; ctx.lineWidth = 5; const s = win.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); ctx.beginPath(); ctx.moveTo(OX + s[0][1] * CS, OY + s[0][0] * CS); ctx.lineTo(OX + s[s.length - 1][1] * CS, OY + s[s.length - 1][0] * CS); ctx.stroke(); }
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play" || turn !== 1) return;
+            const p = Kit.point(cv, e), c = Math.round((p.x - OX) / CS), r = Math.round((p.y - OY) / CS);
+            if (inside(r, c)) place(r, c);
+        });
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play" && turn === -1) { aiT += dt; if (aiT > 0.45) { aiT = -99; aiMove(); } } draw(); }).start();
+        if (window.__test) window.__test.gomoku = { get s() { return { b, turn, state }; }, place, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Five in a Row</h2><p>A classic strategy game played on a 15 by 15 grid, also known as Gomoku. You and the computer take turns placing stones, and the first to make an unbroken line of five wins. It's easy to learn, but the computer attacks and defends at the same time, so you'll need to spot threats early and build two lines at once to beat it.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap a crossing</td><td>Place a stone</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>An open three (empty at both ends) is a big threat. Block it!</li><li>Make two threats at once so the computer can only stop one.</li><li>Play near the middle at the start, where there's room to build.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Five in a Row</h3><p>Five in a Row is all about threats. A line of three with empty spaces at both ends is called an open three, and if you don't block it, it becomes an open four, which can't be stopped. So the first rule is: whenever the computer makes an open three, block one end straight away.</p><p>To win, you need to create two threats with a single stone, like an open three and a four at the same time. The computer can only block one of them, and you win with the other. Look for spots where two of your lines cross.</p><p>Stay close to your other stones and near the middle of the board. Stones on the edge have less room to grow into lines of five.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win your first game by blocking every open three.</li><li><b>Getting good:</b> Try to win in fewer than 30 moves.</li><li><b>Expert:</b> Set up a double threat on purpose.</li></ul><h3>Did you know?</h3><p>Gomoku has been played in Japan for hundreds of years on the same board as the game Go. Computer scientists proved in 1993 that on a 15 by 15 board, the first player can always win with perfect play.</p><h3>Questions players ask</h3><h4>Who goes first?</h4><p>You do, with black stones.</p><h4>Do six in a row count?</h4><p>Yes, any line of five or more wins.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Reversi/reversi">Reversi</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Memory/memory">Memory Match</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

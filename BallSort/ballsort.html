@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A calm color-sorting puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Ball Sort · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Ball <span>Sort</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Ball Sort</h2>
+                <p id="startText">Tap a tube to pick up its top ball, then tap another tube to drop it.<br>A ball can only go on top of the same color, or into an empty tube.<br>Get every color into its own tube!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Use the empty tubes as parking spots, and try to finish one color at a time.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Ball Sort — sort the colored balls so each tube holds one color
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "ballsortBest";
+        const CAP = 4, BR = 20;
+        const COLS = ["#ff4d6d", "#ffc94d", "#2ee6a0", "#4da3ff", "#b07cff", "#ff8a3d", "#4de8ff", "#f15bb5", "#9ef01a", "#ffffff", "#8b5a2b", "#1d5fd0"];
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let tubes, sel = -1, level = 1, moves = 0, hist = [], score = 0, state = "ready", anim = null, fx = Kit.particles(), won = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function newLevel() {
+            const n = Math.min(COLS.length, 2 + level);
+            let balls = []; for (let c = 0; c < n; c++) for (let k = 0; k < CAP; k++) balls.push(c);
+            do { balls.sort(() => Math.random() - 0.5); } while (isSolved(chunk(balls, n)));
+            tubes = chunk(balls, n); tubes.push([], []);
+            sel = -1; moves = 0; hist = []; won = 0;
+            Kit.stat("level", level); Kit.stat("moves", 0);
+        }
+        const chunk = (b, n) => Array.from({ length: n }, (_, i) => b.slice(i * CAP, i * CAP + CAP));
+        const isSolved = (ts) => ts.every((t) => t.length === 0 || (t.length === CAP && t.every((x) => x === t[0])));
+        function layout() {
+            const n = tubes.length, perRow = n > 7 ? Math.ceil(n / 2) : n, rows = Math.ceil(n / perRow);
+            const tw = BR * 2 + 14, gap = Math.min(30, (W - perRow * tw) / (perRow + 1)), th = CAP * BR * 2 + 26;
+            return tubes.map((_, i) => { const r = Math.floor(i / perRow), c = i % perRow, cnt = Math.min(perRow, n - r * perRow); const x0 = (W - (cnt * tw + (cnt - 1) * gap)) / 2; return { x: x0 + c * (tw + gap), y: 150 + r * (th + 50) + (rows === 1 ? 60 : 0), w: tw, h: th }; });
+        }
+        function canMove(a, b) { const A = tubes[a], B = tubes[b]; return a !== b && A.length && B.length < CAP && (!B.length || B[B.length - 1] === A[A.length - 1]); }
+        function tap(i) {
+            if (state !== "play" || anim || won) return;
+            if (sel < 0) { if (tubes[i].length) { sel = i; beep(520, 0.04, "sine", 0.03); } return; }
+            if (i === sel) { sel = -1; return; }
+            if (!canMove(sel, i)) { beep(150, 0.08, "square", 0.03); sel = tubes[i].length ? i : -1; return; }
+            hist.push(tubes.map((t) => t.slice()));
+            const c = tubes[sel].pop(); tubes[i].push(c); moves++; Kit.stat("moves", moves);
+            const L = layout(); anim = { c, from: L[sel], to: L[i], fi: tubes[sel].length, ti: tubes[i].length - 1, t: 0 };
+            sel = -1; beep(660, 0.05, "triangle", 0.04);
+            const t = tubes[i]; if (t.length === CAP && t.every((x) => x === t[0])) { const p = L[i]; setTimeout(() => { fx.burst(p.x + p.w / 2, p.y + 20, COLS[t[0]], 18, 3); tune([784, 1047], 0.06, "triangle", 0.04); }, 200); }
+            if (isSolved(tubes)) {
+                won = 1; const pts = 100 + Math.max(0, (level + 3) * 6 - moves) * 5; score += pts; Kit.stat("score", score);
+                Kit.save(score); Kit.setBest(BEST, score);
+                setTimeout(() => { tune([523, 659, 784, 1047], 0.1, "square", 0.05); won = 2; }, 400);
+            }
+        }
+        function undo() { if (hist.length && !won) { tubes = hist.pop(); sel = -1; moves++; Kit.stat("moves", moves); } }
+        const BTN = { undo: { x: 20, y: H - 64, w: 120, h: 44 }, restart: { x: W - 140, y: H - 64, w: 120, h: 44 }, next: { x: W / 2 - 90, y: H - 70, w: 180, h: 50 } };
+        const inB = (p, b) => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1b1f4a"); g.addColorStop(1, "#0b0d1a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!tubes) return;
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, 50, 30, "#fff", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, T("Tap a tube, then tap where the top ball should go", "הקישו על מבחנה ואז על המקום שאליו הכדור העליון יעבור"), W / 2, 96, 14, "#9aa0c8", "center");
+            const L = layout();
+            tubes.forEach((t, i) => {
+                const p = L[i], lift = i === sel ? 1 : 0;
+                ctx.fillStyle = "#ffffff12"; Kit.rr(ctx, p.x, p.y, p.w, p.h, 18); ctx.fill();
+                ctx.strokeStyle = i === sel ? "#ffc94d" : "#ffffff55"; ctx.lineWidth = 3; Kit.rr(ctx, p.x, p.y, p.w, p.h, 18); ctx.stroke();
+                t.forEach((c, k) => {
+                    if (anim && anim.to === p && k === t.length - 1) return;
+                    const top = lift && k === t.length - 1;
+                    ball(p.x + p.w / 2, top ? p.y - BR - 8 : p.y + p.h - 10 - BR - k * BR * 2, c);
+                });
+            });
+            if (anim) { const a = anim, e = Math.min(1, a.t); const sx = a.from.x + a.from.w / 2, sy = a.from.y - BR - 8, ex = a.to.x + a.to.w / 2, ey = a.to.y + a.to.h - 10 - BR - a.ti * BR * 2; const x = sx + (ex - sx) * e, y = e < 0.5 ? sy - Math.sin(e * Math.PI) * 30 : sy + (ey - sy) * ((e - 0.5) * 2) ** 2; ball(x, y, a.c); }
+            btn(BTN.undo, "↶ " + T("Undo", "ביטול")); btn(BTN.restart, "⟲ " + T("Restart", "מחדש"));
+            if (won === 2) { ctx.fillStyle = "#0b0d1acc"; ctx.fillRect(0, H / 2 - 70, W, 140); Kit.text(ctx, T("Sorted! 🎉", "מסודר! 🎉"), W / 2, H / 2 - 20, 30, "#ffc94d", "center", "'Press Start 2P', monospace", 400); Kit.text(ctx, `${moves} ${T("moves", "מהלכים")}`, W / 2, H / 2 + 24, 16, "#fff", "center"); btn(BTN.next, T("Next level ▶", "השלב הבא ▶"), "#7c5cff"); }
+            fx.draw(ctx);
+        }
+        function ball(x, y, c) { const gr = ctx.createRadialGradient(x - 6, y - 7, 2, x, y, BR); gr.addColorStop(0, "#ffffffcc"); gr.addColorStop(0.3, COLS[c]); gr.addColorStop(1, COLS[c]); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, BR - 1, 0, 7); ctx.fill(); }
+        function btn(b, label, col = "#2a2f6a") { ctx.fillStyle = col; Kit.rr(ctx, b.x, b.y, b.w, b.h, 12); ctx.fill(); Kit.text(ctx, label, b.x + b.w / 2, b.y + b.h / 2, 16, "#fff", "center"); }
+        cv.addEventListener("pointerdown", (e) => {
+            const p = Kit.point(cv, e);
+            if (state !== "play") return;
+            if (won === 2) { if (inB(p, BTN.next)) { level++; newLevel(); } return; }
+            if (inB(p, BTN.undo)) return undo();
+            if (inB(p, BTN.restart)) { if (hist.length) { tubes = hist[0]; hist = []; sel = -1; moves = 0; Kit.stat("moves", 0); } return; }
+            layout().forEach((r, i) => { if (p.x > r.x - 8 && p.x < r.x + r.w + 8 && p.y > r.y - 50 && p.y < r.y + r.h + 10) tap(i); });
+        });
+        Kit.onKeys({ KeyZ: "undo", Backspace: "undo", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "undo") undo(); else if (a === "enter" && won === 2) { level++; newLevel(); } });
+        function start() { level = 1; score = 0; state = "play"; Kit.stat("score", 0); newLevel(); Kit.hide("start"); }
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (anim) { anim.t += dt * 4; if (anim.t >= 1) anim = null; } fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.ballsort = { get s() { return { tubes, level, won, moves }; }, tap, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Ball Sort</h2><p>A calm color-sorting puzzle. The balls are mixed up across the tubes, and your job is to sort them so each tube holds just one color. You can only move the top ball, and it can only land on a ball of the same color or in an empty tube. Every level adds another color, so planning ahead matters more and more.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap or click a tube</td><td>Pick up the top ball</td></tr><tr><td>Tap another tube</td><td>Drop it there</td></tr><tr><td>Z</td><td>Undo</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Keep at least one tube empty for as long as you can.</li><li>Finish one color completely before starting the next.</li><li>Undo is free, so experiment!</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Ball Sort</h3><p>Ball Sort looks simple, but the later levels need planning. The empty tubes are your most valuable tool: they let you park a ball while you dig down to the color you need. Try to keep one tube empty for as long as you can, and only fill it when it finishes a color.</p><p>Work on one color at a time. Pick a color that is already near the top of several tubes, gather it into one tube, and then move on. Every completed tube is one less thing to worry about.</p><p>If you get stuck, use Undo to step back a few moves instead of restarting. Often a single different move early on opens up the whole puzzle.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Levels 1 to 3 have only a few colors. Learn how parking balls works.</li><li><b>Getting good:</b> From level 4, plan two or three moves ahead.</li><li><b>Expert:</b> Later levels have many colors and only two empty tubes, so every move counts.</li></ul><h3>Did you know?</h3><p>Sorting is one of the most studied problems in computer science. Programs use clever sorting methods like quicksort and merge sort to put millions of items in order in a fraction of a second.</p><h3>Questions players ask</h3><h4>Can every level be solved?</h4><p>Yes, there are always two empty tubes, which is enough to sort the balls.</p><h4>How do I get more points?</h4><p>Solve each level in fewer moves for a bigger bonus.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

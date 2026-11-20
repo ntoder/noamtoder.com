@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The classic pencil-and-paper game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Dots and Boxes · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Dots <span>&amp; Boxes</span></h1>
+        <div class="stats"><div class="stat"><b id="you">0</b><small>You</small></div><div class="stat"><b id="cpu">0</b><small>Computer</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Dots and Boxes</h2>
+                <p id="startText">Take turns drawing a line between two dots. If your line closes a box, you win that box and get another turn!<br>Whoever owns the most boxes at the end wins.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Never draw the third side of a box unless you have to: the computer will close it and keep going.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Dots and Boxes — draw lines, close boxes, beat the computer
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "dotsboxesBest";
+        const N = 5, GAP = 90, OX = (W - N * GAP) / 2, OY = 130;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        let hl, vl, box, turn, state = "ready", score, aiT = 0, hover = null, lastLine = null;
+        Kit.stat("best", Kit.best(BEST));
+        // hl[r][c]: horizontal line from dot (r,c) to (r,c+1); vl[r][c]: vertical from (r,c) to (r+1,c)
+        function start() {
+            hl = Array.from({ length: N + 1 }, () => new Array(N).fill(0));
+            vl = Array.from({ length: N }, () => new Array(N + 1).fill(0));
+            box = Array.from({ length: N }, () => new Array(N).fill(0));
+            turn = 1; score = [0, 0]; state = "play"; stats(); Kit.hide("start"); Kit.hide("over");
+        }
+        const sides = (r, c) => hl[r][c] + hl[r + 1][c] + (vl[r][c] ? 1 : 0) + (vl[r][c + 1] ? 1 : 0);
+        const sidesSet = (r, c) => (hl[r][c] ? 1 : 0) + (hl[r + 1][c] ? 1 : 0) + (vl[r][c] ? 1 : 0) + (vl[r][c + 1] ? 1 : 0);
+        function boxesOf(l) { const out = []; if (l.h) { if (l.r > 0) out.push([l.r - 1, l.c]); if (l.r < N) out.push([l.r, l.c]); } else { if (l.c > 0) out.push([l.r, l.c - 1]); if (l.c < N) out.push([l.r, l.c]); } return out; }
+        function draw1(l) {
+            if (l.h ? hl[l.r][l.c] : vl[l.r][l.c]) return false;
+            if (l.h) hl[l.r][l.c] = turn; else vl[l.r][l.c] = turn;
+            lastLine = l;
+            let closed = 0;
+            for (const [r, c] of boxesOf(l)) if (sidesSet(r, c) === 4) { box[r][c] = turn; closed++; score[turn === 1 ? 0 : 1]++; }
+            beep(closed ? 880 : 500, 0.05, "triangle", 0.04);
+            if (closed) tune([660, 880], 0.05, "square", 0.03);
+            if (score[0] + score[1] === N * N) return end();
+            if (!closed) turn = -turn;
+            aiT = 0; stats(); return true;
+        }
+        function allLines() { const out = []; for (let r = 0; r <= N; r++) for (let c = 0; c < N; c++) if (!hl[r][c]) out.push({ h: 1, r, c }); for (let r = 0; r < N; r++) for (let c = 0; c <= N; c++) if (!vl[r][c]) out.push({ h: 0, r, c }); return out; }
+        function aiMove() {
+            const ls = allLines();
+            // 1. complete a box  2. a safe line that doesn't give a box away  3. the line that gives away the fewest
+            const closes = ls.find((l) => boxesOf(l).some(([r, c]) => sidesSet(r, c) === 3));
+            if (closes) return draw1(closes);
+            const safe = ls.filter((l) => boxesOf(l).every(([r, c]) => sidesSet(r, c) < 2));
+            if (safe.length) return draw1(Kit.pick(safe));
+            let best = null, bc = 1e9;
+            for (const l of ls) { const c = giveaway(l); if (c < bc) { bc = c; best = l; } }
+            draw1(best);
+        }
+        function giveaway(l) {
+            // simulate: how many boxes could the opponent then take in a row?
+            const saveH = hl.map((x) => x.slice()), saveV = vl.map((x) => x.slice());
+            if (l.h) hl[l.r][l.c] = 9; else vl[l.r][l.c] = 9;
+            let n = 0, again = true;
+            while (again) { again = false; for (const m of allLines()) if (boxesOf(m).some(([r, c]) => sidesSet(r, c) === 3)) { if (m.h) hl[m.r][m.c] = 9; else vl[m.r][m.c] = 9; n++; again = true; break; } }
+            hl = saveH; vl = saveV; return n;
+        }
+        function stats() { Kit.stat("you", score[0]); Kit.stat("cpu", score[1]); }
+        function end() {
+            state = "over"; stats();
+            const [y, c] = score, sc = y > c ? 600 + (y - c) * 30 : y * 20;
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `<b style="font-size:20px">${y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 Draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
+            tune(y > c ? [523, 659, 784, 1047] : [392, 330, 262], 0.13, "triangle", 0.05);
+            setTimeout(() => Kit.show("over"), 700); return true;
+        }
+        function nearest(p) {
+            let best = null, bd = 22;
+            for (let r = 0; r <= N; r++) for (let c = 0; c < N; c++) { const d = Math.hypot(p.x - (OX + c * GAP + GAP / 2), p.y - (OY + r * GAP)); if (d < bd && !hl[r][c]) { bd = d; best = { h: 1, r, c }; } }
+            for (let r = 0; r < N; r++) for (let c = 0; c <= N; c++) { const d = Math.hypot(p.x - (OX + c * GAP), p.y - (OY + r * GAP + GAP / 2)); if (d < bd && !vl[r][c]) { bd = d; best = { h: 0, r, c }; } }
+            return best;
+        }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!hl) return;
+            Kit.text(ctx, state === "play" ? (turn === 1 ? T("Your turn", "התור שלכם") : T("Computer's turn", "תור המחשב")) : "", W / 2, 50, 22, turn === 1 ? "#4da3ff" : "#ff4d6d", "center");
+            Kit.text(ctx, T("Close a box to score and go again", "סגרו ריבוע כדי לקבל נקודה ותור נוסף"), W / 2, 86, 14, "#9aa0c8", "center");
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (box[r][c]) { ctx.fillStyle = box[r][c] === 1 ? "#4da3ff55" : "#ff4d6d55"; ctx.fillRect(OX + c * GAP + 4, OY + r * GAP + 4, GAP - 8, GAP - 8); Kit.text(ctx, box[r][c] === 1 ? "🙂" : "🤖", OX + c * GAP + GAP / 2, OY + r * GAP + GAP / 2, 28, "#fff", "center"); }
+            const seg = (x1, y1, x2, y2, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+            for (let r = 0; r <= N; r++) for (let c = 0; c < N; c++) { const v = hl[r][c]; if (v) seg(OX + c * GAP, OY + r * GAP, OX + (c + 1) * GAP, OY + r * GAP, v === 1 ? "#4da3ff" : "#ff4d6d", lastLine && lastLine.h && lastLine.r === r && lastLine.c === c ? 9 : 7); }
+            for (let r = 0; r < N; r++) for (let c = 0; c <= N; c++) { const v = vl[r][c]; if (v) seg(OX + c * GAP, OY + r * GAP, OX + c * GAP, OY + (r + 1) * GAP, v === 1 ? "#4da3ff" : "#ff4d6d", lastLine && !lastLine.h && lastLine.r === r && lastLine.c === c ? 9 : 7); }
+            if (hover && turn === 1 && state === "play") { const l = hover; if (l.h) seg(OX + l.c * GAP, OY + l.r * GAP, OX + (l.c + 1) * GAP, OY + l.r * GAP, "#ffffff44", 7); else seg(OX + l.c * GAP, OY + l.r * GAP, OX + l.c * GAP, OY + (l.r + 1) * GAP, "#ffffff44", 7); }
+            for (let r = 0; r <= N; r++) for (let c = 0; c <= N; c++) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(OX + c * GAP, OY + r * GAP, 7, 0, 7); ctx.fill(); }
+        }
+        cv.addEventListener("pointermove", (e) => { hover = nearest(Kit.point(cv, e)); });
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || turn !== 1) return; const l = nearest(Kit.point(cv, e)); if (l) draw1(l); });
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play" && turn === -1) { aiT += dt; if (aiT > 0.5) { aiT = 0; aiMove(); } } draw(); }).start();
+        if (window.__test) window.__test.dots = { get s() { return { score, turn, state }; }, aiMove, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Dots and Boxes</h2><p>The classic pencil-and-paper game. You and the computer take turns joining two neighbouring dots with a line. Draw the fourth side of a box and you claim it and play again. Early on it's a game of patience, avoiding giving away boxes. At the end, long chains of boxes open up, and the player who forces the other to open them usually wins.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap between two dots</td><td>Draw a line</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Don't draw the third side of any box.</li><li>Count the chains near the end: make the computer open the long ones.</li><li>Sometimes giving away two boxes lets you keep control of a long chain.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Dots and Boxes</h3><p>In the beginning, the safe move is any line that doesn't make a box with three sides. As long as both players play safely, nobody scores. Sooner or later, though, every remaining move gives something away, and that's when the real game starts.</p><p>By then the board has turned into chains, rows of boxes that are connected. When one box in a chain is opened, the other player can take the whole chain. So when you're forced to give something away, give away the shortest chain.</p><p>Expert players use a trick: when taking a long chain, they leave the last two boxes for the opponent by drawing the line that splits them. The opponent takes two boxes but then has to open the next chain. Try it against the computer!</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win by never drawing the third side of a box.</li><li><b>Getting good:</b> Count chains and always give away the shortest one.</li><li><b>Expert:</b> Use the 'leave two boxes' trick to stay in control.</li></ul><h3>Did you know?</h3><p>Dots and Boxes was first described in 1889 by the French mathematician Édouard Lucas, who also invented the Tower of Hanoi puzzle.</p><h3>Questions players ask</h3><h4>Why do I get another turn?</h4><p>Closing a box always gives you an extra move. You can chain several boxes in one turn.</p><h4>How big is the board?</h4><p>Five by five boxes, so 25 boxes in total.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/FiveInARow/fiveinarow">Five in a Row</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

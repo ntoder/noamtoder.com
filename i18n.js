@@ -26,7 +26,7 @@ const NAMES = {
     "Motor Racing": "מרוץ אופנועים", "Soccer": "כדורגל",
     "Penalty Shootout": "דו־קרב פנדלים", "Keepy Uppy": "ג'אגלינג", "Mini Golf": "מיני גולף", "Bowling": "באולינג", "Tennis": "טניס",
     "Air Hockey": "הוקי אוויר", "Hoop Shot": "קליעה לסל", "Gem Swap": "החלפת יהלומים", "Sky Climber": "מטפס השמיים", "Fruit Slash": "חיתוך פירות",
-    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Noam Football": "הכדורגל של נועם", "Noam Pool": "הביליארד של נועם", "Bubble Pop": "פיצוץ בועות", "Block Fit": "בלוק פיט", "Fruit Merge": "מיזוג פירות", "Snake Arena": "זירת הנחשים", "Road Hopper": "קפצן הכביש", "Hill Rider": "רוכב הגבעות", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
+    "Header Hero": "מלך הנגיחות", "5-a-Side": "כדורגל 5 על 5", "5-a-Side Football": "כדורגל 5 על 5", "Noam Football": "הכדורגל של נועם", "Noam Pool": "הביליארד של נועם", "Bubble Pop": "פיצוץ בועות", "Block Fit": "בלוק פיט", "Fruit Merge": "מיזוג פירות", "Snake Arena": "זירת הנחשים", "Road Hopper": "קפצן הכביש", "Hill Rider": "רוכב הגבעות", /*ngn:fiveinarow*/"Five in a Row": "חמש ברצף", /*ngn:dotsboxes*/"Dots and Boxes": "נקודות וריבועים", /*ngn:reversi*/"Reversi": "רברסי", /*ngn:ballsort*/"Ball Sort": "מיון כדורים", "Checkers": "דמקה", "Sudoku": "סודוקו", "Solitaire": "סוליטר", "Sea Battle": "קרב ימי",
     "Castle Defense": "הגנת הטירה", "Word Guess": "נחשו את המילה", "Word Search": "תפזורת", "Flag Quiz": "חידון דגלים", "Rhythm Tap": "קצב",
     "Idle Bakery": "המאפייה", "Pixel Paint": "ציור פיקסלים", "Tank Battle": "קרב טנקים", "Fishing Frenzy": "טירוף דיג", "Maze Escape": "בריחה מהמבוך"
 };
@@ -395,6 +395,11 @@ Object.assign(TEXT, {
  "Or without Terminal": "או בלי Terminal",
  "Privacy": "פרטיות"
 });
+// ---- ng names ----
+/*ng:fiveinarow*/Object.assign(TEXT, {"Five in a Row": "חמש ברצף", "Line up five stones before the computer does.": "סדרו חמש אבנים בשורה לפני המחשב."});
+/*ng:dotsboxes*/Object.assign(TEXT, {"Dots and Boxes": "נקודות וריבועים", "Draw lines, close boxes and outsmart the computer.": "ציירו קווים, סגרו ריבועים ותערימו על המחשב."});
+/*ng:reversi*/Object.assign(TEXT, {"Reversi": "רברסי", "Flip your opponent's discs and own the board.": "הפכו את הדסקיות של היריב ושלטו בלוח."});
+/*ng:ballsort*/Object.assign(TEXT, {"Ball Sort": "מיון כדורים", "Sort the colored balls into matching tubes.": "מיינו את הכדורים הצבעוניים למבחנות תואמות."});
 const INFO = {
     "Noametry is the original game of the hub. Your square slides along a never-ending track full of spikes and blocks, and one well-timed jump is the difference between a new record and starting over. The track speeds up as your score climbs, so every run feels a little more intense than the last.":
         "נועמטרי הוא המשחק המקורי של האתר. הריבוע שלכם מחליק על מסלול אינסופי מלא קוצים ובלוקים, וקפיצה אחת בזמן הנכון היא ההבדל בין שיא חדש להתחלה מחדש. המסלול מאיץ ככל שהניקוד עולה, כך שכל ריצה מרגישה קצת יותר מותחת מהקודמת.",

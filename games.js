@@ -63,6 +63,10 @@ export const GAMES = {
     snakearena:   { name: "Snake Arena", path: "/SnakeArena/snakearena", img: "/thumbs/snakearena.png",   tags: ["arcade"],             desc: "Grow your snake and outsmart 15 rivals.", isNew: true },
     roadhopper:   { name: "Road Hopper", path: "/RoadHopper/roadhopper", img: "/thumbs/roadhopper.png",   tags: ["arcade", "runner"],   desc: "Hop across roads, rivers and train tracks.", isNew: true },
     hillrider:    { name: "Hill Rider", path: "/HillRider/hillrider",   img: "/thumbs/hillrider.png",    tags: ["sports", "arcade"],   desc: "Drive over the hills, do flips, upgrade your car.", isNew: true },
+    ballsort: { name: "Ball Sort", path: "/BallSort/ballsort", img: "/thumbs/ballsort.png", tags: ["puzzle"], desc: "Sort the colored balls into matching tubes.", isNew: true },
+    reversi: { name: "Reversi", path: "/Reversi/reversi", img: "/thumbs/reversi.png", tags: ["puzzle", "brain"], desc: "Flip your opponent's discs and own the board.", isNew: true },
+    dotsboxes: { name: "Dots and Boxes", path: "/DotsBoxes/dotsboxes", img: "/thumbs/dotsboxes.png", tags: ["puzzle", "brain"], desc: "Draw lines, close boxes and outsmart the computer.", isNew: true },
+    fiveinarow: { name: "Five in a Row", path: "/FiveInARow/fiveinarow", img: "/thumbs/fiveinarow.png", tags: ["puzzle", "brain"], desc: "Line up five stones before the computer does.", isNew: true },
 };
 
 // Games that only count plays (no score)

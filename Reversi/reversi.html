@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The classic strategy board game, also known as Othello. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Reversi · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>#menu{display:inline-flex;gap:4px;background:#11142b;border-radius:12px;padding:4px;margin-top:12px}#menu button{border:0;background:none;color:#cfd2f5;font:700 14px Inter,sans-serif;padding:7px 14px;border-radius:9px;cursor:pointer}#menu button.active{background:#7c5cff;color:#fff}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1><span>Reversi</span></h1>
+        <div class="stats"><div class="stat"><b id="you">2</b><small>You</small></div><div class="stat"><b id="cpu">2</b><small>Computer</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Reversi</h2>
+                <p id="startText">Place a black disc so it traps white discs in a straight line between two of yours. All the trapped discs flip to black!<br>Whoever has the most discs when the board is full wins.<div class="seg" id="menu"></div></p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Corners can never be flipped back, so they're the best squares on the board. Avoid the squares right next to an empty corner.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Reversi — flank your opponent's discs to flip them
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "reversiBest";
+        const N = 8, CS = 66, OX = (W - N * CS) / 2, OY = 110;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const WEIGHT = [[100, -20, 10, 5, 5, 10, -20, 100], [-20, -50, -2, -2, -2, -2, -50, -20], [10, -2, 1, 1, 1, 1, -2, 10], [5, -2, 1, 0, 0, 1, -2, 5], [5, -2, 1, 0, 0, 1, -2, 5], [10, -2, 1, 1, 1, 1, -2, 10], [-20, -50, -2, -2, -2, -2, -50, -20], [100, -20, 10, 5, 5, 10, -20, 100]];
+        let b, turn, state = "ready", last = null, flips = [], diff = "medium", aiT = 0, msg = "";
+        try { diff = localStorage.getItem("reversiDiff") || "medium"; } catch (e) {}
+        Kit.stat("best", Kit.best(BEST));
+        const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+        function flipsFor(bd, r, c, p) {
+            if (bd[r][c]) return [];
+            const out = [];
+            for (const [dr, dc] of DIRS) {
+                const line = []; let rr = r + dr, cc = c + dc;
+                while (rr >= 0 && rr < N && cc >= 0 && cc < N && bd[rr][cc] === -p) { line.push([rr, cc]); rr += dr; cc += dc; }
+                if (line.length && rr >= 0 && rr < N && cc >= 0 && cc < N && bd[rr][cc] === p) out.push(...line);
+            }
+            return out;
+        }
+        const movesFor = (bd, p) => { const m = []; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const f = flipsFor(bd, r, c, p); if (f.length) m.push({ r, c, f }); } return m; };
+        const count = (bd, p) => bd.flat().filter((x) => x === p).length;
+        function play(r, c) {
+            const f = flipsFor(b, r, c, turn); if (!f.length) return false;
+            b[r][c] = turn; f.forEach(([rr, cc]) => (b[rr][cc] = turn)); last = { r, c }; flips = f.map(([rr, cc]) => ({ r: rr, c: cc, t: 0 }));
+            beep(turn === 1 ? 520 : 380, 0.05, "triangle", 0.04);
+            turn = -turn;
+            if (!movesFor(b, turn).length) { if (!movesFor(b, -turn).length) return end(); msg = turn === 1 ? T("You have no moves, so you pass.", "אין לכם מהלכים, אז אתם מוותרים על התור.") : T("The computer has to pass!", "המחשב חייב לוותר על התור!"); turn = -turn; }
+            else msg = "";
+            stats(); aiT = 0;
+            return true;
+        }
+        function evalBoard(bd) { let s = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) s += bd[r][c] * WEIGHT[r][c]; return s + (movesFor(bd, -1).length - movesFor(bd, 1).length) * 4; }
+        function negamax(bd, p, depth, a, beta) {
+            const ms = movesFor(bd, p);
+            if (!depth || !ms.length) return p * evalBoard(bd);
+            let best = -1e9;
+            for (const m of ms) {
+                const nb = bd.map((row) => row.slice()); nb[m.r][m.c] = p; m.f.forEach(([r, c]) => (nb[r][c] = p));
+                const v = -negamax(nb, -p, depth - 1, -beta, -a);
+                if (v > best) best = v; if (v > a) a = v; if (a >= beta) break;
+            }
+            return best;
+        }
+        function aiMove() {
+            const ms = movesFor(b, -1); if (!ms.length) return;
+            let pick;
+            if (diff === "easy") pick = Kit.pick(ms);
+            else {
+                const depth = diff === "hard" ? 3 : 1;
+                let bs = -1e9;
+                for (const m of ms) { const nb = b.map((row) => row.slice()); nb[m.r][m.c] = -1; m.f.forEach(([r, c]) => (nb[r][c] = -1)); const v = -negamax(nb, 1, depth - 1, -1e9, 1e9) + Math.random() * 2; if (v > bs) { bs = v; pick = m; } }
+            }
+            play(pick.r, pick.c);
+        }
+        function stats() { Kit.stat("you", count(b, 1)); Kit.stat("cpu", count(b, -1)); }
+        function end() {
+            state = "over"; const y = count(b, 1), c = count(b, -1);
+            const sc = y > c ? 500 + (y - c) * 10 + { easy: 0, medium: 300, hard: 700 }[diff] : y * 5;
+            Kit.save(sc); const best = Kit.setBest(BEST, sc);
+            $("overText").innerHTML = `<b style="font-size:20px">${y > c ? T("🏆 You win!", "🏆 ניצחתם!") : y < c ? T("😢 The computer wins", "😢 המחשב ניצח") : T("🤝 It's a draw", "🤝 תיקו")}</b><br>${y} – ${c}<br>${sc} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`;
+            tune(y > c ? [523, 659, 784, 1047] : [392, 330, 262], 0.13, "triangle", 0.05);
+            setTimeout(() => Kit.show("over"), 800); stats(); return true;
+        }
+        function start() {
+            b = Array.from({ length: N }, () => new Array(N).fill(0));
+            b[3][3] = b[4][4] = -1; b[3][4] = b[4][3] = 1; turn = 1; last = null; flips = []; msg = ""; state = "play"; stats();
+            Kit.hide("start"); Kit.hide("over");
+        }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!b) return;
+            Kit.text(ctx, state === "play" ? (turn === 1 ? T("Your turn (black)", "התור שלכם (שחור)") : T("Computer is thinking…", "המחשב חושב…")) : "", W / 2, 40, 20, turn === 1 ? "#ffc94d" : "#9aa0c8", "center");
+            if (msg) Kit.text(ctx, msg, W / 2, 74, 14, "#ff8a3d", "center");
+            ctx.fillStyle = "#3a2410"; Kit.rr(ctx, OX - 12, OY - 12, N * CS + 24, N * CS + 24, 14); ctx.fill();
+            ctx.fillStyle = "#1f8a4c"; ctx.fillRect(OX, OY, N * CS, N * CS);
+            ctx.strokeStyle = "#0e5a2e"; ctx.lineWidth = 2;
+            for (let i = 0; i <= N; i++) { ctx.beginPath(); ctx.moveTo(OX + i * CS, OY); ctx.lineTo(OX + i * CS, OY + N * CS); ctx.moveTo(OX, OY + i * CS); ctx.lineTo(OX + N * CS, OY + i * CS); ctx.stroke(); }
+            const hints = state === "play" && turn === 1 ? movesFor(b, 1) : [];
+            for (const m of hints) { ctx.fillStyle = "#ffffff33"; ctx.beginPath(); ctx.arc(OX + m.c * CS + CS / 2, OY + m.r * CS + CS / 2, 7, 0, 7); ctx.fill(); }
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+                const v = b[r][c]; if (!v) continue;
+                const fl = flips.find((f) => f.r === r && f.c === c), sx = fl ? Math.abs(Math.cos(Math.min(1, fl.t) * Math.PI)) : 1;
+                const col = fl && fl.t < 0.5 ? -v : v;
+                const x = OX + c * CS + CS / 2, y = OY + r * CS + CS / 2;
+                ctx.fillStyle = "#00000055"; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, CS * 0.4 * sx, CS * 0.4, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = col === 1 ? "#141414" : "#f4f4f4"; ctx.beginPath(); ctx.ellipse(x, y, CS * 0.4 * sx, CS * 0.4, 0, 0, 7); ctx.fill();
+                ctx.fillStyle = col === 1 ? "#ffffff22" : "#ffffffaa"; ctx.beginPath(); ctx.ellipse(x - 6 * sx, y - 8, CS * 0.14 * sx, CS * 0.08, 0, 0, 7); ctx.fill();
+                if (last && last.r === r && last.c === c) { ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); }
+            }
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play" || turn !== 1) return;
+            const p = Kit.point(cv, e), c = Math.floor((p.x - OX) / CS), r = Math.floor((p.y - OY) / CS);
+            if (r >= 0 && r < N && c >= 0 && c < N && !play(r, c)) beep(150, 0.06, "square", 0.03);
+        });
+        function menuUI() { const m = $("menu"); if (!m) return; m.innerHTML = ["easy", "medium", "hard"].map((d) => `<button data-d="${d}" class="${d === diff ? "active" : ""}">${{ easy: "Easy", medium: "Medium", hard: "Hard" }[d]}</button>`).join(""); m.querySelectorAll("[data-d]").forEach((x) => (x.onclick = () => { diff = x.dataset.d; try { localStorage.setItem("reversiDiff", diff); } catch (e) {} menuUI(); })); }
+        menuUI();
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { Kit.hide("over"); Kit.show("start"); };
+        Kit.loop((dt) => {
+            flips.forEach((f) => (f.t += dt * 3)); flips = flips.filter((f) => f.t < 1);
+            if (state === "play" && turn === -1) { aiT += dt; if (aiT > 0.6) { aiT = -99; aiMove(); } }
+            draw();
+        }).start();
+        if (window.__test) window.__test.reversi = { get s() { return { b, turn, state }; }, play, aiMove, start, movesFor };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Reversi</h2><p>The classic strategy board game, also known as Othello. You play black against the computer. Each move must trap one or more white discs in a straight line between your new disc and another black disc, and every trapped disc flips to your color. The lead can swing wildly right up to the last move, so think about corners and edges, not just about flipping as many as possible.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap a square</td><td>Place a disc (dots show legal moves)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Grab the corners: they can never be flipped.</li><li>Don't play next to an empty corner, or the computer may take it.</li><li>Flipping fewer discs early often gives you more moves later.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Reversi</h3><p>Beginners try to flip as many discs as possible on every move, but in Reversi that usually backfires. A board full of your color gives your opponent lots of discs to trap. Strong players keep their disc count low in the middle of the game and focus on having more possible moves than their opponent.</p><p>The corners are the most important squares, because a disc in a corner can never be flipped. The squares diagonally next to a corner are the most dangerous ones: playing there often hands the corner to the other side. Edges are good too, but only once they're safe.</p><p>Near the end, count carefully. Because discs flip in big groups, a player who is far behind can win in the last few moves. Save a safe move for last when you can.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Play Easy and learn which moves are legal (the dots show them).</li><li><b>Getting good:</b> On Medium, start grabbing corners and avoiding the squares next to them.</li><li><b>Expert:</b> Hard looks a few moves ahead. Keep your options open and think about mobility.</li></ul><h3>Did you know?</h3><p>The modern version of the game was published in Japan in 1971 under the name Othello, but a very similar game called Reversi was already popular in England in the 1880s.</p><h3>Questions players ask</h3><h4>What if I can't move?</h4><p>Your turn is skipped and the computer plays again. If neither side can move, the game ends.</p><h4>Who goes first?</h4><p>You do, with the black discs.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
