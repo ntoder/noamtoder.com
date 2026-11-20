@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A sky-defence game inspired by an arcade classic. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>City Defender · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>City <span>Defender</span></h1>
+        <div class="stats"><div class="stat"><b id="wave">1</b><small>Wave</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>City Defender</h2>
+                <p id="startText">Rockets are falling on your six cities! Tap or click anywhere in the sky to launch a missile there. It explodes and stops any rocket inside the blast.<br>You have three launchers with 10 missiles each per wave. Some rockets split in two!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Aim a little below a rocket, where it's going to be, not where it is now.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // City Defender — missile command: tap to launch interceptors that explode and stop incoming rockets
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "citydefenderBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const GROUND = H - 50;
+        const BASES = [{ x: 40 }, { x: W / 2 }, { x: W - 40 }];
+        let cities, ammo, missiles, rockets, booms, wave, toSpawn, spawnT, score, state = "ready", fx = Kit.particles(), between = 0, stars;
+        Kit.stat("best", Kit.best(BEST));
+        function newWave() { ammo = [10, 10, 10]; toSpawn = 8 + wave * 3; spawnT = 1; rockets = []; missiles = []; booms = []; Kit.stat("wave", wave); between = 0; }
+        function start() {
+            cities = []; const xs = [95, 150, 205, 275, 330, 385].map((x) => (x * W) / 480); for (const x of xs) cities.push({ x, alive: true });
+            score = 0; wave = 1; state = "play"; newWave(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+            stars = Array.from({ length: 70 }, () => [Math.random() * W, Math.random() * GROUND * 0.8, Math.random()]);
+        }
+        function targets() { const t = cities.filter((c) => c.alive).map((c) => c.x); BASES.forEach((b, i) => ammo[i] > 0 && t.push(b.x)); return t; }
+        function spawnRocket(fromX, fromY) {
+            const t = targets(); if (!t.length) return;
+            const tx = Kit.pick(t) + Kit.rand(-6, 6), x = fromX ?? Kit.rand(20, W - 20), y = fromY ?? 0, sp = 35 + wave * 7 + Math.random() * 15;
+            const d = Math.hypot(tx - x, GROUND - y); rockets.push({ sx: x, sy: y, x, y, vx: ((tx - x) / d) * sp, vy: ((GROUND - y) / d) * sp, split: !fromX && wave > 2 && Math.random() < 0.2, splitY: Kit.rand(150, 320) });
+        }
+        function fire(px, py) {
+            if (state !== "play" || between > 0 || py > GROUND - 30) return;
+            let best = -1, bd = 1e9; BASES.forEach((b, i) => { if (ammo[i] > 0) { const d = Math.abs(b.x - px); if (d < bd) { bd = d; best = i; } } });
+            if (best < 0) { beep(90, 0.05, "square", 0.03); return; }
+            ammo[best]--; const b = BASES[best], d = Math.hypot(px - b.x, py - (GROUND - 16)), sp = 520;
+            missiles.push({ x: b.x, y: GROUND - 16, tx: px, ty: py, vx: ((px - b.x) / d) * sp, vy: ((py - GROUND + 16) / d) * sp });
+            beep(1000, 0.06, "square", 0.03, -600);
+        }
+        function update(dt) {
+            if (between > 0) { between -= dt; if (between <= 0) { wave++; newWave(); } return; }
+            spawnT -= dt; if (toSpawn > 0 && spawnT <= 0) { spawnRocket(); toSpawn--; spawnT = Math.max(0.35, 1.8 - wave * 0.15) * Kit.rand(0.5, 1.3); }
+            for (const m of missiles) { m.x += m.vx * dt; m.y += m.vy * dt; if (m.y <= m.ty) { m.dead = true; booms.push({ x: m.tx, y: m.ty, r: 0, t: 0, mine: true }); beep(120, 0.2, "sawtooth", 0.04, -60); } }
+            for (const b of booms) { b.t += dt; b.r = b.t < 0.5 ? b.t * 90 : Math.max(0, 45 - (b.t - 0.5) * 70); }
+            for (const r of rockets) {
+                r.x += r.vx * dt; r.y += r.vy * dt;
+                if (r.split && r.y > r.splitY) { r.split = false; for (let i = 0; i < 2; i++) spawnRocket(r.x, r.y); }
+                for (const b of booms) if (Math.hypot(r.x - b.x, r.y - b.y) < b.r) { r.dead = true; score += 25 * wave; Kit.stat("score", score); booms.push({ x: r.x, y: r.y, r: 0, t: 0.1 }); break; }
+                if (!r.dead && r.y >= GROUND) {
+                    r.dead = true; booms.push({ x: r.x, y: GROUND, r: 0, t: 0 }); beep(70, 0.4, "sawtooth", 0.06);
+                    for (const c of cities) if (c.alive && Math.abs(c.x - r.x) < 22) { c.alive = false; fx.burst(c.x, GROUND - 10, "#ff9a3c", 30, 4); }
+                    BASES.forEach((b, i) => { if (Math.abs(b.x - r.x) < 22) ammo[i] = 0; });
+                }
+            }
+            missiles = missiles.filter((m) => !m.dead); rockets = rockets.filter((r) => !r.dead); booms = booms.filter((b) => b.t < 1.15);
+            if (!cities.some((c) => c.alive)) return gameOver();
+            if (toSpawn <= 0 && !rockets.length && !booms.length && !missiles.length) {
+                const bonus = cities.filter((c) => c.alive).length * 100 + ammo.reduce((a, b) => a + b, 0) * 5;
+                score += bonus; Kit.stat("score", score); between = 2.5; tune([523, 659, 784], 0.08, "square", 0.04);
+                if (wave % 3 === 0) { const dead = cities.find((c) => !c.alive); if (dead) dead.alive = true; }
+            }
+        }
+        function gameOver() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("All the cities are gone!", "כל הערים נהרסו!")}<br>${T("Wave", "גל")} ${wave} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 800); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#050716"); g.addColorStop(1, "#1d1745"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!cities) return;
+            for (const [x, y, b] of stars) { ctx.fillStyle = `rgba(255,255,255,${0.2 + b * 0.5})`; ctx.fillRect(x, y, 2, 2); }
+            ctx.fillStyle = "#3b2e1a"; ctx.fillRect(0, GROUND, W, H - GROUND); ctx.fillStyle = "#6b5530"; ctx.fillRect(0, GROUND, W, 4);
+            for (const c of cities) { if (c.alive) { ctx.fillStyle = "#5cc8ff"; ctx.fillRect(c.x - 18, GROUND - 14, 10, 14); ctx.fillRect(c.x - 6, GROUND - 24, 12, 24); ctx.fillRect(c.x + 8, GROUND - 18, 10, 18); ctx.fillStyle = "#ffe08a"; for (let i = 0; i < 4; i++) ctx.fillRect(c.x - 3 + (i % 2) * 5, GROUND - 20 + Math.floor(i / 2) * 7, 2, 3); } else { ctx.fillStyle = "#4a3a2a"; ctx.fillRect(c.x - 16, GROUND - 5, 32, 5); } }
+            BASES.forEach((b, i) => { ctx.fillStyle = "#8a6d3b"; ctx.beginPath(); ctx.moveTo(b.x - 26, GROUND); ctx.lineTo(b.x - 10, GROUND - 18); ctx.lineTo(b.x + 10, GROUND - 18); ctx.lineTo(b.x + 26, GROUND); ctx.fill(); Kit.text(ctx, String(ammo[i]), b.x, GROUND + 30, 14, ammo[i] ? "#fff" : "#ff4d6d", "center"); });
+            ctx.lineWidth = 2;
+            for (const r of rockets) { ctx.strokeStyle = "#ff4d6d88"; ctx.beginPath(); ctx.moveTo(r.sx, r.sy); ctx.lineTo(r.x, r.y); ctx.stroke(); ctx.fillStyle = "#fff"; ctx.fillRect(r.x - 2, r.y - 2, 4, 4); }
+            for (const m of missiles) { ctx.strokeStyle = "#2ee6a0"; ctx.beginPath(); ctx.moveTo(m.x - m.vx * 0.04, m.y - m.vy * 0.04); ctx.lineTo(m.x, m.y); ctx.stroke(); ctx.strokeStyle = "#2ee6a0aa"; ctx.beginPath(); ctx.moveTo(m.tx - 5, m.ty - 5); ctx.lineTo(m.tx + 5, m.ty + 5); ctx.moveTo(m.tx + 5, m.ty - 5); ctx.lineTo(m.tx - 5, m.ty + 5); ctx.stroke(); }
+            for (const b of booms) { const c = Math.floor(b.t * 20) % 3; ctx.fillStyle = ["#ffffff", "#ffc94d", "#ff4dd2"][c]; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), W / 2, 36, 20, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (between > 0) Kit.text(ctx, `${T("Wave", "גל")} ${wave} ${T("cleared!", "הושלם!")}`, W / 2, H / 2 - 40, 26, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); fire(p.x, p.y); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.city = { get s() { return { state, score, wave }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About City Defender</h2><p>A sky-defence game inspired by an arcade classic. Enemy rockets streak down toward six cities. Tap a spot in the sky and the nearest launcher fires a missile there. When it arrives it makes a big explosion, and any rocket that flies into it is destroyed. Every wave brings more and faster rockets, and some split into several. Surviving cities and leftover missiles earn bonus points.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap or click the sky</td><td>Launch a missile there</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>One explosion can catch several rockets. Wait for them to bunch up.</li><li>Don't waste missiles: you only get 30 per wave.</li><li>Every third wave rebuilds one lost city.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at City Defender</h3><p>City Defender is about leading your shots. Your missile takes a moment to fly up, and the rocket keeps falling while it does. Aim below the rocket along its trail, at the point it will reach when your missile arrives.</p><p>Explosions stay in the sky for about a second. Try to place one where several rocket trails cross, so a single missile takes out two or three. That saves ammo for the later, busier part of the wave.</p><p>Watch for the rockets that split. If you catch them high up, before they split, you only need one missile instead of three. Your launchers are targets too, so protect the middle one, which can reach both sides.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Survive wave 3.</li><li><b>Getting good:</b> Finish a wave without losing a city.</li><li><b>Expert:</b> Reach wave 8.</li></ul><h3>Did you know?</h3><p>Real air-defence systems work out where a fast object will be in the future, using its speed and direction. Your brain does the same thing when you catch a ball.</p><h3>Questions players ask</h3><h4>What happens when a launcher is hit?</h4><p>It loses all its missiles for the rest of that wave.</p><h4>Can I get cities back?</h4><p>Yes. Every third wave one destroyed city is rebuilt.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

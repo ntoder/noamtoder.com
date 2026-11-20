@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A tribute to one of the first arcade games ever. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Alien Invaders · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Alien <span>Invaders</span></h1>
+        <div class="stats"><div class="stat"><b id="wave">1</b><small>Wave</small></div><div class="stat"><b id="lives">3</b><small>Lives</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Alien Invaders</h2>
+                <p id="startText">⬅ ➡ (or A D) to move, Space to shoot. On a phone, drag to move and tap to shoot.<br>Hide behind the green shields and shoot the red saucer for a mystery bonus!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="fire">🔥</button><button data-k="right">➡</button></div>
+    <p class="hint">Clear the columns at the edges first. The army has to walk further before it turns and moves down.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Alien Invaders — classic marching aliens, shields and a mystery saucer
+        const { $, beep } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "invadersBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = 9, ROWS = 5, AW = 34, AH = 24, GX = 48, GY = 44;
+        const SHAPES = ["..X.....X..|...X...X...|..XXXXXXX..|.XX.XXX.XX.|XXXXXXXXXXX|X.XXXXXXX.X|X.X.....X.X|...XX.XX...", "....XXX....|.XXXXXXXXX.|XXXXXXXXXXX|XXX..X..XXX|XXXXXXXXXXX|..XX...XX..|.XX.XX.XX..|XX.......XX", "....XX.....|...XXXX....|..XXXXXX...|.XX.XX.XX..|.XXXXXXXX..|...X..X....|..X.XX.X...|.X.X..X.X.."].map((s) => s.split("|"));
+        const COLORS = ["#ff4dd2", "#5cc8ff", "#5cc8ff", "#2ee6a0", "#2ee6a0"];
+        let aliens, ax, ay, adir, step, stepT, frame, player, shots, bombs, shields, saucer, score, lives, wave, state = "ready", fx = Kit.particles(), cool = 0, dead = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function newWave() {
+            aliens = []; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) aliens.push({ r, c, alive: true, kind: r === 0 ? 2 : r < 3 ? 1 : 0 });
+            ax = 30; ay = 90 + Math.min(5, wave - 1) * 14; adir = 1; stepT = 0; frame = 0; shots = []; bombs = []; saucer = null;
+            shields = []; for (let s = 0; s < 4; s++) { const sx = 40 + s * ((W - 80) / 4) + 14; for (let y = 0; y < 6; y++) for (let x = 0; x < 10; x++) if (!(y > 3 && x > 2 && x < 7) && !(y === 0 && (x === 0 || x === 9))) shields.push({ x: sx + x * 7, y: H - 170 + y * 7, hp: 2 }); }
+            Kit.stat("wave", wave);
+        }
+        function start() { score = 0; lives = 3; wave = 1; player = { x: W / 2 }; dead = 0; state = "play"; newWave(); Kit.stat("score", 0); Kit.stat("lives", lives); Kit.hide("start"); Kit.hide("over"); }
+        const alienPos = (a) => [ax + a.c * GX, ay + a.r * GY];
+        function live() { return aliens.filter((a) => a.alive); }
+        function shoot() { if (state !== "play" || dead > 0 || shots.length >= 1 + (wave > 3 ? 1 : 0) || cool > 0) return; shots.push({ x: player.x, y: H - 80 }); cool = 0.25; beep(880, 0.05, "square", 0.03, -400); }
+        function update(dt) {
+            cool -= dt;
+            if (dead > 0) { dead -= dt; if (dead <= 0) { if (lives <= 0) return gameOver(); bombs = []; } return; }
+            const sp = 260; if (Kit.keys.has("left")) player.x -= sp * dt; if (Kit.keys.has("right")) player.x += sp * dt; if (Kit.keys.has("fire")) shoot();
+            player.x = Math.max(24, Math.min(W - 24, player.x));
+            const L = live(), n = L.length;
+            stepT += dt; const interval = Math.max(0.04, 0.05 + n * 0.012 - wave * 0.01);
+            if (stepT > interval) {
+                stepT = 0; frame ^= 1; beep([110, 98, 87, 82][step = ((step || 0) + 1) % 4], 0.05, "square", 0.025);
+                let minX = 1e9, maxX = -1e9; for (const a of L) { const [x] = alienPos(a); minX = Math.min(minX, x); maxX = Math.max(maxX, x + AW); }
+                if ((adir > 0 && maxX + 8 > W - 10) || (adir < 0 && minX - 8 < 10)) { adir *= -1; ay += 18; } else ax += 8 * adir;
+            }
+            // bombs
+            if (Math.random() < dt * (0.8 + wave * 0.3) && n) { const cols = {}; for (const a of L) if (!cols[a.c] || cols[a.c].r < a.r) cols[a.c] = a; const pick = Kit.pick(Object.values(cols)); const [x, y] = alienPos(pick); bombs.push({ x: x + AW / 2, y: y + AH, z: Math.random() < 0.5 }); }
+            if (!saucer && Math.random() < dt * 0.06) saucer = { x: Math.random() < 0.5 ? -40 : W + 40, y: 64 }, saucer.v = saucer.x < 0 ? 110 : -110;
+            if (saucer) { saucer.x += saucer.v * dt; if (saucer.x < -60 || saucer.x > W + 60) saucer = null; else if (Math.floor(saucer.x / 20) % 2) beep(600, 0.02, "sine", 0.01); }
+            for (const s of shots) {
+                s.y -= 620 * dt;
+                for (const a of L) { const [x, y] = alienPos(a); if (s.x > x && s.x < x + AW && s.y > y && s.y < y + AH) { a.alive = false; s.dead = true; score += [10, 20, 30][a.kind] * (1 + (wave - 1) * 0.5) | 0; Kit.stat("score", score); fx.burst(x + AW / 2, y + AH / 2, COLORS[a.r], 14, 3); beep(220, 0.08, "sawtooth", 0.04, -150); break; } }
+                if (!s.dead && saucer && Math.abs(s.x - saucer.x) < 26 && Math.abs(s.y - saucer.y) < 12) { s.dead = true; const pts = Kit.pick([50, 100, 150, 300]); score += pts; Kit.stat("score", score); fx.burst(saucer.x, saucer.y, "#ff4d6d", 30, 4); saucer = null; beep(300, 0.3, "square", 0.05, 400); }
+                if (!s.dead) for (const b of shields) if (b.hp > 0 && s.x > b.x - 2 && s.x < b.x + 9 && s.y > b.y && s.y < b.y + 7) { b.hp--; s.dead = true; break; }
+                if (s.y < 30) s.dead = true;
+            }
+            for (const b of bombs) {
+                b.y += (180 + wave * 15) * dt;
+                for (const sh of shields) if (sh.hp > 0 && b.x > sh.x - 2 && b.x < sh.x + 9 && b.y > sh.y && b.y < sh.y + 7) { sh.hp--; b.dead = true; break; }
+                if (!b.dead && Math.abs(b.x - player.x) < 20 && b.y > H - 80 && b.y < H - 56) { b.dead = true; hitPlayer(); }
+                if (b.y > H - 40) b.dead = true;
+            }
+            shots = shots.filter((s) => !s.dead); bombs = bombs.filter((b) => !b.dead);
+            for (const a of L) { const [, y] = alienPos(a); if (y + AH > H - 170) for (const sh of shields) if (sh.hp > 0 && sh.y < y + AH) sh.hp = 0; if (y + AH > H - 80) { lives = 0; Kit.stat("lives", 0); return gameOver(); } }
+            if (!live().length) { wave++; score += 100; Kit.stat("score", score); newWave(); }
+        }
+        function hitPlayer() { lives--; Kit.stat("lives", lives); dead = 1.5; fx.burst(player.x, H - 70, "#2ee6a0", 40, 4); beep(80, 0.6, "sawtooth", 0.07, -40); }
+        function gameOver() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("The invaders won this time!", "הפולשים ניצחו הפעם!")}<br>${T("Wave", "גל")} ${wave} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function sprite(shape, x, y, color, px) { ctx.fillStyle = color; for (let r = 0; r < shape.length; r++) for (let c = 0; c < shape[r].length; c++) if (shape[r][c] === "X") ctx.fillRect(x + c * px, y + r * px, px, px); }
+        function draw() {
+            ctx.fillStyle = "#05060f"; ctx.fillRect(0, 0, W, H);
+            for (let i = 0; i < 60; i++) { ctx.fillStyle = i % 7 ? "#ffffff33" : "#ffffff88"; ctx.fillRect((i * 97) % W, (i * 53 + i * i) % H, 2, 2); }
+            if (!aliens) return;
+            for (const a of live()) { const [x, y] = alienPos(a); const sh = a.kind === 2 ? SHAPES[2] : a.kind === 1 ? SHAPES[0] : SHAPES[1]; let s = sh; if (frame) s = sh.map((row, i) => (i >= 6 ? row.split("").reverse().join("") : row)); sprite(s, x + 1, y, COLORS[a.r], 3); }
+            if (saucer) { ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.ellipse(saucer.x, saucer.y, 26, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(saucer.x, saucer.y - 6, 11, 8, 0, Math.PI, 0); ctx.fill(); }
+            for (const b of shields) if (b.hp > 0) { ctx.fillStyle = b.hp === 2 ? "#2ee6a0" : "#2ee6a088"; ctx.fillRect(b.x, b.y, 7, 7); }
+            ctx.fillStyle = "#fff"; for (const s of shots) ctx.fillRect(s.x - 1.5, s.y, 3, 14);
+            ctx.fillStyle = "#ffc94d"; for (const b of bombs) { ctx.save(); ctx.translate(b.x, b.y); for (let i = 0; i < 4; i++) ctx.fillRect((b.z ? (i % 2 ? 2 : -2) : 0) - 1.5, i * 4, 3, 4); ctx.restore(); }
+            if (dead <= 0 || Math.floor(dead * 10) % 2) { const x = player.x, y = H - 70; ctx.fillStyle = "#2ee6a0"; ctx.fillRect(x - 20, y, 40, 12); ctx.fillRect(x - 15, y - 5, 30, 6); ctx.fillRect(x - 3, y - 14, 6, 10); }
+            ctx.fillStyle = "#2ee6a0"; ctx.fillRect(0, H - 40, W, 2);
+            for (let i = 0; i < lives; i++) { ctx.fillStyle = "#2ee6a0"; ctx.fillRect(20 + i * 36, H - 26, 26, 8); ctx.fillRect(30 + i * 36, H - 32, 6, 6); }
+            fx.draw(ctx);
+            Kit.text(ctx, `${score}`, 20, 30, 16, "#fff", "left", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, `${T("WAVE", "גל")} ${wave}`, W - 20, 30, 14, "#5cc8ff", "right", "'Press Start 2P', monospace", 400);
+        }
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Space: "fire", ArrowUp: "fire", KeyW: "fire", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons((k) => { if (k === "fire") shoot(); });
+        let drag = null;
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); drag = true; player && (player.tx = p.x); shoot(); });
+        cv.addEventListener("pointermove", (e) => { if (drag && player) player.x = Math.max(24, Math.min(W - 24, Kit.point(cv, e).x)); });
+        window.addEventListener("pointerup", () => (drag = null));
+        cv.style.touchAction = "none";
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.inv = { get s() { return { state, score, wave }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Alien Invaders</h2><p>A tribute to one of the first arcade games ever. Rows of pixel aliens march side to side, stepping down every time they reach the edge. The fewer aliens are left, the faster they move. Shoot them from your cannon, hide behind the shields, and don't let them reach the ground. Each new wave starts a little lower and drops more bombs.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ ➡ or A D</td><td>Move</td></tr><tr><td>Space or ⬆</td><td>Shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>You can only have one shot on screen at a time, so don't miss.</li><li>The top row is worth the most points.</li><li>Shields wear away, so don't stay behind one shield forever.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Alien Invaders</h3><p>In Alien Invaders the army moves as one block. It only steps down when its outer edge touches the side of the screen. If you clear out the left and right columns first, the block becomes narrower and has to walk further each time, which gives you more time before it reaches you.</p><p>You can only have one shot in the air (two from wave 4). A missed shot means waiting for it to fly off the top. Aim carefully, and fire from right under the alien you want instead of firing while moving.</p><p>The last few aliens move very fast. Stay in the middle so you can reach either side, and lead your shots a little so the alien walks into them. When the red saucer flies across the top, it's worth a lot of points.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear wave 1.</li><li><b>Getting good:</b> Reach wave 3.</li><li><b>Expert:</b> Hit the mystery saucer.</li></ul><h3>Did you know?</h3><p>The original alien-invasion arcade game came out in Japan in 1978. Its aliens sped up as you destroyed them because the computer had less to draw, and the designer kept that as a feature.</p><h3>Questions players ask</h3><h4>What ends the game?</h4><p>Losing all three lives, or the aliens reaching the ground.</p><h4>How much is the saucer worth?</h4><p>It's a mystery: 50, 100, 150 or 300 points.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/KnifeThrow/knifethrow">Knife Throw</a><a href="/Mancala/mancala">Mancala</a><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

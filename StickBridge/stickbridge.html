@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple game about guessing distances. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Stick Bridge · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Stick <span>Bridge</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Stick Bridge</h2>
+                <p id="startText">Hold down (or hold Space) to grow a stick. Let go and it falls over to make a bridge.<br>Too short or too long and your ninja falls! Land on the red middle spot for bonus points.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Look at the gap, not the stick. The stick needs to be as long as the gap plus a little bit of the next pillar.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Stick Bridge — grow a stick to just the right length to reach the next pillar
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "stickbridgeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const GROUND = H - 220, HERO = 22;
+        let pillars, cur, stick, phase, hx, camX, score, perfectRun, state = "ready", fx = Kit.particles(), fall = 0, msg = null, stars;
+        Kit.stat("best", Kit.best(BEST));
+        function nextPillar(prev) { const gap = Kit.randi(50, 230), w = Kit.randi(28, 90); return { x: prev.x + prev.w + gap, w }; }
+        function start() {
+            pillars = [{ x: 40, w: 80 }]; for (let i = 0; i < 4; i++) pillars.push(nextPillar(pillars[pillars.length - 1]));
+            cur = 0; stick = { len: 0, ang: -Math.PI / 2 }; phase = "wait"; hx = 40 + 80 - HERO - 4; camX = 0; score = 0; perfectRun = 0; fall = 0;
+            stars = Array.from({ length: 40 }, () => ({ x: Math.random() * W * 3, y: Math.random() * GROUND * 0.7, r: Math.random() * 2 }));
+            state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+        }
+        function press() { if (state === "play" && phase === "wait") { phase = "grow"; stick = { len: 0, ang: -Math.PI / 2 }; } }
+        function release() { if (state === "play" && phase === "grow") { phase = "rotate"; beep(330, 0.05, "triangle", 0.04); } }
+        function update(dt) {
+            const p = pillars[cur], n = pillars[cur + 1], base = p.x + p.w;
+            if (phase === "grow") { stick.len += 330 * dt; if (stick.len % 40 < 6) beep(200 + stick.len, 0.01, "sine", 0.01); }
+            else if (phase === "rotate") {
+                stick.ang += 4.5 * dt;
+                if (stick.ang >= 0) {
+                    stick.ang = 0; beep(140, 0.06, "square", 0.04);
+                    const tip = base + stick.len;
+                    const ok = tip >= n.x && tip <= n.x + n.w;
+                    const perfect = ok && Math.abs(tip - (n.x + n.w / 2)) < 6;
+                    if (perfect) { perfectRun++; score += 1 + perfectRun; msg = { t: 1, s: `${T("PERFECT", "מושלם")} +${1 + perfectRun}` }; tune([660, 990], 0.06, "square", 0.04); fx.burst(n.x + n.w / 2 - camX, GROUND, "#ffc94d", 16, 3); }
+                    else if (ok) { perfectRun = 0; score++; }
+                    phase = ok ? "walk" : "walkFail"; Kit.stat("score", score);
+                }
+            } else if (phase === "walk") {
+                hx += 260 * dt; const target = n.x + n.w - HERO - 4;
+                if (hx >= target) { hx = target; cur++; pillars.push(nextPillar(pillars[pillars.length - 1])); phase = "scroll"; }
+            } else if (phase === "walkFail") {
+                hx += 260 * dt; if (hx >= base + stick.len) { phase = "fall"; beep(400, 0.5, "sawtooth", 0.05, -300); }
+            } else if (phase === "fall") {
+                fall += 900 * dt; stick.ang = Math.min(Math.PI / 2, stick.ang + 5 * dt);
+                if (fall > H) gameOver();
+            } else if (phase === "scroll") {
+                const want = pillars[cur].x - 40; camX += (want - camX) * Math.min(1, dt * 8);
+                if (Math.abs(want - camX) < 1) { camX = want; phase = "wait"; }
+            }
+        }
+        function gameOver() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("You fell!", "נפלתם!")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function hero(x, y) {
+            ctx.fillStyle = "#1b1b2f"; Kit.rr(ctx, x, y - HERO, HERO, HERO, 5); ctx.fill();
+            ctx.fillStyle = "#ff4d6d"; ctx.fillRect(x, y - HERO + 5, HERO, 4); ctx.fillRect(x - 6, y - HERO + 5, 8, 3);
+            ctx.fillStyle = "#fff"; ctx.fillRect(x + 14, y - HERO + 11, 4, 4);
+            const leg = phase === "walk" || phase === "walkFail" ? Math.sin(hx * 0.3) * 3 : 0;
+            ctx.fillStyle = "#1b1b2f"; ctx.fillRect(x + 4 + leg, y, 4, 4); ctx.fillRect(x + 14 - leg, y, 4, 4);
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ffb37a"); g.addColorStop(0.6, "#ff7aa0"); g.addColorStop(1, "#6b4ca8"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#fff6"; ctx.beginPath(); ctx.arc(W * 0.72, GROUND * 0.45, 60, 0, 7); ctx.fill();
+            if (!pillars) return;
+            ctx.fillStyle = "#4a3a7a88"; for (let i = 0; i < 8; i++) { const x = ((i * 140 - camX * 0.3) % (W + 200) + W + 200) % (W + 200) - 100; ctx.beginPath(); ctx.moveTo(x - 120, GROUND + 40); ctx.lineTo(x, GROUND - 120 - (i % 3) * 40); ctx.lineTo(x + 120, GROUND + 40); ctx.fill(); }
+            ctx.save(); ctx.translate(-camX, 0);
+            for (let i = 0; i < pillars.length; i++) { const p = pillars[i]; ctx.fillStyle = "#1b1b2f"; ctx.fillRect(p.x, GROUND, p.w, H - GROUND); if (i > 0) { ctx.fillStyle = "#ff4d6d"; ctx.fillRect(p.x + p.w / 2 - 5, GROUND, 10, 6); } }
+            const p = pillars[cur], base = p.x + p.w;
+            if (phase !== "wait" || stick.len > 0) { ctx.save(); ctx.translate(base, GROUND); ctx.rotate(stick.ang); ctx.fillStyle = "#3b2a1a"; ctx.fillRect(0, -2, stick.len, 4); ctx.restore(); }
+            hero(hx, GROUND + fall);
+            ctx.restore();
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), W / 2, 90, 48, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (msg && msg.t > 0) Kit.text(ctx, msg.s, W / 2, 140, 20, "#ffc94d", "center");
+            if (state === "play" && score === 0 && phase === "wait") Kit.text(ctx, T("Hold to grow the stick", "החזיקו כדי להאריך את המקל"), W / 2, GROUND - 120, 18, "#fff", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); press(); });
+        window.addEventListener("pointerup", release);
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "go", ArrowUp: "go", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "go") press(); }, (a) => { if (a === "go") release(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); if (msg) msg.t -= dt; fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.stick = { get s() { return { state, score, phase }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Stick Bridge</h2><p>A simple game about guessing distances. Your little ninja stands on a pillar, and the next pillar is somewhere across a gap. Hold down to grow a stick, then let go. The stick tips over and becomes a bridge. If it lands on the next pillar, your ninja walks across. If it's too short or too long, down they go. Hitting the red spot in the middle of a pillar gives extra points, and more for every perfect hit in a row.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Hold tap, mouse or Space</td><td>Grow the stick</td></tr><tr><td>Let go</td><td>Drop the stick</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The stick grows at the same speed every time, so you can learn to count.</li><li>Narrow pillars are harder. Aim for the middle.</li><li>Perfect hits in a row are worth more and more.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Stick Bridge</h3><p>Stick Bridge is a game of judging distance. The stick always grows at the same speed, so the length depends only on how long you hold. Some players count in their head, others watch the stick top and imagine it falling over onto the gap.</p><p>The stick falls from the edge of your pillar, so the length you need is the gap plus part of the next pillar. Aim for the middle of the next pillar, not its near edge, to give yourself room for error both ways.</p><p>The red spot in the middle gives bonus points, and a chain of perfect hits adds more each time. If you're going for a high score, take the time to aim. If you just want to survive, aim for the middle anyway since that's the safest place.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Cross 10 gaps.</li><li><b>Getting good:</b> Score 25 points.</li><li><b>Expert:</b> Hit 3 perfect spots in a row.</li></ul><h3>Did you know?</h3><p>Judging distance is called depth perception. Our two eyes see from slightly different places, and the brain uses that difference to work out how far away things are.</p><h3>Questions players ask</h3><h4>What happens if the stick is too long?</h4><p>It goes past the next pillar and your ninja walks off the end and falls.</p><h4>How do I get bonus points?</h4><p>Make the stick end land on the red spot in the middle of the pillar.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TileMatch/tilematch">Tile Match</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/Game2048/2048">2048</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

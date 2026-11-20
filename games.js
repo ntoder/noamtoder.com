@@ -79,6 +79,10 @@ export const GAMES = {
     tilematch: { name: "Tile Match", path: "/TileMatch/tilematch", img: "/thumbs/tilematch.png", tags: ["puzzle"], desc: "Tap tiles into the tray. Three of a kind disappear!", isNew: true },
     helixdrop: { name: "Helix Drop", path: "/HelixDrop/helixdrop", img: "/thumbs/helixdrop.png", tags: ["arcade"], desc: "Spin the tower and drop the ball through the gaps.", isNew: true },
     knifethrow: { name: "Knife Throw", path: "/KnifeThrow/knifethrow", img: "/thumbs/knifethrow.png", tags: ["arcade"], desc: "Stick every knife in the spinning log.", isNew: true },
+    pianotiles: { name: "Piano Tiles", path: "/PianoTiles/pianotiles", img: "/thumbs/pianotiles.png", tags: ["arcade", "music"], desc: "Tap the black tiles to play a song. Never tap white!", isNew: true },
+    stickbridge: { name: "Stick Bridge", path: "/StickBridge/stickbridge", img: "/thumbs/stickbridge.png", tags: ["arcade"], desc: "Grow a stick just long enough to cross the gap.", isNew: true },
+    citydefender: { name: "City Defender", path: "/CityDefender/citydefender", img: "/thumbs/citydefender.png", tags: ["arcade", "shooter"], desc: "Tap the sky to stop falling rockets and save your cities.", isNew: true },
+    alieninvaders: { name: "Alien Invaders", path: "/AlienInvaders/invaders", img: "/thumbs/alieninvaders.png", tags: ["arcade", "shooter"], desc: "Blast the marching alien army before it lands.", isNew: true },
 };
 
 // Games that only count plays (no score)
