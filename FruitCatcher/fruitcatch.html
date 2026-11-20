@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A cheerful catching game for all ages. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Fruit Catcher · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Fruit <span>Catcher</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="520" height="680"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Fruit Catcher</h2>
+                <p id="startText">Move the basket with the mouse, your finger or ⬅ ➡. Catch all the fruit you can!<br>⭐ stars are worth 50. 🐢 slows everything down and 🧺 gives you a bigger basket. But catching 💣 🥾 or 🦴 costs a life!</p>
+                <button class="btn" id="startBtn">🧺 Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🧺 Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button></div>
+    <p class="hint">Watch out for junk falling right next to fruit. Sometimes it's better to let a fruit go.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Fruit Catcher — move the basket, catch falling fruit, avoid the rotten stuff and bombs
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "fruitcatchBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const GOOD = ["🍎", "🍌", "🍇", "🍓", "🍊", "🍐", "🍒", "🍉", "🥝", "🍍"], BAD = ["💣", "🥾", "🦴"];
+        let bx, items, score, lives, combo, spawnT, t, state = "ready", fx = Kit.particles(), pops = [], tx = null, slow = 0, wide = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function start() { bx = W / 2; items = []; score = 0; lives = 3; combo = 0; spawnT = 0; t = 0; slow = 0; wide = 0; state = "play"; Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️"); Kit.hide("start"); Kit.hide("over"); }
+        function spawn() { const r = Math.random(); const kind = r < 0.14 + Math.min(0.12, t / 300) ? "bad" : r < 0.18 ? "gold" : r < 0.2 ? "power" : "good"; items.push({ x: Kit.rand(30, W - 30), y: -30, vy: Kit.rand(140, 200) + t * 2.2, e: kind === "bad" ? Kit.pick(BAD) : kind === "gold" ? "⭐" : kind === "power" ? Kit.pick(["🐢", "🧺"]) : Kit.pick(GOOD), kind, rot: Kit.rand(-1, 1) }); }
+        function update(dt) {
+            t += dt; slow -= dt; wide -= dt; const sp = slow > 0 ? 0.5 : 1;
+            const k = Kit.keys; if (k.has("left")) bx -= 520 * dt; if (k.has("right")) bx += 520 * dt; if (tx !== null) bx += (tx - bx) * Math.min(1, dt * 14);
+            const bw = wide > 0 ? 130 : 84; bx = Math.max(bw / 2, Math.min(W - bw / 2, bx));
+            spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = Math.max(0.28, 0.9 - t * 0.008); }
+            for (const it of items) {
+                it.y += it.vy * sp * dt; it.rot += dt;
+                if (it.y > H - 70 && it.y < H - 40 && Math.abs(it.x - bx) < bw / 2 + 6 && !it.done) {
+                    it.done = true;
+                    if (it.kind === "bad") { lives--; combo = 0; Kit.stat("lives", "❤️".repeat(Math.max(0, lives)) + "🖤".repeat(3 - Math.max(0, lives))); fx.burst(it.x, it.y, "#555", 20, 4); beep(100, 0.3, "sawtooth", 0.06); if (lives <= 0) return end(); }
+                    else if (it.kind === "power") { if (it.e === "🐢") slow = 5; else wide = 8; tune([660, 990], 0.05, "triangle", 0.04); pops.push({ x: it.x, y: it.y, s: it.e === "🐢" ? T("Slow-mo!", "הילוך איטי!") : T("Big basket!", "סל גדול!"), t: 1 }); }
+                    else { combo++; const p = (it.kind === "gold" ? 50 : 10) * Math.min(5, 1 + Math.floor(combo / 10)); score += p; Kit.stat("score", score); pops.push({ x: it.x, y: it.y, s: `+${p}`, t: 1 }); beep(500 + Math.min(combo, 20) * 25, 0.04, "square", 0.03); }
+                }
+                if (it.y > H + 20 && !it.done) { it.done = true; if (it.kind === "good" || it.kind === "gold") combo = 0; }
+            }
+            items = items.filter((i) => !i.done);
+        }
+        function end() { state = "over"; Kit.save(Math.floor(score / 5)); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Oops! Too much junk in the basket.", "אופס! יותר מדי זבל בסל.")}<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, slow > 0 ? "#c6e8ff" : "#9fd8ff"); g.addColorStop(1, "#e8f7ff"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#3f8a3a"; ctx.beginPath(); ctx.arc(-40, 40, 140, 0, 7); ctx.arc(W + 40, 60, 150, 0, 7); ctx.fill(); ctx.fillStyle = "#6b4a2a"; ctx.fillRect(-20, 120, 30, H); ctx.fillRect(W - 10, 140, 30, H);
+            ctx.fillStyle = "#7cc46a"; ctx.fillRect(0, H - 30, W, 30);
+            if (!items) return;
+            for (const it of items) { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rot * 0.5); Kit.text(ctx, it.e, 0, 12, 34, "#000", "center"); ctx.restore(); }
+            const bw = wide > 0 ? 130 : 84; ctx.fillStyle = "#b07a45"; ctx.beginPath(); ctx.moveTo(bx - bw / 2, H - 70); ctx.lineTo(bx + bw / 2, H - 70); ctx.lineTo(bx + bw / 2 - 12, H - 32); ctx.lineTo(bx - bw / 2 + 12, H - 32); ctx.fill();
+            ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 3; for (let y = H - 62; y < H - 34; y += 9) { ctx.beginPath(); ctx.moveTo(bx - bw / 2 + 6, y); ctx.lineTo(bx + bw / 2 - 6, y); ctx.stroke(); } ctx.beginPath(); ctx.arc(bx, H - 70, bw * 0.38, Math.PI, 0); ctx.stroke();
+            fx.draw(ctx);
+            for (const p of pops) Kit.text(ctx, p.s, p.x, p.y - (1 - p.t) * 40, 18, "#1a6a2a", "center");
+            Kit.text(ctx, String(score), W / 2, 44, 28, "#1a2a4a", "center", "'Press Start 2P', monospace", 400);
+            if (combo >= 10) Kit.text(ctx, `🔥 x${Math.min(5, 1 + Math.floor(combo / 10))}`, W / 2, 76, 18, "#ff7a3c", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { tx = Kit.point(cv, e).x; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (tx !== null || e.pointerType === "mouse") tx = Kit.point(cv, e).x; });
+        cv.addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") tx = null; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "left" || a === "right") tx = null; });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.04)); pops.forEach((p) => (p.t -= dt * 1.5)); pops = pops.filter((p) => p.t > 0); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.fc = { get s() { return { state, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Fruit Catcher</h2><p>A cheerful catching game for all ages. Fruit tumbles down from the trees and you slide your basket left and right to catch it. Catch ten in a row and your points multiply. Stars are worth extra, the turtle puts everything in slow motion, and the big basket makes catching easier for a while. But bombs, old boots and bones fall too, and every one you catch costs a heart. It gets faster the longer you play.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse, drag or ⬅ ➡</td><td>Move the basket</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Catching 10 in a row starts a combo multiplier.</li><li>Missing a fruit breaks your combo.</li><li>Grab 🐢 when it gets too fast.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Fruit Catcher</h3><p>Fruit Catcher is about keeping your eyes up. Look at what's falling high on the screen, not just what's about to land, so you can plan where to move next.</p><p>Your combo multiplier grows with every ten fruits in a row, up to five times the points. Missing a fruit resets it, so it's worth stretching for every one, unless a bomb is in the way.</p><p>Junk is the real danger. If a boot is falling right next to an apple, let the apple go. Losing a combo is better than losing a heart.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score 300 points.</li><li><b>Getting good:</b> Reach a x3 combo.</li><li><b>Expert:</b> Score 2,000 points.</li></ul><h3>Did you know?</h3><p>Apples float in water because about a quarter of an apple is air. That's why bobbing for apples works!</p><h3>Questions players ask</h3><h4>What costs a life?</h4><p>Catching a bomb, a boot or a bone.</p><h4>What do the 🐢 and 🧺 do?</h4><p>The turtle slows everything down for 5 seconds; the basket makes yours bigger for 8 seconds.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/GoldMiner/goldminer">Gold Miner</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/HigherLower/higherlower">Higher or Lower</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
