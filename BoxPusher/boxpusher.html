@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic warehouse puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Box Pusher · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Box <span>Pusher</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1/10</b><small>Level</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="600"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Box Pusher</h2>
+                <p id="startText">Use the arrow keys, WASD or swipe to walk. Walk into a crate to push it.<br>Get every crate onto a gold circle to finish the level. You can only push, never pull! Made a mistake? Press Z to undo or R to restart.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>All solved!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Start from level 1</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button><button data-k="undo">↶</button><button data-k="reset">⟲</button></div>
+    <p class="hint">Never push a crate into a corner unless there's a target there. You'll never get it out!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Box Pusher — classic Sokoban: push every crate onto a target. Undo + restart
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "boxpusherBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        // # wall, . target, $ box, * box on target, @ player, + player on target
+        const LEVELS = [
+            ["#####", "#@$.#", "#####"].join("\n"),
+            ["######", "#    #", "# @$.#", "#  $.#", "######"].join("\n"),
+            ["#######", "#  .  #", "# #$# #", "#.$@$.#", "# #$# #", "#  .  #", "#######"].join("\n"),
+            ["#######", "#.  # #", "#.$$  #", "#. $@ #", "#######"].join("\n"),
+            [" ####", "##  #", "# $ #", "# $@#", "#.$ ##", "#.. #", "#####"].join("\n"),
+            ["  ####", "###  #", "#  $ #", "# #. ###", "# .$  .#", "# @$ ###", "###  #", "  ####"].join("\n"),
+            ["########", "#  .   #", "# $$#  #", "#.  @ .#", "#  $#$ #", "#  .   #", "########"].join("\n"),
+            ["####", "# .#", "#  ###", "#*@  #", "#  $ #", "#  ###", "####"].join("\n"),
+            ["  #####", "###   #", "#.@$  #", "### $.#", "#.##$ #", "# # . ##", "#$ *$$.#", "#   .  #", "########"].join("\n"),
+            ["########", "#..    #", "#..$ $ #", "###$## #", "  #  $ #", "  # @  #", "  ######"].join("\n"),
+        ];
+        let lv = 0, grid, px, py, boxes, goals, moves, hist, state = "ready", winT = 0, face = 1;
+        Kit.stat("best", Kit.best(BEST));
+        function load(i) {
+            lv = i; const rows = LEVELS[i].split("\n"); grid = []; boxes = new Set(); goals = new Set(); moves = 0; hist = [];
+            rows.forEach((r, y) => { grid.push([]); [...r].forEach((ch, x) => { grid[y][x] = ch === "#" ? 1 : 0; if (".*+".includes(ch)) goals.add(x + "," + y); if ("$*".includes(ch)) boxes.add(x + "," + y); if ("@+".includes(ch)) { px = x; py = y; } }); });
+            // mark outside cells (unreachable) as void
+            const H2 = grid.length, W2 = Math.max(...grid.map((r) => r.length)); grid.forEach((r) => { while (r.length < W2) r.push(0); });
+            const seen = new Set([px + "," + py]), st = [[px, py]]; while (st.length) { const [x, y] = st.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (ny < 0 || ny >= H2 || nx < 0 || nx >= W2 || grid[ny][nx] === 1 || seen.has(nx + "," + ny)) continue; seen.add(nx + "," + ny); st.push([nx, ny]); } }
+            for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) if (!grid[y][x] && !seen.has(x + "," + y)) grid[y][x] = 2;
+            winT = 0; Kit.stat("level", `${i + 1}/${LEVELS.length}`); Kit.stat("moves", 0); state = "play";
+        }
+        function start() { const saved = +(localStorage.getItem("boxpusherLevel") || 0); load(Math.min(saved, LEVELS.length - 1)); Kit.hide("start"); Kit.hide("over"); }
+        function move(dx, dy) {
+            if (state !== "play" || winT) return; if (dx) face = dx;
+            const nx = px + dx, ny = py + dy, k = nx + "," + ny; if (grid[ny]?.[nx] !== 0) return beep(120, 0.03, "square", 0.02);
+            if (boxes.has(k)) { const bx = nx + dx, by = ny + dy, bk = bx + "," + by; if (grid[by]?.[bx] !== 0 || boxes.has(bk)) return beep(120, 0.03, "square", 0.02); hist.push({ px, py, boxes: new Set(boxes) }); boxes.delete(k); boxes.add(bk); beep(goals.has(bk) ? 880 : 260, 0.05, "triangle", 0.04); }
+            else hist.push({ px, py, boxes: new Set(boxes) });
+            px = nx; py = ny; moves++; Kit.stat("moves", moves);
+            if ([...boxes].every((b) => goals.has(b))) { winT = 1.2; tune([523, 659, 784, 1047], 0.08, "square", 0.05); Kit.save(30); Kit.setBest(BEST, lv + 1); localStorage.setItem("boxpusherLevel", Math.max(+(localStorage.getItem("boxpusherLevel") || 0), lv + 1)); }
+        }
+        function undo() { const h = hist.pop(); if (!h) return; px = h.px; py = h.py; boxes = h.boxes; moves = Math.max(0, moves - 1); Kit.stat("moves", moves); beep(500, 0.03, "sine", 0.02); }
+        function draw() {
+            ctx.fillStyle = "#1a1530"; ctx.fillRect(0, 0, W, H);
+            if (!grid) return;
+            const gh = grid.length, gw = grid[0].length, cs = Math.min(64, (W - 40) / gw, (H - 100) / gh), ox = (W - gw * cs) / 2, oy = 60 + (H - 80 - gh * cs) / 2;
+            for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+                const v = grid[y][x], X = ox + x * cs, Y = oy + y * cs;
+                if (v === 1) { ctx.fillStyle = "#6b4a8a"; Kit.rr(ctx, X + 1, Y + 1, cs - 2, cs - 2, 6); ctx.fill(); ctx.fillStyle = "#7d5aa0"; ctx.fillRect(X + 4, Y + 4, cs - 8, cs * 0.3); }
+                else if (v === 0) { ctx.fillStyle = (x + y) % 2 ? "#2c2550" : "#30295a"; ctx.fillRect(X, Y, cs, cs); if (goals.has(x + "," + y)) { ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X + cs / 2, Y + cs / 2, cs * 0.2, 0, 7); ctx.stroke(); } }
+            }
+            for (const b of boxes) { const [x, y] = b.split(",").map(Number), X = ox + x * cs, Y = oy + y * cs, on = goals.has(b); ctx.fillStyle = on ? "#2ee6a0" : "#d9963a"; Kit.rr(ctx, X + cs * 0.1, Y + cs * 0.1, cs * 0.8, cs * 0.8, 6); ctx.fill(); ctx.strokeStyle = on ? "#1a8a60" : "#a0682a"; ctx.lineWidth = 3; ctx.strokeRect(X + cs * 0.22, Y + cs * 0.22, cs * 0.56, cs * 0.56); ctx.beginPath(); ctx.moveTo(X + cs * 0.22, Y + cs * 0.22); ctx.lineTo(X + cs * 0.78, Y + cs * 0.78); ctx.moveTo(X + cs * 0.78, Y + cs * 0.22); ctx.lineTo(X + cs * 0.22, Y + cs * 0.78); ctx.stroke(); }
+            const X = ox + px * cs + cs / 2, Y = oy + py * cs + cs / 2;
+            ctx.fillStyle = "#5cc8ff"; ctx.beginPath(); ctx.arc(X, Y + cs * 0.05, cs * 0.32, 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(X + face * cs * 0.1, Y - cs * 0.04, cs * 0.08, 0, 7); ctx.fill(); ctx.fillStyle = "#1a1a2a"; ctx.beginPath(); ctx.arc(X + face * cs * 0.13, Y - cs * 0.04, cs * 0.04, 0, 7); ctx.fill(); ctx.fillStyle = "#ff4d6d"; ctx.fillRect(X - cs * 0.3, Y - cs * 0.22, cs * 0.6, cs * 0.08);
+            Kit.text(ctx, `${T("Level", "שלב")} ${lv + 1}`, W / 2, 36, 22, "#fff", "center");
+            Kit.text(ctx, T("Z = undo · R = restart", "Z = ביטול · R = התחלה מחדש"), W / 2, H - 14, 13, "#ffffff77", "center");
+            if (winT) Kit.text(ctx, T("Level complete! 🎉", "השלב הושלם! 🎉"), W / 2, H / 2, 34, "#ffc94d", "center");
+        }
+        Kit.onKeys({ ArrowUp: "u", ArrowDown: "d", ArrowLeft: "l", ArrowRight: "r", KeyW: "u", KeyS: "d", KeyA: "l", KeyD: "r", KeyZ: "undo", Backspace: "undo", KeyR: "reset", Enter: "enter", "+ArrowUp": "u" }, (a) => {
+            if (a === "enter") { if (state !== "play") start(); return; }
+            if (a === "undo") return undo(); if (a === "reset") return load(lv);
+            move(...{ u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] }[a]);
+        });
+        Kit.swipe(cv, (d) => move(...{ up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[d]));
+        Kit.touchButtons((k) => { if (k === "undo") undo(); else if (k === "reset") load(lv); else move(...{ up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[k]); });
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { localStorage.setItem("boxpusherLevel", 0); start(); };
+        Kit.loop((dt) => { if (winT) { winT -= dt; if (winT <= 0) { winT = 0; if (lv + 1 >= LEVELS.length) { state = "over"; $("overText").innerHTML = T("You solved every puzzle! 🏆", "פתרתם את כל הפאזלים! 🏆"); Kit.show("over"); } else load(lv + 1); } } draw(); }).start();
+        if (window.__test) window.__test.box = { get s() { return { lv, moves, px, py, boxes: [...boxes] }; }, start, load, move };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Box Pusher</h2><p>A classic warehouse puzzle. You're a little worker in a maze of walls, and your job is to push every crate onto a gold target spot. You can push a crate if there's free floor behind it, but you can never pull one, and you can't push two at once. That means one wrong push can trap a crate for good. Plan ahead, use undo freely, and work through ten levels of growing difficulty. Your progress is saved.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrows, WASD or swipe</td><td>Walk / push</td></tr><tr><td>Z or Backspace</td><td>Undo</td></tr><tr><td>R</td><td>Restart the level</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>A crate in a corner is stuck forever (unless that's a target).</li><li>A crate against a wall can only slide along that wall.</li><li>Work out which crate goes on which target before you start.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Box Pusher</h3><p>Box Pusher is about avoiding dead ends. Because you can only push, a crate pushed into a corner can never move again. A crate pushed against a wall can only slide along that wall. Before every push, ask yourself: can I still get this crate to a target from there?</p><p>Plan the order. Usually the targets furthest inside the room need to be filled first, otherwise the crates you placed earlier block the way. Look at the level for a while before you move.</p><p>Undo is your friend. Press Z as many times as you like to step back. There's no penalty, so experiment, and if a level gets really tangled, press R to start it fresh.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve level 3.</li><li><b>Getting good:</b> Solve level 6.</li><li><b>Expert:</b> Solve all 10 levels.</li></ul><h3>Did you know?</h3><p>This kind of puzzle is called Sokoban, which means 'warehouse keeper' in Japanese. The first version was made in Japan in 1981.</p><h3>Questions players ask</h3><h4>Can I pull a crate?</h4><p>No, only push. That's what makes it tricky!</p><h4>Is my progress saved?</h4><p>Yes, the game remembers the furthest level you've reached on this device.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BrickBalls/brickballs">Brick Balls</a><a href="/CellEater/celleater">Cell Eater</a><a href="/ColorTrick/colortrick">Color Trick</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

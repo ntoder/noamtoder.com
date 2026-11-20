@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A maze-blasting action game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Bomb Maze · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Bomb <span>Maze</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="lives">❤️❤️❤️</b><small>Lives</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="760" height="580"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Bomb Maze</h2>
+                <p id="startText">Arrow keys or WASD to walk, Space to drop a bomb. Then run! Bombs blast in a cross shape.<br>Blow up the crates to find power-ups: 💣 more bombs, 🔥 bigger blasts, 👟 more speed. Knock out every robot to clear the level, but don't get caught in your own blast!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button><button data-k="bomb">💣</button></div>
+    <p class="hint">After dropping a bomb, step around a corner. The blast only goes in straight lines.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Bomb Maze — drop bombs to blast crates and the robots. Power-ups: extra bomb, bigger blast, speed
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "bombmazeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const GW = 15, GH = 11, CS = 48, OX = (W - GW * CS) / 2, OY = 40;
+        let g, me, foes, bombs, fires, pups, level, score, state = "ready", fx = Kit.particles(), lvlT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function build() {
+            g = []; for (let y = 0; y < GH; y++) { g.push([]); for (let x = 0; x < GW; x++) { const wall = x === 0 || y === 0 || x === GW - 1 || y === GH - 1 || (x % 2 === 0 && y % 2 === 0); g[y][x] = wall ? 1 : 0; } }
+            const safe = (x, y) => (x <= 2 && y <= 2);
+            for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) if (!g[y][x] && !safe(x, y) && Math.random() < 0.55) g[y][x] = 2;
+            pups = []; foes = [];
+            const n = Math.min(6, 2 + level);
+            while (foes.length < n) { const x = Kit.randi(5, GW - 2), y = Kit.randi(1, GH - 2); if (g[y][x] === 1) continue; g[y][x] = 0; foes.push({ x, y, fx: x, fy: y, dir: Kit.pick([[1, 0], [-1, 0], [0, 1], [0, -1]]), sp: 2.2 + level * 0.25 + Math.random(), smart: Math.random() < 0.15 + level * 0.08 }); }
+            bombs = []; fires = []; me.x = me.fx = 1; me.y = me.fy = 1; me.moving = null; lvlT = 0; Kit.stat("level", level);
+        }
+        function start() { me = { x: 1, y: 1, fx: 1, fy: 1, bombs: 1, range: 2, speed: 5, lives: 3, moving: null, inv: 0 }; level = 1; score = 0; state = "play"; build(); Kit.stat("score", 0); Kit.stat("lives", "❤️❤️❤️"); Kit.hide("start"); Kit.hide("over"); }
+        const free = (x, y, ignoreBomb) => g[y] && g[y][x] === 0 && (ignoreBomb || !bombs.some((b) => b.x === x && b.y === y));
+        function drop() { if (state !== "play" || me.dead) return; const x = Math.round(me.fx), y = Math.round(me.fy); if (bombs.filter((b) => b.own).length >= me.bombs || bombs.some((b) => b.x === x && b.y === y)) return; bombs.push({ x, y, t: 2.2, own: true, range: me.range }); beep(300, 0.05, "square", 0.03); }
+        function explode(b) {
+            b.done = true; beep(80, 0.3, "sawtooth", 0.06); const cells = [[b.x, b.y]];
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let i = 1; i <= b.range; i++) { const x = b.x + dx * i, y = b.y + dy * i; if (g[y][x] === 1) break; cells.push([x, y]); if (g[y][x] === 2) { g[y][x] = 0; score += 10; if (Math.random() < 0.3) pups.push({ x, y, k: Kit.pick(["bomb", "range", "speed"]) }); fx.burst(OX + x * CS + CS / 2, OY + y * CS + CS / 2, "#c08a4a", 10, 3); break; } }
+            for (const [x, y] of cells) { fires.push({ x, y, t: 0.5 }); const ob = bombs.find((q) => !q.done && q.x === x && q.y === y); if (ob) ob.t = Math.min(ob.t, 0.05); pups = pups.filter((p) => !(p.x === x && p.y === y && p.age > 0.5)); }
+            Kit.stat("score", score);
+        }
+        function stepMover(m, dt, sp) {
+            if (!m.moving) return; const [tx, ty] = m.moving, dx = tx - m.fx, dy = ty - m.fy, d = Math.hypot(dx, dy), s = sp * dt;
+            if (d <= s) { m.fx = tx; m.fy = ty; m.x = tx; m.y = ty; m.moving = null; } else { m.fx += (dx / d) * s; m.fy += (dy / d) * s; }
+        }
+        function update(dt) {
+            lvlT += dt; if (me.inv > 0) me.inv -= dt;
+            const k = Kit.keys;
+            if (!me.moving && !me.dead) { const dir = k.has("up") ? [0, -1] : k.has("down") ? [0, 1] : k.has("left") ? [-1, 0] : k.has("right") ? [1, 0] : null; if (dir) { const nx = me.x + dir[0], ny = me.y + dir[1]; if (free(nx, ny)) me.moving = [nx, ny]; } }
+            stepMover(me, dt, me.speed);
+            for (const f of foes) {
+                if (!f.moving) {
+                    let opts = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => free(f.x + dx, f.y + dy) && !fires.some((q) => q.x === f.x + dx && q.y === f.y + dy));
+                    if (f.smart && Math.random() < 0.6) { opts.sort((a, b) => Math.hypot(f.x + a[0] - me.x, f.y + a[1] - me.y) - Math.hypot(f.x + b[0] - me.x, f.y + b[1] - me.y)); if (opts.length) f.dir = opts[0]; }
+                    else if (!opts.some(([dx, dy]) => dx === f.dir[0] && dy === f.dir[1]) || Math.random() < 0.2) f.dir = opts.length ? Kit.pick(opts) : f.dir;
+                    if (free(f.x + f.dir[0], f.y + f.dir[1])) f.moving = [f.x + f.dir[0], f.y + f.dir[1]];
+                }
+                stepMover(f, dt, f.sp);
+                if (!me.dead && me.inv <= 0 && Math.hypot(f.fx - me.fx, f.fy - me.fy) < 0.6) hurt();
+            }
+            for (const b of bombs) { b.t -= dt; if (b.t <= 0 && !b.done) explode(b); } bombs = bombs.filter((b) => !b.done);
+            for (const f of fires) { f.t -= dt; if (!me.dead && me.inv <= 0 && Math.round(me.fx) === f.x && Math.round(me.fy) === f.y) hurt(); for (const o of foes) if (!o.dead && Math.round(o.fx) === f.x && Math.round(o.fy) === f.y) { o.dead = true; score += 100; Kit.stat("score", score); fx.burst(OX + o.fx * CS + CS / 2, OY + o.fy * CS + CS / 2, "#ff4dd2", 20, 4); tune([660, 880], 0.05, "square", 0.04); } }
+            fires = fires.filter((f) => f.t > 0); foes = foes.filter((f) => !f.dead);
+            for (const p of pups) { p.age = (p.age || 0) + dt; if (Math.round(me.fx) === p.x && Math.round(me.fy) === p.y) { p.got = true; if (p.k === "bomb") me.bombs++; if (p.k === "range") me.range++; if (p.k === "speed") me.speed = Math.min(9, me.speed + 1); tune([880, 1320], 0.05, "triangle", 0.04); } } pups = pups.filter((p) => !p.got);
+            if (!foes.length && !me.dead) { score += 500; Kit.stat("score", score); level++; tune([523, 659, 784, 1047], 0.08, "square", 0.05); build(); }
+        }
+        function hurt() { me.lives--; Kit.stat("lives", "❤️".repeat(Math.max(0, me.lives)) + "🖤".repeat(3 - Math.max(0, me.lives))); fx.burst(OX + me.fx * CS + CS / 2, OY + me.fy * CS + CS / 2, "#5cc8ff", 30, 4); beep(100, 0.4, "sawtooth", 0.06); if (me.lives <= 0) { me.dead = true; state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Game over!", "המשחק נגמר!")}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 700); return; } me.inv = 2; me.x = me.fx = 1; me.y = me.fy = 1; me.moving = null; }
+        function draw() {
+            ctx.fillStyle = "#1d2a1d"; ctx.fillRect(0, 0, W, H);
+            if (!g) return;
+            for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+                const X = OX + x * CS, Y = OY + y * CS, v = g[y][x];
+                ctx.fillStyle = (x + y) % 2 ? "#3f7a3a" : "#468440"; ctx.fillRect(X, Y, CS, CS);
+                if (v === 1) { ctx.fillStyle = "#6a6f80"; Kit.rr(ctx, X + 1, Y + 1, CS - 2, CS - 2, 6); ctx.fill(); ctx.fillStyle = "#8a90a3"; ctx.fillRect(X + 4, Y + 4, CS - 8, 8); }
+                if (v === 2) { ctx.fillStyle = "#b07a45"; Kit.rr(ctx, X + 3, Y + 3, CS - 6, CS - 6, 4); ctx.fill(); ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 3; ctx.strokeRect(X + 8, Y + 8, CS - 16, CS - 16); }
+            }
+            for (const p of pups) Kit.text(ctx, { bomb: "💣", range: "🔥", speed: "👟" }[p.k], OX + p.x * CS + CS / 2, OY + p.y * CS + CS / 2 + 10, 26, "#fff", "center");
+            for (const b of bombs) { const X = OX + b.x * CS + CS / 2, Y = OY + b.y * CS + CS / 2, s = 1 + Math.sin(b.t * 12) * 0.08; ctx.fillStyle = "#1a1a2a"; ctx.beginPath(); ctx.arc(X, Y + 3, 15 * s, 0, 7); ctx.fill(); ctx.strokeStyle = "#ffc94d"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X + 8, Y - 10); ctx.quadraticCurveTo(X + 14, Y - 20, X + 18, Y - 16); ctx.stroke(); if (Math.floor(b.t * 10) % 2) { ctx.fillStyle = "#ff7a3c"; ctx.beginPath(); ctx.arc(X + 18, Y - 16, 4, 0, 7); ctx.fill(); } }
+            for (const f of fires) { const X = OX + f.x * CS, Y = OY + f.y * CS; ctx.fillStyle = `rgba(255,${120 + f.t * 200},40,${0.5 + f.t})`; Kit.rr(ctx, X + 4, Y + 4, CS - 8, CS - 8, 10); ctx.fill(); ctx.fillStyle = "#fff6a0"; Kit.rr(ctx, X + 14, Y + 14, CS - 28, CS - 28, 6); ctx.fill(); }
+            for (const f of foes) { const X = OX + f.fx * CS + CS / 2, Y = OY + f.fy * CS + CS / 2; ctx.fillStyle = f.smart ? "#ff4d6d" : "#ff9a3c"; Kit.rr(ctx, X - 16, Y - 16, 32, 30, 8); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(X - 10, Y - 8, 8, 8); ctx.fillRect(X + 2, Y - 8, 8, 8); ctx.fillStyle = "#000"; ctx.fillRect(X - 7 + f.dir[0] * 2, Y - 5, 4, 4); ctx.fillRect(X + 5 + f.dir[0] * 2, Y - 5, 4, 4); ctx.fillStyle = "#c9ccd9"; ctx.fillRect(X - 1, Y - 24, 2, 8); ctx.beginPath(); ctx.arc(X, Y - 25, 3, 0, 7); ctx.fill(); }
+            if (!me.dead && (me.inv <= 0 || Math.floor(me.inv * 10) % 2)) { const X = OX + me.fx * CS + CS / 2, Y = OY + me.fy * CS + CS / 2; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(X, Y - 6, 12, 0, 7); ctx.fill(); ctx.fillStyle = "#5cc8ff"; Kit.rr(ctx, X - 11, Y + 2, 22, 16, 6); ctx.fill(); ctx.fillStyle = "#ffd9b3"; ctx.fillRect(X - 7, Y - 10, 14, 8); ctx.fillStyle = "#000"; ctx.fillRect(X - 5, Y - 8, 3, 4); ctx.fillRect(X + 2, Y - 8, 3, 4); ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(X, Y - 20, 4, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, `💣${me ? me.bombs : 1}  🔥${me ? me.range : 2}  👟${me ? me.speed - 4 : 1}`, OX, 28, 16, "#fff", "left");
+            Kit.text(ctx, `🤖 ${foes.length}`, W - OX, 28, 16, "#fff", "right");
+            if (lvlT < 1.5) Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, H / 2, 40, "#ffc94d", "center", "'Press Start 2P', monospace", 400);
+        }
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Space: "bomb", KeyX: "bomb", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "bomb") drop(); });
+        Kit.touchButtons((k) => k === "bomb" && drop());
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.05)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.bomb = { get s() { return { state, level, score, foes: foes && foes.length }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Bomb Maze</h2><p>A maze-blasting action game. You're in a grid full of stone pillars and wooden crates, with robots wandering around. Drop a bomb and it explodes a couple of seconds later in a cross shape, smashing crates and zapping any robot caught in it. Crates hide power-ups that give you more bombs, bigger blasts and faster feet. Red robots are smart and chase you. Clear all the robots to move to the next level.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrows or WASD</td><td>Walk</td></tr><tr><td>Space or X</td><td>Drop a bomb</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Blasts stop at stone pillars, so hide behind one.</li><li>Your own bomb can hurt you!</li><li>Red robots chase you; orange ones wander.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Bomb Maze</h3><p>In Bomb Maze, the key move is 'drop and hide'. Bombs explode in a straight cross, so after you drop one, walk around a corner or behind a stone pillar. You're safe as long as you're not in a straight line from the bomb.</p><p>Clear crates early to collect power-ups. More bombs let you trap robots between two blasts, and a bigger blast range reaches robots from further away. Speed helps you escape, but be careful not to run into your own blast.</p><p>Robots move along the corridors. Drop a bomb where a robot is heading, then step away. Red robots follow you, which makes them easier to lure into a trap: let them chase you past a bomb you've just dropped.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear level 1.</li><li><b>Getting good:</b> Collect 3 power-ups.</li><li><b>Expert:</b> Reach level 5.</li></ul><h3>Did you know?</h3><p>This style of maze-bombing game started on home computers in the 1980s and became one of the most popular party games for four players.</p><h3>Questions players ask</h3><h4>Can my own bomb hurt me?</h4><p>Yes! Always step out of the cross shape before it goes off.</p><h4>How do I finish a level?</h4><p>Knock out every robot.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BoxPusher/boxpusher">Box Pusher</a><a href="/BurgerChef/burgerchef">Burger Chef</a><a href="/ColorHop/colorhop">Color Hop</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

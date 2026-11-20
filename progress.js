@@ -49,6 +49,8 @@ export const TARGETS = {
     snakearena:   { easy: 800,  hard: 3000,  unit: "points" },
     roadhopper:   { easy: 30,   hard: 120,   unit: "hops" },
     hillrider:    { easy: 300,  hard: 1500,  unit: "m" },
+    bombmaze: { easy: 1500, hard: 5000, unit: "points" },
+    boxpusher: { easy: 5, hard: 10, unit: "levels" },
     ludo: { easy: 1, hard: 3, unit: "wins" },
     pinball: { easy: 20000, hard: 80000, unit: "points" },
     neonslope: { easy: 300, hard: 1200, unit: "points" },
