@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A satisfying aim-and-shoot puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Brick Balls · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Brick <span>Balls</span></h1>
+        <div class="stats"><div class="stat"><b id="turn">1</b><small>Turn</small></div><div class="stat"><b id="balls">1</b><small>Balls</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="490" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Brick Balls</h2>
+                <p id="startText">Drag or point to aim, then let go to fire all your balls. Each hit takes 1 off a brick's number.<br>Grab the green rings to get more balls. After each turn the bricks move down. Don't let them reach the red line!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Aim for gaps to get balls bouncing above the bricks. Up there they hit lots of bricks from behind.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Brick Balls — aim and fire a stream of balls at numbered bricks that move down each turn
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "brickballsBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = 7, CS = W / COLS, TOP = 70, ROWS = 9, BOTTOM = TOP + ROWS * CS, BR = 7;
+        let bricks, balls, nBalls, launchX, nextX, aim, firing, fireT, fired, turn, state = "ready", fx = Kit.particles(), returned, speedUp;
+        Kit.stat("best", Kit.best(BEST));
+        function addRow() {
+            for (const b of bricks) b.r++;
+            const cells = [...Array(COLS).keys()].sort(() => Math.random() - 0.5), k = Kit.randi(2, Math.min(6, 2 + Math.floor(turn / 4)));
+            for (let i = 0; i < k; i++) bricks.push({ r: 1, c: cells[i], hp: Math.random() < 0.2 ? turn * 2 : turn, ball: false });
+            bricks.push({ r: 1, c: cells[k], hp: 1, ball: true });
+        }
+        function start() { bricks = []; balls = []; nBalls = 1; launchX = W / 2; nextX = null; turn = 1; firing = false; state = "play"; addRow(); Kit.stat("turn", 1); Kit.stat("balls", 1); Kit.hide("start"); Kit.hide("over"); }
+        function fire(dx, dy) {
+            if (state !== "play" || firing) return; const d = Math.hypot(dx, dy); if (dy > -0.15 * d) return;
+            firing = true; fired = 0; fireT = 0; returned = 0; nextX = null; speedUp = 0; aim = { x: dx / d, y: dy / d }; beep(500, 0.05, "sine", 0.03);
+        }
+        function hitRect(b, x0, y0, x1, y1) {
+            const cx = Math.max(x0, Math.min(b.x, x1)), cy = Math.max(y0, Math.min(b.y, y1)), dx = b.x - cx, dy = b.y - cy;
+            if (dx * dx + dy * dy > BR * BR) return false;
+            if (Math.abs(dx) > Math.abs(dy)) { b.vx = Math.sign(dx || -b.vx) * Math.abs(b.vx); b.x = cx + Math.sign(dx || 1) * BR; } else { b.vy = Math.sign(dy || -b.vy) * Math.abs(b.vy); b.y = cy + Math.sign(dy || 1) * BR; }
+            return true;
+        }
+        function update(dt) {
+            if (!firing) return;
+            speedUp += dt; const spd = 620 * (speedUp > 6 ? 2 : 1);
+            fireT -= dt; if (fired < nBalls && fireT <= 0) { balls.push({ x: launchX, y: BOTTOM - BR, vx: aim.x, vy: aim.y }); fired++; fireT = 0.07; }
+            const steps = 4, h = dt / steps;
+            for (let s = 0; s < steps; s++) for (const b of balls) {
+                if (b.done) continue; b.x += b.vx * spd * h; b.y += b.vy * spd * h;
+                if (b.x < BR) { b.x = BR; b.vx = Math.abs(b.vx); } if (b.x > W - BR) { b.x = W - BR; b.vx = -Math.abs(b.vx); } if (b.y < TOP + BR) { b.y = TOP + BR; b.vy = Math.abs(b.vy); }
+                if (Math.abs(b.vy) < 0.08) b.vy = Math.sign(b.vy || 1) * 0.08;
+                for (const br of bricks) {
+                    if (br.hp <= 0) continue; const x0 = br.c * CS, y0 = TOP + br.r * CS;
+                    if (br.ball) { if (Math.hypot(b.x - (x0 + CS / 2), b.y - (y0 + CS / 2)) < BR + 10) { br.hp = 0; nBalls++; beep(900, 0.06, "triangle", 0.04); fx.burst(x0 + CS / 2, y0 + CS / 2, "#2ee6a0", 10, 2); } continue; }
+                    if (hitRect(b, x0 + 2, y0 + 2, x0 + CS - 2, y0 + CS - 2)) { br.hp--; beep(300 + Math.min(br.hp, 40) * 10, 0.02, "square", 0.02); if (br.hp <= 0) fx.burst(x0 + CS / 2, y0 + CS / 2, color(br), 14, 3); }
+                }
+                if (b.y > BOTTOM - BR && b.vy > 0) { b.done = true; returned++; if (nextX === null) nextX = b.x; }
+            }
+            bricks = bricks.filter((b) => b.hp > 0);
+            if (fired >= nBalls && returned >= nBalls) {
+                firing = false; balls = []; launchX = Math.max(BR, Math.min(W - BR, nextX ?? launchX)); turn++; Kit.stat("turn", turn); Kit.stat("balls", nBalls);
+                addRow(); for (const b of bricks) if (b.ball && b.r >= ROWS - 1) b.hp = 0; bricks = bricks.filter((b) => b.hp > 0);
+                if (bricks.some((b) => !b.ball && b.r >= ROWS - 1)) gameOver();
+            }
+        }
+        function gameOver() { state = "over"; Kit.save(turn * 10); const best = Kit.setBest(BEST, turn); beep(100, 0.5, "sawtooth", 0.06); $("overText").innerHTML = `${T("The bricks reached the bottom!", "הלבנים הגיעו לתחתית!")}<br>${T("Turn", "תור")} ${turn} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        const color = (b) => `hsl(${(200 - Math.min(b.hp, 60) * 4 + 360) % 360},80%,58%)`;
+        let mouse = null;
+        function draw() {
+            ctx.fillStyle = "#151832"; ctx.fillRect(0, 0, W, H);
+            if (!bricks) return;
+            ctx.fillStyle = "#0e1026"; ctx.fillRect(0, TOP, W, BOTTOM - TOP);
+            ctx.fillStyle = "#ff4d6d55"; ctx.fillRect(0, TOP + (ROWS - 1) * CS - 2, W, 2);
+            for (const b of bricks) {
+                const x = b.c * CS, y = TOP + b.r * CS;
+                if (b.ball) { ctx.strokeStyle = "#2ee6a0"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + CS / 2, y + CS / 2, 12 + Math.sin(performance.now() / 200) * 2, 0, 7); ctx.stroke(); ctx.fillStyle = "#2ee6a0"; ctx.beginPath(); ctx.arc(x + CS / 2, y + CS / 2, 6, 0, 7); ctx.fill(); continue; }
+                ctx.fillStyle = color(b); Kit.rr(ctx, x + 3, y + 3, CS - 6, CS - 6, 8); ctx.fill();
+                Kit.text(ctx, String(b.hp), x + CS / 2, y + CS / 2 + 7, 20, "#10142a", "center");
+            }
+            ctx.fillStyle = "#fff"; for (const b of balls) if (!b.done) { ctx.beginPath(); ctx.arc(b.x, b.y, BR, 0, 7); ctx.fill(); }
+            if (!firing) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(launchX, BOTTOM - BR, BR, 0, 7); ctx.fill(); Kit.text(ctx, `x${nBalls}`, launchX, BOTTOM + 26, 16, "#fff", "center"); }
+            if (mouse && !firing && state === "play") { const dx = mouse.x - launchX, dy = mouse.y - (BOTTOM - BR), d = Math.hypot(dx, dy); if (dy < -0.15 * d) { ctx.fillStyle = "#ffffffaa"; for (let i = 1; i < 14; i++) { ctx.beginPath(); ctx.arc(launchX + (dx / d) * i * 26, BOTTOM - BR + (dy / d) * i * 26, 3, 0, 7); ctx.fill(); } } }
+            fx.draw(ctx);
+            Kit.text(ctx, `${T("Turn", "תור")} ${turn}`, W / 2, 44, 22, "#fff", "center");
+            if (firing && speedUp > 6) Kit.text(ctx, "⏩ x2", W - 40, 44, 16, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { mouse = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" || e.buttons) mouse = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", (e) => { const p = Kit.point(cv, e); fire(p.x - launchX, p.y - (BOTTOM - BR)); if (e.pointerType !== "mouse") mouse = null; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.bb = { get s() { return { state, turn, nBalls }; }, start, fire };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Brick Balls</h2><p>A satisfying aim-and-shoot puzzle. Every turn a new row of numbered bricks appears at the top and the old ones move down. Aim and fire, and all your balls stream out one after another, bouncing off walls and bricks. Each hit takes one point off a brick, and at zero it breaks. Collect green rings to add balls to your stream. Where your first ball lands is where you shoot from next.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag, or move the mouse</td><td>Aim</td></tr><tr><td>Let go / click</td><td>Fire</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Low, angled shots off the side walls can reach far corners.</li><li>Always try to grab the green rings: more balls means more hits.</li><li>If a turn takes a long time, the balls speed up.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Brick Balls</h3><p>In Brick Balls, more balls is everything. Each green ring you collect adds one ball forever, so early on aim for the rings even if it means leaving some bricks.</p><p>The best shots get balls behind the bricks. If you can send a ball through a gap to the top, it bounces around up there, hitting bricks from above again and again. Look for a gap in the row nearest you and aim through it.</p><p>Watch the bottom row. The game ends when a brick reaches the red line, so when bricks get close, aim at them directly, even if it's less efficient. Bricks with big numbers can wait until they're closer.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Reach turn 20.</li><li><b>Getting good:</b> Collect 30 balls.</li><li><b>Expert:</b> Reach turn 60.</li></ul><h3>Did you know?</h3><p>The angle a ball bounces off a wall is the same as the angle it hit at. Pool players and mini-golfers use this rule to plan bank shots.</p><h3>Questions players ask</h3><h4>Where do I shoot from?</h4><p>From wherever your first ball landed on the previous turn.</p><h4>How do I get more balls?</h4><p>Fly a ball through a green ring.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/CityDefender/citydefender">City Defender</a><a href="/Darts/darts">Darts</a><a href="/Hangman/hangman">Balloon Hangman</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The classic family board game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Snakes &amp; Ladders · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Snakes <span>&amp; Ladders</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="880" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Snakes & Ladders</h2>
+                <p id="startText"><span class="seg" id="players"><button data-p="1,2" class="on">🙂 vs 🤖</button><button data-p="1,4">🙂 vs 🤖🤖🤖</button><button data-p="2,2">👥 2 Players</button><button data-p="3,3">3 Players</button><button data-p="4,4">4 Players</button></span>Take turns rolling the die (click Roll or press Space). Land on a ladder to climb up, land on a snake's head to slide down.<br>Roll a 6 for another turn. You need the exact number to land on 100!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">It's all luck, so just enjoy the ride! Bigger rolls aren't always better: some lead straight onto a snake.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Snakes & Ladders — 2 to 4 players (any mix of people and computer), roll the die and race to 100
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const B = 600, CS = B / 10, OX = 20, OY = 20;
+        const LADDERS = { 4: 25, 13: 46, 33: 49, 42: 63, 50: 69, 62: 81, 74: 92 };
+        const SNAKES = { 27: 5, 40: 3, 43: 18, 54: 31, 66: 45, 76: 58, 89: 53, 99: 41 };
+        const COLORS = ["#2a74ff", "#ff4d6d", "#2ee6a0", "#ffc94d"], NAMES = () => [T("Blue", "כחול"), T("Red", "אדום"), T("Green", "ירוק"), T("Yellow", "צהוב")];
+        let players, turn, die = 1, rolling = 0, moving = null, state = "ready", log = "", humans = 1, total = 2, winner;
+        function cellXY(n) { const i = n - 1, r = Math.floor(i / 10), c = r % 2 ? 9 - (i % 10) : i % 10; return [OX + c * CS + CS / 2, OY + (9 - r) * CS + CS / 2]; }
+        function start() { players = Array.from({ length: total }, (_, i) => ({ pos: 0, c: COLORS[i], cpu: i >= humans, shown: 0 })); turn = 0; die = 1; winner = null; state = "play"; log = T("Blue goes first. Roll the die!", "כחול מתחיל. הטילו את הקובייה!"); Kit.hide("start"); Kit.hide("over"); maybeCpu(); }
+        function roll() {
+            if (state !== "play" || rolling || moving) return;
+            rolling = 0.7; beep(300, 0.03, "square", 0.02);
+        }
+        function afterRoll() {
+            const p = players[turn], target = p.pos + die;
+            if (target > 100) { log = `${NAMES()[turn]} ${T("needs exactly", "צריך בדיוק")} ${100 - p.pos}. ${T("Turn passes.", "התור עובר.")}`; return nextTurn(die === 6); }
+            const path = []; for (let s = p.pos + 1; s <= target; s++) path.push(s);
+            moving = { p, path, t: 0, extra: die === 6 };
+        }
+        function step(dt) {
+            if (rolling) { rolling -= dt; die = Kit.randi(1, 6); if (Math.random() < 0.3) beep(200 + die * 50, 0.02, "square", 0.015); if (rolling <= 0) { rolling = 0; afterRoll(); } return; }
+            if (!moving) return;
+            moving.t += dt;
+            if (moving.path.length && moving.t > 0.18) { moving.t = 0; moving.p.pos = moving.path.shift(); beep(500 + moving.p.pos * 4, 0.04, "triangle", 0.03); return; }
+            if (!moving.path.length && moving.t > 0.25) {
+                const p = moving.p, extra = moving.extra; let jump = null;
+                if (LADDERS[p.pos]) { jump = LADDERS[p.pos]; log = `${NAMES()[turn]} ${T("climbs a ladder to", "טיפס בסולם ל-")} ${jump}! 🪜`; tune([523, 659, 784, 1047], 0.06, "triangle", 0.04); }
+                else if (SNAKES[p.pos]) { jump = SNAKES[p.pos]; log = `${NAMES()[turn]} ${T("slid down a snake to", "החליק בנחש ל-")} ${jump}. 🐍`; beep(500, 0.5, "sawtooth", 0.04, -400); }
+                else log = `${NAMES()[turn]} ${T("rolled", "הטיל")} ${die}${extra ? " — " + T("6 means roll again!", "6 זה עוד תור!") : ""}`;
+                if (jump) p.pos = jump;
+                moving = null;
+                if (p.pos === 100) { winner = turn; state = "over"; tune([523, 659, 784, 1047, 1319], 0.1, "square", 0.05); if (!p.cpu) Kit.save(100); setTimeout(() => { $("overText").innerHTML = `🏆 ${NAMES()[turn]} ${T("wins!", "ניצח!")}`; Kit.show("over"); }, 900); return; }
+                nextTurn(extra);
+            }
+        }
+        function nextTurn(again) { if (!again) turn = (turn + 1) % players.length; maybeCpu(); }
+        function maybeCpu() { if (state === "play" && players[turn].cpu) setTimeout(() => state === "play" && players[turn].cpu && !rolling && !moving && roll(), 700); }
+        function drawDie(x, y, s, v) {
+            ctx.fillStyle = "#fff"; Kit.rr(ctx, x, y, s, s, s * 0.18); ctx.fill(); ctx.strokeStyle = players ? players[turn].c : "#999"; ctx.lineWidth = 4; ctx.stroke();
+            const pip = { 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]], 4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], 6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] }[v];
+            ctx.fillStyle = "#1a1a2a"; for (const [a, b] of pip) { ctx.beginPath(); ctx.arc(x + s * (0.25 + a * 0.25), y + s * (0.25 + b * 0.25), s * 0.08, 0, 7); ctx.fill(); }
+        }
+        function draw() {
+            ctx.fillStyle = "#1b1f3b"; ctx.fillRect(0, 0, W, H);
+            for (let n = 1; n <= 100; n++) { const [x, y] = cellXY(n), r = Math.floor((n - 1) / 10); ctx.fillStyle = (n + r) % 2 ? "#fde9c4" : "#f7d38f"; if (n === 100) ctx.fillStyle = "#ffc94d"; ctx.fillRect(x - CS / 2, y - CS / 2, CS, CS); Kit.text(ctx, String(n), x - CS / 2 + 6, y - CS / 2 + 16, 12, "#8a6d3b", "left"); }
+            // ladders
+            for (const [a, b] of Object.entries(LADDERS)) { const [x1, y1] = cellXY(+a), [x2, y2] = cellXY(b), ang = Math.atan2(y2 - y1, x2 - x1), nx = -Math.sin(ang) * 10, ny = Math.cos(ang) * 10, len = Math.hypot(x2 - x1, y2 - y1);
+                ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x1 + nx, y1 + ny); ctx.lineTo(x2 + nx, y2 + ny); ctx.moveTo(x1 - nx, y1 - ny); ctx.lineTo(x2 - nx, y2 - ny); ctx.stroke(); ctx.lineWidth = 3;
+                for (let d = 14; d < len - 6; d += 16) { const px = x1 + Math.cos(ang) * d, py = y1 + Math.sin(ang) * d; ctx.beginPath(); ctx.moveTo(px + nx, py + ny); ctx.lineTo(px - nx, py - ny); ctx.stroke(); } }
+            // snakes
+            let si = 0; for (const [a, b] of Object.entries(SNAKES)) { const [x1, y1] = cellXY(+a), [x2, y2] = cellXY(b), col = ["#2ea84a", "#d62b3a", "#7a3ad6", "#ff8a1f"][si++ % 4];
+                const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+                ctx.strokeStyle = col; ctx.lineCap = "round"; ctx.lineWidth = 11; ctx.beginPath();
+                for (let i = 0; i <= 30; i++) { const t = i / 30, w = Math.sin(t * Math.PI * 3) * 14; const x = x1 + dx * t + nx * w, y = y1 + dy * t + ny * w; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+                ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x1, y1, 12, 10, Math.atan2(dy, dx), 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x1 - 4, y1 - 3, 3, 0, 7); ctx.arc(x1 + 4, y1 - 3, 3, 0, 7); ctx.fill(); ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(x1 - 4, y1 - 3, 1.4, 0, 7); ctx.arc(x1 + 4, y1 - 3, 1.4, 0, 7); ctx.fill(); }
+            ctx.lineCap = "butt";
+            if (players) players.forEach((p, i) => { if (!p.pos) return; const [x, y] = cellXY(p.pos), ox = (i % 2) * 16 - 8, oy = Math.floor(i / 2) * 16 - 8; ctx.fillStyle = "#0005"; ctx.beginPath(); ctx.arc(x + ox + 2, y + oy + 3, 11, 0, 7); ctx.fill(); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(x + ox, y + oy, 11, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); });
+            // side panel
+            const px = B + 40;
+            if (players) {
+                players.forEach((p, i) => { const y = 40 + i * 54; ctx.fillStyle = i === turn && state === "play" ? "#ffffff22" : "transparent"; Kit.rr(ctx, px - 10, y - 26, W - px - 10, 46, 10); ctx.fill(); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(px + 14, y - 3, 12, 0, 7); ctx.fill(); Kit.text(ctx, `${NAMES()[i]}${p.cpu ? " 🤖" : ""}`, px + 36, y + 3, 17, "#fff", "left"); Kit.text(ctx, String(p.pos || "–"), W - 30, y + 3, 17, "#ffc94d", "right"); });
+                drawDie(px + (W - px) / 2 - 50, 280, 90, die);
+                const me = players[turn];
+                if (state === "play" && !me.cpu && !rolling && !moving) { ctx.fillStyle = me.c; Kit.rr(ctx, px, 400, W - px - 20, 56, 14); ctx.fill(); Kit.text(ctx, T("🎲 Roll", "🎲 הטלה"), px + (W - px - 20) / 2, 436, 22, "#fff", "center"); }
+                wrap(log, px, 500, W - px - 20, 22);
+            }
+        }
+        function wrap(s, x, y, w, lh) { const words = s.split(" "); let line = ""; for (const wd of words) { const t = line ? line + " " + wd : wd; ctx.font = "700 16px Inter, Rubik, sans-serif"; if (ctx.measureText(t).width > w && line) { Kit.text(ctx, line, x, y, 16, "#dfe3ff", "left", undefined, 700); y += lh; line = wd; } else line = t; } if (line) Kit.text(ctx, line, x, y, 16, "#dfe3ff", "left", undefined, 700); }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); if (p.x > B + 30 && players && !players[turn].cpu) roll(); });
+        Kit.onKeys({ Space: "roll", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "roll" && players && !players[turn].cpu) roll(); });
+        document.querySelectorAll("#players button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#players button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); [humans, total] = b.dataset.p.split(",").map(Number); }));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") step(dt); draw(); }).start();
+        if (window.__test) window.__test.sl = { get s() { return { state, turn, pos: players && players.map((p) => p.pos) }; }, start, roll };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Snakes & Ladders</h2><p>The classic family board game. Up to four players race their counters across a 100-square board. Roll the die and move that many squares. If you stop at the bottom of a ladder you climb to the top, but if you stop on a snake's head you slide down to its tail. Rolling a 6 gives another turn, and you need the exact number to finish on square 100. Play against the computer or pass the device around with friends.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Space or click Roll</td><td>Roll the die</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The ladder at 4 goes all the way to 25.</li><li>The snake on 99 is the worst one, so be careful near the end.</li><li>A 6 always gives an extra turn.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Snakes &amp; Ladders</h3><p>Snakes & Ladders is a game of pure luck, so there's no wrong move. Every turn you roll and move. That makes it great for playing with younger kids or anyone who wants a relaxed game.</p><p>Even though you can't choose, it's fun to know the board. Big ladders are on 4, 13 and 50, and the nastiest snakes are on 99, 89 and 76. The last row is full of danger.</p><p>You need the exact number to land on 100. If you're on 97, only a 3 will do. Any bigger number and your turn is skipped, which can lead to some exciting finishes.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a game against the computer.</li><li><b>Getting good:</b> Win a 4-player game.</li><li><b>Expert:</b> Climb three ladders in one game.</li></ul><h3>Did you know?</h3><p>Snakes & Ladders comes from an old game played in India called Moksha Patam. The ladders stood for good deeds and the snakes for bad ones.</p><h3>Questions players ask</h3><h4>How many people can play?</h4><p>Two to four, in any mix of people and computer players.</p><h4>What happens if I roll too high at the end?</h4><p>You don't move, and the turn passes on.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/StickBridge/stickbridge">Stick Bridge</a><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

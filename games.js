@@ -91,6 +91,10 @@ export const GAMES = {
     reactiontest: { name: "Reaction Test", path: "/ReactionTest/reaction", img: "/thumbs/reactiontest.png", tags: ["brain"], desc: "How fast are you? Tap the moment the screen turns green.", isNew: true },
     higherlower: { name: "Higher or Lower", path: "/HigherLower/higherlower", img: "/thumbs/higherlower.png", tags: ["cards"], desc: "Will the next card be higher or lower? Build a winning streak!", isNew: true },
     memorygrid: { name: "Memory Grid", path: "/MemoryGrid/memorygrid", img: "/thumbs/memorygrid.png", tags: ["brain"], desc: "Some squares light up. Remember them and tap them all!", isNew: true },
+    brickballs: { name: "Brick Balls", path: "/BrickBalls/brickballs", img: "/thumbs/brickballs.png", tags: ["arcade", "physics"], desc: "Aim, shoot a stream of balls, and break the numbered bricks.", isNew: true },
+    jetpackdash: { name: "Jetpack Dash", path: "/JetpackDash/jetpack", img: "/thumbs/jetpackdash.png", tags: ["arcade", "runner"], desc: "Hold to fly with your jetpack. Dodge zappers and missiles!", isNew: true },
+    archery: { name: "Archery", path: "/Archery/archery", img: "/thumbs/archery.png", tags: ["sports"], desc: "Pull back your bow, mind the wind and hit the bullseye.", isNew: true },
+    snakesladders: { name: "Snakes & Ladders", path: "/SnakesLadders/snakesladders", img: "/thumbs/snakesladders.png", tags: ["board", "2 players"], desc: "Roll the die, climb the ladders, dodge the snakes. First to 100 wins!", isNew: true },
 };
 
 // Games that only count plays (no score)

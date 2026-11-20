@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An endless flying game set in a secret lab. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Jetpack Dash · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Jetpack <span>Dash</span></h1>
+        <div class="stats"><div class="stat"><b id="dist">0 m</b><small>Distance</small></div><div class="stat"><b id="coins">0</b><small>Coins</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="720" height="440"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Jetpack Dash</h2>
+                <p id="startText">Hold Space, ⬆ or the screen to fire your jetpack and fly up. Let go to drop.<br>Dodge the electric zappers. When you see a red ❗, a missile is coming at your height: move!<br>Grab coins on the way. How far can you get?</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Tap quickly to hover. Holding sends you to the ceiling, letting go drops you fast.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Jetpack Dash — hold to fly up, let go to fall. Dodge zappers and missiles, grab coins
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "jetpackBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const FLOOR = H - 50, CEIL = 40, PX = 150;
+        let p, obs, coins, missiles, dist, coinN, speed, hold = false, state = "ready", fx = Kit.particles(), spawnX, bgX = 0, dead = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function start() { p = { y: FLOOR - 30, vy: 0 }; obs = []; coins = []; missiles = []; dist = 0; coinN = 0; speed = 260; spawnX = W + 200; dead = 0; state = "play"; Kit.stat("coins", 0); Kit.stat("dist", "0 m"); Kit.hide("start"); Kit.hide("over"); }
+        function spawn() {
+            const kind = Math.random();
+            if (kind < 0.55) { const len = Kit.rand(90, 200), a = Kit.pick([0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]), y = Kit.rand(CEIL + 60, FLOOR - 60); obs.push({ x: spawnX, y, len, a, spin: dist > 800 && Math.random() < 0.3 ? Kit.rand(-1.5, 1.5) : 0 }); }
+            else if (kind < 0.85) { const y0 = Kit.rand(CEIL + 40, FLOOR - 100), shape = Kit.randi(0, 2); for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) coins.push({ x: spawnX + i * 26, y: y0 + j * 26 + (shape === 1 ? Math.sin(i / 1.5) * 30 : 0) }); }
+            else missiles.push({ warn: 1.4, y: p.y, x: W + 40 });
+            spawnX += Kit.rand(220, 380) - Math.min(100, dist / 60);
+        }
+        function segHit(o) {
+            const dx = Math.cos(o.a) * o.len / 2, dy = Math.sin(o.a) * o.len / 2, ax = o.x - dx, ay = o.y - dy, bx = o.x + dx, by = o.y + dy;
+            const px = PX, py = p.y, t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+            return Math.hypot(px - (ax + t * (bx - ax)), py - (ay + t * (by - ay))) < 20;
+        }
+        function update(dt) {
+            if (dead) { dead += dt; p.vy += 1400 * dt; p.y = Math.min(FLOOR - 16, p.y + p.vy * dt); speed *= 0.97; bgX += speed * dt; if (dead > 1.4) gameOver(); return; }
+            speed = 260 + Math.min(320, dist / 8); const mv = speed * dt; dist += mv / 10; bgX += mv;
+            if (hold) { p.vy -= 1900 * dt; if (Math.random() < 0.7) fx.burst(PX - 14, p.y + 22, Kit.pick(["#ffc94d", "#ff7a3c", "#fff"]), 1, 1.5); } p.vy += 1100 * dt; p.vy = Math.max(-420, Math.min(520, p.vy)); p.y += p.vy * dt;
+            if (p.y > FLOOR - 24) { p.y = FLOOR - 24; p.vy = 0; } if (p.y < CEIL + 24) { p.y = CEIL + 24; p.vy = Math.max(0, p.vy); }
+            spawnX -= mv; while (spawnX < W + 400) spawn();
+            for (const o of obs) { o.x -= mv; o.a += o.spin * dt; if (segHit(o)) die(); }
+            for (const c of coins) { c.x -= mv; if (!c.got && Math.hypot(c.x - PX, c.y - p.y) < 22) { c.got = true; coinN++; Kit.stat("coins", coinN); beep(1200 + (coinN % 5) * 80, 0.03, "square", 0.02); } }
+            for (const m of missiles) { if (m.warn > 0) { m.warn -= dt; m.y += (p.y - m.y) * Math.min(1, dt * 3); if (Math.random() < 0.1) beep(1500, 0.02, "square", 0.015); } else { m.x -= (speed + 420) * dt; if (Math.abs(m.x - PX) < 24 && Math.abs(m.y - p.y) < 18) die(); } }
+            obs = obs.filter((o) => o.x > -200); coins = coins.filter((c) => c.x > -30 && !c.got); missiles = missiles.filter((m) => m.x > -60);
+            Kit.stat("dist", Math.floor(dist) + " m");
+        }
+        function die() { if (dead) return; dead = 0.001; fx.burst(PX, p.y, "#5cc8ff", 40, 5); beep(80, 0.5, "sawtooth", 0.07); p.vy = -200; }
+        function gameOver() { state = "over"; const sc = Math.floor(dist) + coinN * 5; Kit.save(sc); const best = Kit.setBest(BEST, Math.floor(dist)); $("overText").innerHTML = `${T("Zapped!", "התחשמלתם!")}<br>${Math.floor(dist)} m · ${coinN} ${T("coins", "מטבעות")} · ${T("best", "שיא")} ${best} m`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#26304f"; ctx.fillRect(0, 0, W, H);
+            // lab background panels
+            const off = bgX * 0.5 % 160; for (let x = -off; x < W; x += 160) { ctx.fillStyle = "#2c3860"; ctx.fillRect(x + 10, CEIL + 20, 140, FLOOR - CEIL - 40); ctx.fillStyle = "#3a4a7a"; ctx.fillRect(x + 30, CEIL + 50, 100, 60); ctx.fillStyle = "#5cc8ff22"; ctx.fillRect(x + 34, CEIL + 54, 92, 52); }
+            ctx.fillStyle = "#151a2e"; ctx.fillRect(0, 0, W, CEIL); ctx.fillRect(0, FLOOR, W, H - FLOOR);
+            ctx.fillStyle = "#ffc94d"; for (let x = -(bgX % 60); x < W; x += 60) { ctx.fillRect(x, FLOOR, 30, 6); ctx.fillRect(x + 30, CEIL - 6, 30, 6); }
+            if (!p) return;
+            for (const c of coins) { ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, 7); ctx.fill(); ctx.fillStyle = "#fff5"; ctx.beginPath(); ctx.arc(c.x - 3, c.y - 3, 3, 0, 7); ctx.fill(); }
+            for (const o of obs) {
+                const dx = Math.cos(o.a) * o.len / 2, dy = Math.sin(o.a) * o.len / 2;
+                ctx.strokeStyle = "#ffe14d"; ctx.lineWidth = 8; ctx.shadowColor = "#ffe14d"; ctx.shadowBlur = 16; ctx.beginPath(); ctx.moveTo(o.x - dx, o.y - dy);
+                for (let i = 1; i <= 8; i++) { const t = i / 8; ctx.lineTo(o.x - dx + 2 * dx * t + (i < 8 ? Kit.rand(-5, 5) : 0), o.y - dy + 2 * dy * t + (i < 8 ? Kit.rand(-5, 5) : 0)); } ctx.stroke(); ctx.shadowBlur = 0;
+                ctx.fillStyle = "#9aa0b5"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(o.x + dx * s, o.y + dy * s, 12, 0, 7); ctx.fill(); }
+            }
+            for (const m of missiles) {
+                if (m.warn > 0) { if (Math.floor(m.warn * 8) % 2) { ctx.fillStyle = "#ff3b4d"; ctx.beginPath(); ctx.moveTo(W - 20, m.y - 16); ctx.lineTo(W - 4, m.y + 12); ctx.lineTo(W - 36, m.y + 12); ctx.fill(); Kit.text(ctx, "!", W - 20, m.y + 9, 16, "#fff", "center"); } }
+                else { ctx.fillStyle = "#d62b3a"; Kit.rr(ctx, m.x - 20, m.y - 7, 40, 14, 7); ctx.fill(); ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(m.x + 20, m.y); ctx.lineTo(m.x + 34 + Math.random() * 10, m.y - 5); ctx.lineTo(m.x + 34 + Math.random() * 10, m.y + 5); ctx.fill(); }
+            }
+            fx.draw(ctx);
+            // hero
+            ctx.save(); ctx.translate(PX, p.y); if (dead) ctx.rotate(dead * 6);
+            ctx.fillStyle = "#9aa0b5"; Kit.rr(ctx, -22, -14, 12, 30, 4); ctx.fill();
+            ctx.fillStyle = "#ff8a1f"; Kit.rr(ctx, -12, -16, 24, 30, 8); ctx.fill();
+            ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(2, -24, 11, 0, 7); ctx.fill(); ctx.fillStyle = "#3a2a1a"; ctx.beginPath(); ctx.arc(2, -28, 11, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = "#1a1a2a"; ctx.fillRect(6, -26, 3, 3);
+            ctx.fillStyle = "#2a74ff"; ctx.fillRect(-10, 14, 8, 10); ctx.fillRect(2, 14, 8, 10);
+            ctx.restore();
+            Kit.text(ctx, `${Math.floor(dist)} m`, 20, 28, 18, "#fff", "left");
+            Kit.text(ctx, `🪙 ${coinN}`, W - 20, 28, 18, "#ffc94d", "right");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); hold = true; });
+        window.addEventListener("pointerup", () => (hold = false));
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Space: "fly", ArrowUp: "fly", KeyW: "fly", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "fly") hold = true; }, (a) => { if (a === "fly") hold = false; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.jet = { get s() { return { state, dist }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Jetpack Dash</h2><p>An endless flying game set in a secret lab. Your hero runs forward on their own, and you control just one thing: the jetpack. Hold to rise, let go to fall. Electric zappers block the way at different angles, some of them spinning, and homing missiles are announced by a flashing warning. Collect coins and see how far you can fly before you get zapped.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Hold Space, ⬆ or W</td><td>Fly up</td></tr><tr><td>Hold on screen</td><td>Fly up (touch)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Quick taps let you hover at one height.</li><li>When the ❗ appears, the missile aims at your height. Change it at the last moment.</li><li>Following coin lines is often a safe path.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Jetpack Dash</h3><p>Jetpack Dash is about controlling your height. Holding the button sends you up fast and letting go drops you fast, so the real skill is tapping in a rhythm to hover. Practise staying in the middle of the screen, where you can dodge up or down.</p><p>Zappers come at four angles. Flat ones are easy to fly over or under. Diagonal ones need you to be at the right height early, and spinning ones need timing, so watch them turn before you commit.</p><p>Missiles lock onto your height while the warning flashes. Don't move away too early, or the missile follows you. Wait until the warning stops, then change height quickly.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Fly 500 metres.</li><li><b>Getting good:</b> Collect 100 coins in one run.</li><li><b>Expert:</b> Fly 2,000 metres.</li></ul><h3>Did you know?</h3><p>Real jetpacks exist! The first one was tested in the 1960s, but it could only fly for about 20 seconds before running out of fuel.</p><h3>Questions players ask</h3><h4>How do I stay in the air?</h4><p>Tap the button quickly over and over instead of holding it.</p><h4>What does the red ❗ mean?</h4><p>A missile is about to fly in at that height.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/KnifeThrow/knifethrow">Knife Throw</a><a href="/LightsOut/lightsout">Lights Out</a><a href="/MoonLander/moonlander">Moon Lander</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

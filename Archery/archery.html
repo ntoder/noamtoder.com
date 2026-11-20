@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A bow-and-arrow skill game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Archery · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Arch<span>ery</span></h1>
+        <div class="stats"><div class="stat"><b id="arrows">10</b><small>Arrows</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="760" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Archery</h2>
+                <p id="startText">Press anywhere and drag backwards to pull the bow, like a slingshot. Let go to shoot!<br>The dotted line shows where the arrow starts to fly. Watch the wind: it pushes your arrow sideways. 10 arrows, up to 10 points each.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Wind pushes the arrow forward or back as it flies. Into a headwind (⬅), aim a little higher.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Archery — pull back to aim, wind pushes the arrow, hit the target. 10 arrows
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "archeryBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const BX = 90, BY = H - 150, G = 420;
+        let tgt, wind, arrows, flying, stuck, score, state = "ready", drag = null, msg = null, round, fx = Kit.particles();
+        Kit.stat("best", Kit.best(BEST));
+        function newTarget() { const far = Math.min(1, round / 8); tgt = { x: Kit.rand(W * 0.55, W * (0.7 + far * 0.22)), y: Kit.rand(H * 0.3, H * 0.65), r: 60 - far * 18, vy: round > 4 ? Kit.rand(20, 50 + round * 4) * Kit.pick([-1, 1]) : 0 }; wind = round > 1 ? +(Kit.rand(-1, 1) * Math.min(60, 10 + round * 6)).toFixed(0) : 0; }
+        function start() { arrows = 10; score = 0; round = 0; stuck = []; flying = null; state = "play"; newTarget(); Kit.stat("arrows", arrows); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function shoot(dx, dy) {
+            const pow = Math.min(160, Math.hypot(dx, dy)); if (pow < 20 || flying || state !== "play") return;
+            const a = Math.atan2(-dy, -dx), v = pow * 6.2; flying = { x: BX, y: BY, vx: Math.cos(a) * v, vy: Math.sin(a) * v }; arrows--; Kit.stat("arrows", arrows); beep(300, 0.12, "triangle", 0.05, 300);
+        }
+        function land(hit, pts) {
+            if (hit) { score += pts; Kit.stat("score", score); msg = { t: 1.4, s: pts === 10 ? T("BULLSEYE! +10", "בול! +10") : `+${pts}` }; pts >= 9 ? tune([660, 880, 1320], 0.07, "square", 0.05) : beep(220, 0.08, "square", 0.05); if (pts >= 9) fx.burst(flying.x, flying.y, "#ffc94d", 24, 4); }
+            else { msg = { t: 1.2, s: T("Miss!", "החטאה!") }; beep(120, 0.15, "sawtooth", 0.03); }
+            flying = null;
+            setTimeout(() => { if (arrows <= 0) return end(); round++; stuck = stuck.filter((s) => !s.onT); newTarget(); }, 1100);
+        }
+        function end() { state = "over"; Kit.save(score * 5); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("Out of arrows!", "נגמרו החצים!")}<br>${score} ${T("points out of 100", "נקודות מתוך 100")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function update(dt) {
+            if (tgt.vy) { tgt.y += tgt.vy * dt; if (tgt.y < H * 0.2 || tgt.y > H * 0.72) tgt.vy *= -1; }
+            for (const s of stuck) if (s.onT) s.y = tgt.y + s.dy;
+            if (!flying) return;
+            const f = flying, steps = 4, h = dt / steps;
+            for (let i = 0; i < steps && flying; i++) {
+                const px = f.x; f.vx += wind * 1.2 * h; f.vy += G * h; f.x += f.vx * h; f.y += f.vy * h;
+                // target is a vertical board at tgt.x (seen from the side)
+                if (px < tgt.x && f.x >= tgt.x) {
+                    const yy = f.y, d = Math.abs(yy - tgt.y);
+                    if (d <= tgt.r) { const ring = Math.min(9, Math.floor((d / tgt.r) * 10)); const pts = 10 - ring; stuck.push({ x: tgt.x, y: yy, dy: yy - tgt.y, a: Math.atan2(f.vy, f.vx), onT: true }); return land(true, pts); }
+                }
+                if (f.y > H - 40 || f.x > W + 40 || f.x < -40) { if (f.y > H - 40) stuck.push({ x: f.x, y: H - 40, a: Math.atan2(f.vy, f.vx) }); return land(false); }
+            }
+        }
+        function arrowAt(x, y, a, len = 46) { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.strokeStyle = "#5a3b22"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-len, 0); ctx.lineTo(0, 0); ctx.stroke(); ctx.fillStyle = "#c9ccd9"; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-6, -4); ctx.lineTo(-6, 4); ctx.fill(); ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.moveTo(-len, 0); ctx.lineTo(-len - 8, -6); ctx.lineTo(-len + 6, 0); ctx.lineTo(-len - 8, 6); ctx.fill(); ctx.restore(); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#8fd3ff"); g.addColorStop(1, "#d8f1ff"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#7ac46a"; ctx.fillRect(0, H - 40, W, 40); ctx.fillStyle = "#5fa851"; for (let x = 0; x < W; x += 18) ctx.fillRect(x, H - 40, 9, 5);
+            ctx.fillStyle = "#ffffffcc"; for (const [cx, cy] of [[160, 80], [420, 60], [640, 110]]) { ctx.beginPath(); ctx.arc(cx, cy, 24, 0, 7); ctx.arc(cx + 26, cy - 8, 30, 0, 7); ctx.arc(cx + 54, cy, 22, 0, 7); ctx.fill(); }
+            if (!tgt) return;
+            // target (side-on as ellipse) + stand
+            ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(tgt.x + 6, tgt.y); ctx.lineTo(tgt.x + 30, H - 40); ctx.stroke();
+            const rings = ["#ffffff", "#ffffff", "#1a1a2a", "#1a1a2a", "#2a74ff", "#2a74ff", "#d62b3a", "#d62b3a", "#ffc800", "#ffc800"];
+            for (let i = 0; i < 10; i++) { const r = tgt.r * (1 - i / 10); ctx.fillStyle = rings[i]; ctx.beginPath(); ctx.ellipse(tgt.x, tgt.y, Math.max(3, r * 0.22), r, 0, 0, 7); ctx.fill(); ctx.strokeStyle = "#0003"; ctx.lineWidth = 1; ctx.stroke(); }
+            for (const s of stuck) arrowAt(s.x, s.y, s.a);
+            if (flying) arrowAt(flying.x, flying.y, Math.atan2(flying.vy, flying.vx));
+            // archer
+            ctx.fillStyle = "#3a2a1a"; ctx.fillRect(BX - 30, BY - 10, 10, 60); ctx.fillStyle = "#2a74ff"; Kit.rr(ctx, BX - 40, BY - 20, 26, 46, 8); ctx.fill();
+            ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(BX - 27, BY - 34, 13, 0, 7); ctx.fill(); ctx.fillStyle = "#2ee6a0"; ctx.beginPath(); ctx.moveTo(BX - 42, BY - 38); ctx.lineTo(BX - 12, BY - 42); ctx.lineTo(BX - 34, BY - 54); ctx.fill();
+            ctx.fillStyle = "#3a2a1a"; ctx.fillRect(BX - 40, BY + 26, 10, 64); ctx.fillRect(BX - 24, BY + 26, 10, 64);
+            let a = -0.2, pull = 0; if (drag && drag.cur) { const dx = drag.cur.x - drag.x, dy = drag.cur.y - drag.y; a = Math.atan2(-dy, -dx); pull = Math.min(160, Math.hypot(dx, dy)); }
+            ctx.save(); ctx.translate(BX, BY); ctx.rotate(a); ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(-10, 0, 44, -1.2, 1.2); ctx.stroke();
+            const sx = -10 + Math.cos(1.2) * 44 - pull * 0.25; ctx.strokeStyle = "#eee"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-10 + Math.cos(-1.2) * 44, Math.sin(-1.2) * 44); ctx.lineTo(sx, 0); ctx.lineTo(-10 + Math.cos(1.2) * 44, Math.sin(1.2) * 44); ctx.stroke();
+            if (!flying && state === "play") { ctx.restore(); arrowAt(BX + Math.cos(a) * (40 - pull * 0.25), BY + Math.sin(a) * (40 - pull * 0.25), a); ctx.save(); } ctx.restore();
+            // aim preview (short)
+            if (drag && drag.cur && pull > 20) { const v = pull * 6.2; let x = BX, y = BY, vx = Math.cos(a) * v, vy = Math.sin(a) * v; ctx.fillStyle = "#0005"; for (let i = 0; i < 14; i++) { for (let k = 0; k < 3; k++) { vy += G * 0.01; x += vx * 0.01; y += vy * 0.01; } ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill(); } }
+            // wind
+            ctx.fillStyle = "#0004"; Kit.rr(ctx, W / 2 - 90, 16, 180, 40, 10); ctx.fill();
+            Kit.text(ctx, `${T("Wind", "רוח")} ${wind === 0 ? "—" : (wind > 0 ? "➡ " : "⬅ ") + Math.abs(wind)}`, W / 2, 43, 18, "#fff", "center");
+            for (let i = 0; i < arrows; i++) { ctx.fillStyle = "#5a3b22"; ctx.fillRect(20 + i * 12, 20, 4, 30); ctx.fillStyle = "#ff4d6d"; ctx.fillRect(18 + i * 12, 44, 8, 6); }
+            fx.draw(ctx);
+            if (msg && msg.t > 0) Kit.text(ctx, msg.s, W / 2, 110, 30, "#1a1a2a", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || flying) return; const p = Kit.point(cv, e); drag = { x: p.x, y: p.y, cur: p }; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (drag) drag.cur = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => { if (drag && drag.cur) shoot(drag.cur.x - drag.x, drag.cur.y - drag.y); drag = null; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); if (msg) msg.t -= dt; fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.arch = { get s() { return { state, score, arrows }; }, start, shoot };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Archery</h2><p>A bow-and-arrow skill game. Drag back from anywhere on the screen to draw the bow: the further you pull, the harder the shot. The arrow flies in a curve because of gravity, and the wind pushes it along. Hit the target as close to the yellow centre as you can. The targets move further away, get smaller, and later even slide up and down.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag backwards and let go</td><td>Shoot</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>A long pull gives a flatter, faster arrow.</li><li>Headwind (⬅) makes the arrow drop short; tailwind (➡) carries it further.</li><li>On moving targets, shoot where the target will be.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Archery</h3><p>Archery is about finding the right power and angle. Pull back further for a faster, flatter shot. A strong pull at a low angle is easier to aim than a weak pull lobbed high, because a fast arrow has less time to be pushed by gravity and wind.</p><p>The dotted line shows the start of the arrow's path, but not the whole flight. Remember how your last arrow landed and adjust from there: if it hit low, aim a little higher next time.</p><p>Wind pushes the arrow along its flight. A headwind (pointing left) slows it so it drops sooner, and a tailwind (pointing right) carries it further. From round 5 targets move up and down, so time your release for when the target will be at the right height.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Hit a bullseye.</li><li><b>Getting good:</b> Score 60 points.</li><li><b>Expert:</b> Score 85 points.</li></ul><h3>Did you know?</h3><p>Olympic archers shoot at a target 70 metres away. Its centre ring, worth 10 points, is just 12.2 centimetres across, about the size of a CD.</p><h3>Questions players ask</h3><h4>How do I shoot?</h4><p>Press anywhere, drag backwards (away from the target), and let go.</p><h4>What does the wind do?</h4><p>It pushes the arrow forward or back while it flies, changing how far it goes.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BallSort/ballsort">Ball Sort</a><a href="/CityDefender/citydefender">City Defender</a><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
