@@ -71,6 +71,10 @@ export const GAMES = {
     mancala: { name: "Mancala", path: "/Mancala/mancala", img: "/thumbs/mancala.png", tags: ["puzzle", "brain", "strategy"], desc: "Sow stones, capture, and fill your store.", isNew: true },
     hanoi: { name: "Tower of Hanoi", path: "/Hanoi/hanoi", img: "/thumbs/hanoi.png", tags: ["puzzle", "brain"], desc: "Move the tower one disc at a time.", isNew: true },
     slidepuzzle: { name: "Slide Puzzle", path: "/SlidePuzzle/slidepuzzle", img: "/thumbs/slidepuzzle.png", tags: ["puzzle", "brain"], desc: "Slide the numbered tiles back into order.", isNew: true },
+    hangman: { name: "Balloon Hangman", path: "/Hangman/hangman", img: "/thumbs/hangman.png", tags: ["word", "brain"], desc: "Guess the word before all the balloons pop.", isNew: true },
+    wordscramble: { name: "Word Scramble", path: "/WordScramble/wordscramble", img: "/thumbs/wordscramble.png", tags: ["word", "brain"], desc: "Unscramble as many words as you can in 90 seconds.", isNew: true },
+    pipeconnect: { name: "Pipe Connect", path: "/PipeConnect/pipeconnect", img: "/thumbs/pipeconnect.png", tags: ["puzzle", "brain"], desc: "Turn the pipes so water reaches every tile.", isNew: true },
+    trafficjam: { name: "Traffic Jam", path: "/TrafficJam/trafficjam", img: "/thumbs/trafficjam.png", tags: ["puzzle", "brain"], desc: "Slide the cars out of the way to free the red car.", isNew: true },
 };
 
 // Games that only count plays (no score)

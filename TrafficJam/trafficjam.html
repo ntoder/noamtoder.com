@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A sliding-car puzzle in a crowded parking lot. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Traffic Jam · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Traffic <span>Jam</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Traffic Jam</h2>
+                <p id="startText">The red car is stuck! Drag the cars forward and backward (they can only move in the direction they face) to clear a path to the exit on the right.<br>Every level is a new puzzle.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Work backward: find which car blocks the red car, then which car blocks that one.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Traffic Jam — slide the cars to get the red car out
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "trafficjamBest";
+        const N = 6, CS = 80, OX = (W - N * CS) / 2, OY = 120, EXIT_ROW = 2;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CAR_COLS = ["#4da3ff", "#2ee6a0", "#ffc94d", "#b07cff", "#ff8a3d", "#4de8ff", "#f15bb5", "#9ef01a", "#c0c4d6", "#8b5a2b", "#1d5fd0", "#ff9fd0"];
+        let cars, level = 1, moves = 0, best = 0, score = 0, state = "ready", drag = null, won = 0, exitAnim = 0;
+        Kit.stat("best", Kit.best(BEST));
+        const occ = (cs, skip) => { const g = Array.from({ length: N }, () => new Array(N).fill(-1)); cs.forEach((c, i) => { if (i === skip) return; for (let k = 0; k < c.len; k++) g[c.r + (c.h ? 0 : k)][c.c + (c.h ? k : 0)] = i; }); return g; };
+        const key = (cs) => cs.map((c) => (c.h ? c.c : c.r)).join(",");
+        function solve(cs) {
+            // breadth-first search over car positions; returns fewest slides (any distance) to free the red car
+            const start = cs.map((c) => (c.h ? c.c : c.r)), seen = new Set([start.join(",")]);
+            let frontier = [start], depth = 0;
+            while (frontier.length && depth < 40) {
+                const nxt = [];
+                for (const pos of frontier) {
+                    const st = cs.map((c, i) => ({ ...c, ...(c.h ? { c: pos[i] } : { r: pos[i] }) }));
+                    if (st[0].c + st[0].len === N) return depth;
+                    const g = occ(st);
+                    st.forEach((c, i) => {
+                        for (const d of [-1, 1]) {
+                            for (let s = 1; ; s++) {
+                                const p = pos[i] + d * s; if (p < 0 || p + c.len > N) break;
+                                const cell = d > 0 ? p + c.len - 1 : p;
+                                if (c.h ? g[c.r][cell] !== -1 : g[cell][c.c] !== -1) break;
+                                const np = pos.slice(); np[i] = p; const k = np.join(",");
+                                if (!seen.has(k)) { seen.add(k); nxt.push(np); }
+                            }
+                        }
+                    });
+                }
+                frontier = nxt; depth++;
+                if (seen.size > 60000) return -1;
+            }
+            return -1;
+        }
+        function generate() {
+            const want = Math.min(4 + level * 2, 22);
+            for (let tries = 0; tries < 400; tries++) {
+                const cs = [{ r: EXIT_ROW, c: Kit.randi(0, 2), len: 2, h: 1 }];
+                const n = Math.min(12, 6 + Math.floor(level / 2) + Kit.randi(0, 2));
+                for (let k = 0; k < n * 4 && cs.length < n; k++) {
+                    const h = Math.random() < 0.5, len = Math.random() < 0.3 ? 3 : 2;
+                    const r = h ? Kit.randi(0, N - 1) : Kit.randi(0, N - len), c = h ? Kit.randi(0, N - len) : Kit.randi(0, N - 1);
+                    if (h && r === EXIT_ROW) continue;
+                    const g = occ(cs); let free = true; for (let q = 0; q < len; q++) if (g[r + (h ? 0 : q)][c + (h ? q : 0)] !== -1) free = false;
+                    if (free) cs.push({ r, c, len, h: h ? 1 : 0 });
+                }
+                const m = solve(cs);
+                if (m >= Math.min(want, 4 + level) && m <= want + 8) { best = m; return cs; }
+                if (tries > 300 && m >= 3) { best = m; return cs; }
+            }
+            return generate();
+        }
+        function newLevel() { cars = generate(); moves = 0; won = 0; exitAnim = 0; Kit.stat("level", level); Kit.stat("moves", 0); }
+        function start() { level = 1; score = 0; state = "play"; Kit.stat("score", 0); newLevel(); Kit.hide("start"); Kit.hide("over"); }
+        function range(i) {
+            const c = cars[i], g = occ(cars, i); let lo = c.h ? c.c : c.r, hi = lo;
+            while (lo - 1 >= 0 && (c.h ? g[c.r][lo - 1] : g[lo - 1][c.c]) === -1) lo--;
+            while (hi + c.len < N && (c.h ? g[c.r][hi + c.len] : g[hi + c.len][c.c]) === -1) hi++;
+            return [lo, hi];
+        }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!cars) return;
+            Kit.text(ctx, `${T("Level", "שלב")} ${level} · ${T("can be solved in", "אפשר לפתור ב־")} ${best} ${T("moves", "מהלכים")}`, W / 2, 50, 18, "#fff", "center");
+            Kit.text(ctx, T("Slide the cars to get the red car out", "הזיזו את המכוניות כדי להוציא את המכונית האדומה"), W / 2, 84, 14, "#9aa0c8", "center");
+            ctx.fillStyle = "#4a4e63"; Kit.rr(ctx, OX - 12, OY - 12, N * CS + 24, N * CS + 24, 14); ctx.fill();
+            ctx.fillStyle = "#3a3d50"; ctx.fillRect(OX, OY, N * CS, N * CS);
+            ctx.fillStyle = "#4a4e63"; ctx.fillRect(OX + N * CS, OY + EXIT_ROW * CS, 14, CS);
+            Kit.text(ctx, "➜", OX + N * CS + 26, OY + EXIT_ROW * CS + CS / 2, 26, "#2ee6a0", "center");
+            for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { ctx.fillStyle = "#ffffff08"; ctx.fillRect(OX + c * CS + 2, OY + r * CS + 2, CS - 4, CS - 4); }
+            cars.forEach((c, i) => {
+                let x = OX + c.c * CS, y = OY + c.r * CS;
+                if (drag && drag.i === i) { if (c.h) x = OX + drag.pos * CS; else y = OY + drag.pos * CS; }
+                if (i === 0 && won) x += exitAnim * 400;
+                const w = c.h ? c.len * CS : CS, h = c.h ? CS : c.len * CS, col = i === 0 ? "#ff3b4d" : CAR_COLS[i % CAR_COLS.length];
+                ctx.fillStyle = "#00000044"; Kit.rr(ctx, x + 8, y + 10, w - 12, h - 12, 14); ctx.fill();
+                ctx.fillStyle = col; Kit.rr(ctx, x + 5, y + 5, w - 10, h - 10, 14); ctx.fill();
+                ctx.fillStyle = "#ffffff55"; if (c.h) Kit.rr(ctx, x + w * 0.3, y + 14, w * 0.35, h - 28, 8); else Kit.rr(ctx, x + 14, y + h * 0.3, w - 28, h * 0.35, 8); ctx.fill();
+                if (i === 0) Kit.text(ctx, "★", x + w / 2, y + h / 2, 22, "#fff", "center");
+            });
+            if (won && exitAnim > 0.6) { ctx.fillStyle = "#0b0d1acc"; ctx.fillRect(0, H / 2 - 50, W, 100); Kit.text(ctx, T("Free! 🎉", "יצאה! 🎉"), W / 2, H / 2, 30, "#2ee6a0", "center", "'Press Start 2P', monospace", 400); }
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play" || won) return;
+            const p = Kit.point(cv, e), c = Math.floor((p.x - OX) / CS), r = Math.floor((p.y - OY) / CS);
+            const g = occ(cars); if (r < 0 || r >= N || c < 0 || c >= N || g[r][c] < 0) return;
+            const i = g[r][c], car = cars[i]; drag = { i, start: car.h ? p.x : p.y, orig: car.h ? car.c : car.r, pos: car.h ? car.c : car.r, range: range(i) };
+            cv.setPointerCapture(e.pointerId);
+        });
+        cv.addEventListener("pointermove", (e) => { if (!drag) return; const p = Kit.point(cv, e), car = cars[drag.i], d = ((car.h ? p.x : p.y) - drag.start) / CS; drag.pos = Math.max(drag.range[0], Math.min(drag.range[1], drag.orig + d)); });
+        cv.addEventListener("pointerup", () => {
+            if (!drag) return; const car = cars[drag.i], np = Math.round(drag.pos);
+            if (np !== drag.orig) { if (car.h) car.c = np; else car.r = np; moves++; Kit.stat("moves", moves); beep(420, 0.04, "triangle", 0.03); }
+            drag = null;
+            if (cars[0].c + 2 === N) {
+                won = 1; const pts = 100 + level * 20 + Math.max(0, best + 5 - moves) * 15; score += pts; Kit.stat("score", score); Kit.save(score); Kit.setBest(BEST, score);
+                tune([523, 659, 784, 1047], 0.08, "square", 0.05); setTimeout(() => { level++; newLevel(); }, 1500);
+            }
+        });
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (won) exitAnim += dt * 1.5; draw(); }).start();
+        if (window.__test) window.__test.traffic = { get s() { return { cars, best, level }; }, solve, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Traffic Jam</h2><p>A sliding-car puzzle in a crowded parking lot. Cars and trucks can only drive forward or backward, and your goal is to clear a path so the red car can drive out of the exit. Every level is freshly made and checked by the computer, which also tells you the fewest moves it can be solved in.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag a car</td><td>Slide it along its lane</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Find the cars blocking the red car first.</li><li>Long trucks are usually the key pieces.</li><li>Fewer moves earn more points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Traffic Jam</h3><p>The best way to solve a Traffic Jam puzzle is to work backward from the goal. Look at the red car's row and find every car blocking it. For each blocker, ask: which way does it need to move, and what's in its way? Keep going until you find a car that can move freely, and start there.</p><p>Vertical cars in the red car's row usually need to move up or down by a whole space, which means the cars above or below them must move first. Trucks, which are three spaces long, are the hardest to shift and are often the real problem.</p><p>The level tells you the fewest moves possible. A move is sliding one car any distance, so try to move each car straight to where it needs to be.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve the first five levels.</li><li><b>Getting good:</b> Solve a level in exactly the fewest moves.</li><li><b>Expert:</b> Reach level 15.</li></ul><h3>Did you know?</h3><p>Sliding-block car puzzles became famous in the 1990s, but the idea goes back to the 1930s. Computer scientists have shown that very large versions of this puzzle are extremely hard for computers to solve.</p><h3>Questions players ask</h3><h4>What counts as a move?</h4><p>Sliding one car, any number of spaces.</p><h4>Is every level solvable?</h4><p>Yes, the computer solves every level before showing it to you.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/Memory/memory">Memory Match</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

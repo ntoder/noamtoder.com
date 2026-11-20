@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast word game against the clock. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Word Scramble · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Word <span>Scramble</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Word Scramble</h2>
+                <p id="startText">The letters of an English word are all mixed up. Tap them (or type them) in the right order to spell the word!<br>Every word you solve adds 3 seconds to the clock. You can skip 3 words.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's Up</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Look for common pairs like TH, CH, SH and ER, and for a word ending you know, like -ER or -ET.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Word Scramble — unscramble as many words as you can in 90 seconds
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "wordscrambleBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const WORDS = "APPLE BEACH CLOUD DANCE EAGLE FLAME GHOST HONEY JUICE KOALA LEMON MAGIC NINJA OCEAN PIANO QUEEN RIVER SNAKE TIGER UNCLE VOICE WHALE YACHT ZEBRA BRAVE CANDY DREAM FROST GRAPE HAPPY JELLY LUCKY MONEY NOISY PARTY ROBOT SMILE TOAST WATER ANGEL BREAD CHAIR DRINK EARTH FIELD GLASS HEART HOUSE LIGHT MOUSE NIGHT PLANT RADIO SHEEP SPACE STORM TRAIN WORLD PLANET GARDEN ROCKET CASTLE PIRATE DRAGON JUNGLE WINTER SUMMER SPRING BUTTER COOKIE PENCIL MONKEY RABBIT TURTLE BRIDGE CAMERA DOCTOR FLOWER GUITAR HAMMER ISLAND LADDER MIRROR ORANGE PEPPER SCHOOL SILVER TICKET WIZARD BASKET CIRCUS FOREST HELMET KITTEN MEADOW PUZZLE SPIDER TOMATO VIOLIN".split(" ");
+        let word, letters, picked, time, score, solved, state = "ready", shake = 0, flash = null, skips;
+        Kit.stat("best", Kit.best(BEST));
+        function shuffle(w) { let s; do { s = [...w].sort(() => Math.random() - 0.5); } while (s.join("") === w); return s; }
+        function next() { word = Kit.pick(WORDS.filter((w) => w.length <= 5 + Math.min(1, Math.floor(solved / 5)))); letters = shuffle(word).map((ch, i) => ({ ch, i, used: false })); picked = []; }
+        function start() { score = 0; solved = 0; time = 90; skips = 3; state = "play"; next(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function tap(i) {
+            const l = letters[i]; if (!l || l.used || state !== "play") return;
+            l.used = true; picked.push(l); beep(500 + picked.length * 60, 0.04, "triangle", 0.03);
+            if (picked.length === word.length) check();
+        }
+        function back() { const l = picked.pop(); if (l) l.used = false; }
+        function check() {
+            const g = picked.map((l) => l.ch).join("");
+            if (g === word) { solved++; const pts = word.length * 10 + Math.ceil(time / 10); score += pts; time += 3; Kit.stat("score", score); flash = { text: `+${pts}`, t: 1, ok: true }; tune([660, 880, 1100], 0.05, "square", 0.04); next(); }
+            else { shake = 0.4; beep(160, 0.12, "sawtooth", 0.04); setTimeout(() => { letters.forEach((l) => (l.used = false)); picked = []; }, 300); }
+        }
+        function skip() { if (state !== "play" || skips <= 0) return; skips--; flash = { text: word, t: 1.2, ok: false }; next(); }
+        function end() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${solved} ${T("words solved", "מילים נפתרו")} · ${score} ${T("points", "נקודות")}<br>${T("best", "שיא")} ${best}`; tune([523, 392, 330], 0.13, "triangle", 0.05); Kit.show("over"); }
+        const tile = (i, n, y) => { const s = Math.min(78, (W - 40) / n - 8); return { x: (W - n * (s + 8)) / 2 + i * (s + 8), y, s }; };
+        const BTN = { back: { x: 60, y: 560, w: 150, h: 50 }, skip: { x: W - 210, y: 560, w: 150, h: 50 } };
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!word) return;
+            const tw = (W - 80) * Math.max(0, time) / 90; ctx.fillStyle = "#2a3060"; Kit.rr(ctx, 40, 30, W - 80, 14, 7); ctx.fill(); ctx.fillStyle = time > 15 ? "#2ee6a0" : "#ff4d6d"; Kit.rr(ctx, 40, 30, Math.min(W - 80, tw), 14, 7); ctx.fill();
+            Kit.text(ctx, `${Math.ceil(time)}s`, W / 2, 72, 18, "#fff", "center");
+            Kit.text(ctx, T("Tap the letters in the right order", "הקישו על האותיות בסדר הנכון"), W / 2, 120, 16, "#9aa0c8", "center");
+            const n = word.length, sx = shake > 0 ? Math.sin(shake * 60) * 8 : 0;
+            for (let i = 0; i < n; i++) { const r = tile(i, n, 180); ctx.fillStyle = "#151833"; Kit.rr(ctx, r.x + sx, r.y, r.s, r.s, 12); ctx.fill(); const l = picked[i]; if (l) Kit.text(ctx, l.ch, r.x + r.s / 2 + sx, r.y + r.s / 2, r.s * 0.5, "#ffc94d", "center", "'Press Start 2P', monospace", 400); }
+            letters.forEach((l, i) => { const r = tile(i, n, 360); ctx.fillStyle = l.used ? "#1a1d3a" : "#7c5cff"; Kit.rr(ctx, r.x, r.y, r.s, r.s, 14); ctx.fill(); if (!l.used) Kit.text(ctx, l.ch, r.x + r.s / 2, r.y + r.s / 2, r.s * 0.5, "#fff", "center", "'Press Start 2P', monospace", 400); });
+            ctx.fillStyle = "#2a2f6a"; Kit.rr(ctx, BTN.back.x, BTN.back.y, BTN.back.w, BTN.back.h, 12); ctx.fill(); Kit.text(ctx, "⌫ " + T("Back", "מחיקה"), BTN.back.x + 75, BTN.back.y + 25, 16, "#fff", "center");
+            ctx.fillStyle = skips ? "#2a2f6a" : "#1a1d3a"; Kit.rr(ctx, BTN.skip.x, BTN.skip.y, BTN.skip.w, BTN.skip.h, 12); ctx.fill(); Kit.text(ctx, `⏭ ${T("Skip", "דילוג")} (${skips})`, BTN.skip.x + 75, BTN.skip.y + 25, 16, "#fff", "center");
+            if (flash) { ctx.globalAlpha = Math.min(1, flash.t * 2); Kit.text(ctx, flash.ok ? flash.text : `${T("It was", "זה היה")} ${flash.text}`, W / 2, 300, 22, flash.ok ? "#2ee6a0" : "#ff8a3d", "center"); ctx.globalAlpha = 1; }
+        }
+        const inB = (p, b) => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play") return; const p = Kit.point(cv, e);
+            if (inB(p, BTN.back)) return back(); if (inB(p, BTN.skip)) return skip();
+            letters.forEach((l, i) => { const r = tile(i, word.length, 360); if (p.x > r.x && p.x < r.x + r.s && p.y > r.y && p.y < r.y + r.s) tap(i); });
+        });
+        addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && state !== "play") return start();
+            if (state !== "play") return;
+            if (e.key === "Backspace") { e.preventDefault(); return back(); }
+            if (/^[a-z]$/i.test(e.key)) { const i = letters.findIndex((l) => !l.used && l.ch === e.key.toUpperCase()); if (i >= 0) tap(i); }
+        });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") { time -= dt; if (time <= 0) { time = 0; end(); } } if (shake > 0) shake -= dt; if (flash && (flash.t -= dt) <= 0) flash = null; draw(); }).start();
+        if (window.__test) window.__test.scramble = { get s() { return { word, score }; }, tap, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Word Scramble</h2><p>A fast word game against the clock. Each round shows the letters of an English word in a jumbled order, and you rebuild the word by tapping the letters or typing them. Solve as many as you can in 90 seconds, and every correct word buys you a little more time. Words start at five letters and get longer as you go.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap letters or type</td><td>Spell the word</td></tr><tr><td>Backspace</td><td>Take back a letter</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Find the vowels first and think about where they go.</li><li>Many words end in -ER, -ET, -LE or -ON.</li><li>Skip a word if you're stuck: it saves time.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Word Scramble</h3><p>Speed comes from spotting patterns. Instead of trying every order, look for letter pairs that often go together in English, like TH, CH, SH, ER, LE and ON. Once you've found a likely pair or ending, the rest of the word often falls into place.</p><p>Look at where the vowels could go. Most five- and six-letter words follow simple shapes, like consonant-vowel-consonant. If there are two vowels, they're often split up.</p><p>Don't get stuck. You have three skips, and a skipped word shows you the answer, so you'll learn it for next time. Every solved word adds three seconds, so a quick skip can earn you more points than staring at a hard one.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve 5 words in one game.</li><li><b>Getting good:</b> Solve 12 words.</li><li><b>Expert:</b> Score over 600 points.</li></ul><h3>Did you know?</h3><p>Puzzles made from rearranged letters are called anagrams. Some people make anagrams of their own names just for fun.</p><h3>Questions players ask</h3><h4>Are the words in English?</h4><p>Yes, they're common English words.</p><h4>Do longer words give more points?</h4><p>Yes, each letter is worth 10 points, plus a bonus for time left.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

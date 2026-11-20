@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A relaxing plumbing puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Pipe Connect · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Pipe <span>Connect</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="taps">0</b><small>Taps</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="680"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Pipe Connect</h2>
+                <p id="startText">Water starts at the 💧 in the middle. Tap pipes to turn them, and connect every single tile so the water flows everywhere!<br>Each level is a bigger grid.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Start with the corners and edges: their pipes can only point a few ways, so they're easy to fix.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Pipe Connect — rotate the pipes so water reaches every tile
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "pipeconnectBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        // directions: 1 up, 2 right, 4 down, 8 left
+        const D = [[1, -1, 0, 4], [2, 0, 1, 8], [4, 1, 0, 1], [8, 0, -1, 2]];
+        let n, grid, src, level = 1, taps = 0, score = 0, state = "ready", wet = new Set(), won = 0, spin = {};
+        Kit.stat("best", Kit.best(BEST));
+        const rot = (m) => ((m << 1) | (m >> 3)) & 15;
+        function newLevel() {
+            n = Math.min(8, 3 + level); grid = Array.from({ length: n }, () => new Array(n).fill(0));
+            src = [Math.floor(n / 2), Math.floor(n / 2)];
+            const seen = new Set([src.join()]), stack = [src];
+            while (stack.length) {
+                const [r, c] = stack[stack.length - 1];
+                const opts = D.filter(([, dr, dc]) => { const rr = r + dr, cc = c + dc; return rr >= 0 && rr < n && cc >= 0 && cc < n && !seen.has(rr + "," + cc); });
+                if (!opts.length || (stack.length > 1 && Math.random() < 0.08)) { stack.pop(); continue; }
+                const [bit, dr, dc, back] = Kit.pick(opts), rr = r + dr, cc = c + dc;
+                grid[r][c] |= bit; grid[rr][cc] |= back; seen.add(rr + "," + cc); stack.push([rr, cc]);
+            }
+            for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) { const k = Kit.randi(1, 3); for (let i = 0; i < k; i++) grid[r][c] = rot(grid[r][c]); }
+            taps = 0; won = 0; flow(); if (wet.size === n * n) return newLevel();
+            Kit.stat("level", level); Kit.stat("taps", 0);
+        }
+        function flow() {
+            wet = new Set([src.join()]); const q = [src];
+            while (q.length) { const [r, c] = q.shift(); for (const [bit, dr, dc, back] of D) { const rr = r + dr, cc = c + dc; if (grid[r][c] & bit && rr >= 0 && rr < n && cc >= 0 && cc < n && grid[rr][cc] & back && !wet.has(rr + "," + cc)) { wet.add(rr + "," + cc); q.push([rr, cc]); } } }
+        }
+        function tap(r, c) {
+            if (state !== "play" || won) return;
+            grid[r][c] = rot(grid[r][c]); spin[r + "," + c] = 1; taps++; Kit.stat("taps", taps); beep(400, 0.03, "sine", 0.03);
+            const before = wet.size; flow(); if (wet.size > before) beep(700, 0.04, "triangle", 0.03);
+            if (wet.size === n * n) { won = 1; const pts = n * n * 10 + Math.max(0, n * n * 2 - taps) * 5; score += pts; Kit.stat("score", score); Kit.save(score); Kit.setBest(BEST, score); tune([523, 659, 784, 1047], 0.08, "square", 0.05); setTimeout(() => { level++; newLevel(); }, 1500); }
+        }
+        function start() { level = 1; score = 0; state = "play"; Kit.stat("score", 0); newLevel(); Kit.hide("start"); Kit.hide("over"); }
+        const CS = () => Math.min(90, 520 / n), OX = () => (W - CS() * n) / 2, OY = 110;
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!grid) return;
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, 44, 24, "#fff", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, T("Tap pipes to turn them. Get water to every tile!", "הקישו על צינורות כדי לסובב אותם. הביאו מים לכל משבצת!"), W / 2, 80, 14, "#9aa0c8", "center");
+            const s = CS();
+            for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+                const x = OX() + c * s, y = OY + r * s, w = wet.has(r + "," + c), sp = spin[r + "," + c] || 0;
+                ctx.fillStyle = "#151833"; Kit.rr(ctx, x + 2, y + 2, s - 4, s - 4, 10); ctx.fill();
+                ctx.save(); ctx.translate(x + s / 2, y + s / 2); ctx.rotate(-sp * Math.PI / 2);
+                ctx.strokeStyle = w ? "#4de8ff" : "#6b7194"; ctx.lineWidth = s * 0.22; ctx.lineCap = "round";
+                for (const [bit, dr, dc] of D) if (grid[r][c] & bit) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dc * s / 2, dr * s / 2); ctx.stroke(); }
+                if (w) { ctx.strokeStyle = "#c9f7ff"; ctx.lineWidth = s * 0.06; for (const [bit, dr, dc] of D) if (grid[r][c] & bit) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dc * s / 2, dr * s / 2); ctx.stroke(); } }
+                ctx.restore();
+                if (r === src[0] && c === src[1]) { ctx.fillStyle = "#1d5fd0"; ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.24, 0, 7); ctx.fill(); Kit.text(ctx, "💧", x + s / 2, y + s / 2, s * 0.28, "#fff", "center"); }
+                else if ([1, 2, 4, 8].includes(grid[r][c])) { ctx.fillStyle = w ? "#2ee6a0" : "#3a3f66"; ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.16, 0, 7); ctx.fill(); }
+            }
+            Kit.text(ctx, `${wet.size} / ${n * n} ${T("filled", "מלאים")}`, W / 2, OY + n * s + 30, 16, won ? "#2ee6a0" : "#9aa0c8", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (!grid) return; const p = Kit.point(cv, e), s = CS(), c = Math.floor((p.x - OX()) / s), r = Math.floor((p.y - OY) / s); if (r >= 0 && r < n && c >= 0 && c < n) tap(r, c); });
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { for (const k in spin) { spin[k] -= dt * 8; if (spin[k] <= 0) delete spin[k]; } draw(); }).start();
+        if (window.__test) window.__test.pipes = { get s() { return { grid, wet, n }; }, tap, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Pipe Connect</h2><p>A relaxing plumbing puzzle. Every tile has a piece of pipe, and they're all twisted the wrong way. Tap a tile to rotate it a quarter turn. When pipes line up, water flows from the source in the middle and lights them up blue. Connect the whole grid to finish the level. The grid grows from 4 by 4 up to 8 by 8.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap a tile</td><td>Turn it a quarter turn</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Corner tiles can only connect two ways, so fix them first.</li><li>Dead ends (a single short pipe) must point at a neighbour.</li><li>Straight pipes on an edge must run along that edge.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Pipe Connect</h3><p>Every puzzle has exactly one solution where all the pipes connect, and the edges give it away. A pipe on the edge of the grid can never point outward, so edge and corner tiles have very few possible positions. Fix those first.</p><p>Next look at the dead ends, the tiles with just one short pipe stub. Each one must point at a neighbour that has an opening facing back. Once a tile is certainly right, you can use it as a clue for its neighbours.</p><p>The water shows your progress: blue pipes are already connected to the source. If a big area won't fill, look for the one tile where the water stops.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve the 4 by 4 and 5 by 5 grids.</li><li><b>Getting good:</b> Solve 6 by 6 in fewer taps than tiles times two.</li><li><b>Expert:</b> Finish the 8 by 8 grid.</li></ul><h3>Did you know?</h3><p>Real water pipes in houses use the same idea: every pipe joint must line up perfectly, or water leaks out. Plumbers plan the whole network of pipes before they start building.</p><h3>Questions players ask</h3><h4>Is there always a solution?</h4><p>Yes, every grid is made from a connected network, then the tiles are turned.</p><h4>Do taps matter?</h4><p>Finishing in fewer taps gives a bigger bonus.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Reversi/reversi">Reversi</a><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/SpaceShooter/spaceshooter">Space Shooter</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
