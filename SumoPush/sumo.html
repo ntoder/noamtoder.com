@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A pushy, bouncy sumo game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Sumo Push · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Sumo <span>Push</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 – 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Wins</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="720" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Sumo Push</h2>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>You're the blue wrestler. Move with W A S D (or the arrows) and press Space for a big charge. Push the other wrestler out of the ring!<br>First to win 3 rounds is the champion. If a round lasts too long, the ring starts shrinking. In 2-player mode, Red uses the arrows and Right Shift.</p>
+                <button class="btn" id="startBtn">💪 Fight</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">💪 Rematch</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="a.left">⬅</button><button data-k="a.up">⬆</button><button data-k="a.down">⬇</button><button data-k="a.dash">💥</button><button data-k="a.right">➡</button></div>
+    <p class="hint">Don't charge from far away: if you miss, you might fly out yourself! Charge when you're close.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Sumo Push — knock your opponent out of the ring. Charge for a big shove! vs computer or 2 players, best of 5
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "sumoBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CX = W / 2, CY = H / 2 + 10, RING = 220, R = 30;
+        let ps, wins, state = "ready", two = false, roundT = 0, msg = "", fx = Kit.particles(), shrink = 0, rt = 0;
+        document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
+        Kit.stat("best", Kit.best(BEST));
+        function round() { ps = [{ x: CX - 110, y: CY, vx: 0, vy: 0, c: "#2a74ff", dash: 0, cd: 0, out: false }, { x: CX + 110, y: CY, vx: 0, vy: 0, c: "#ff4d6d", dash: 0, cd: 0, out: false }]; roundT = 1.2; shrink = 0; rt = 0; }
+        function start() { wins = [0, 0]; state = "play"; msg = ""; round(); Kit.stat("score", "0 – 0"); Kit.hide("start"); Kit.hide("over"); }
+        function move(p, mx, my, dash, dt) {
+            const l = Math.hypot(mx, my); if (l) { p.vx += (mx / l) * 900 * dt; p.vy += (my / l) * 900 * dt; }
+            if (dash && p.cd <= 0 && l) { p.vx += (mx / l) * 520; p.vy += (my / l) * 520; p.dash = 0.25; p.cd = 1.2; beep(250, 0.1, "sawtooth", 0.04, 200); }
+            p.dash -= dt; p.cd -= dt; p.vx *= Math.pow(0.12, dt); p.vy *= Math.pow(0.12, dt); p.x += p.vx * dt; p.y += p.vy * dt;
+        }
+        function ai(p, o, dt) {
+            const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy); const fromC = Math.hypot(p.x - CX, p.y - CY);
+            let mx = dx, my = dy; if (fromC > rad() - 70) { mx = CX - p.x + dx * 0.3; my = CY - p.y + dy * 0.3; }
+            // try to get between opponent and centre: push outward
+            const ox = o.x - CX, oy = o.y - CY, ol = Math.hypot(ox, oy) || 1; mx += (ox / ol) * 40; my += (oy / ol) * 40;
+            move(p, mx, my, d < 110 && Math.random() < 0.015, dt * 0.75);
+        }
+        const rad = () => RING - shrink;
+        function update(dt) {
+            if (roundT > 0) { roundT -= dt; return; }
+            rt += dt; if (rt > 12) shrink = Math.min(130, (rt - 12) * 10);
+            const k = Kit.keys, [a, b] = ps;
+            if (two) { move(a, (k.has("a.right") ? 1 : 0) - (k.has("a.left") ? 1 : 0), (k.has("a.down") ? 1 : 0) - (k.has("a.up") ? 1 : 0), k.has("a.dash"), dt); move(b, (k.has("b.right") ? 1 : 0) - (k.has("b.left") ? 1 : 0), (k.has("b.down") ? 1 : 0) - (k.has("b.up") ? 1 : 0), k.has("b.dash"), dt); }
+            else { const r = k.has("a.right") || k.has("b.right"), l = k.has("a.left") || k.has("b.left"), u = k.has("a.up") || k.has("b.up"), d = k.has("a.down") || k.has("b.down"); move(a, (r ? 1 : 0) - (l ? 1 : 0), (d ? 1 : 0) - (u ? 1 : 0), k.has("a.dash") || k.has("b.dash"), dt); ai(b, a, dt); }
+            const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+            if (d < R * 2 && d > 0) { const nx = dx / d, ny = dy / d, ov = R * 2 - d; a.x -= nx * ov / 2; a.y -= ny * ov / 2; b.x += nx * ov / 2; b.y += ny * ov / 2;
+                const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny; if (rel > 0) { const pa = a.dash > 0 ? 1.8 : 1, pb = b.dash > 0 ? 1.8 : 1; const imp = rel * 1.1; b.vx += nx * imp * pa; b.vy += ny * imp * pa; a.vx -= nx * imp * pb * 0.6; a.vy -= ny * imp * pb * 0.6; if (imp > 120) { beep(120, 0.08, "square", 0.05); fx.burst(a.x + nx * R, a.y + ny * R, "#fff", 8, 3); } } }
+            for (let i = 0; i < 2; i++) { const p = ps[i]; if (Math.hypot(p.x - CX, p.y - CY) > rad() + R * 0.3) { p.out = true; } }
+            if (a.out || b.out) { const w = a.out && b.out ? -1 : a.out ? 1 : 0; if (w >= 0) wins[w]++; Kit.stat("score", `${wins[0]} – ${wins[1]}`); tune(w === 0 ? [659, 880] : [392, 330], 0.08, "square", 0.05); msg = w < 0 ? T("Both out!", "שניהם בחוץ!") : w === 0 ? (two ? T("Blue wins the round!", "הכחול ניצח בסיבוב!") : T("You win the round!", "ניצחתם בסיבוב!")) : two ? T("Red wins the round!", "האדום ניצח בסיבוב!") : T("Computer wins the round", "המחשב ניצח בסיבוב");
+                if (Math.max(...wins) >= 3) { state = "over"; const iw = wins[0] > wins[1]; if (!two && iw) { Kit.save(100); Kit.setBest(BEST, (Kit.best(BEST) || 0) + 1); } setTimeout(() => { $("overText").innerHTML = `${two ? (iw ? T("🔵 Blue is the sumo champion!", "🔵 הכחול אלוף הסומו!") : T("🔴 Red is the sumo champion!", "🔴 האדום אלוף הסומו!")) : iw ? T("🏆 You're the sumo champion!", "🏆 אתם אלופי הסומו!") : T("😢 The computer wins", "😢 המחשב ניצח")}<br>${wins[0]} – ${wins[1]}`; Kit.show("over"); }, 900); }
+                else setTimeout(() => { msg = ""; if (state === "play") round(); }, 1300); roundT = 99; }
+        }
+        function wrestler(p) {
+            if (p.out) ctx.globalAlpha = 0.4; ctx.fillStyle = "#0004"; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 6, R, R * 0.8, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, 7); ctx.fill(); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.75, 0, 7); ctx.fill(); ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.5, 0, 7); ctx.fill(); ctx.fillStyle = "#1a1a2a"; ctx.beginPath(); ctx.arc(p.x, p.y - 4, 8, 0, 7); ctx.fill();
+            if (p.dash > 0) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, R + 6, 0, 7); ctx.stroke(); }
+            ctx.globalAlpha = 1; ctx.fillStyle = "#0005"; ctx.fillRect(p.x - 20, p.y + R + 8, 40, 5); ctx.fillStyle = p.cd > 0 ? "#888" : "#ffc94d"; ctx.fillRect(p.x - 20, p.y + R + 8, 40 * Math.min(1, 1 - Math.max(0, p.cd) / 1.2), 5);
+        }
+        function draw() {
+            ctx.fillStyle = "#3a2a1e"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#c9a36a"; ctx.beginPath(); ctx.arc(CX, CY, RING + 30, 0, 7); ctx.fill();
+            ctx.fillStyle = "#e8cf98"; ctx.beginPath(); ctx.arc(CX, CY, rad(), 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(CX, CY, rad(), 0, 7); ctx.stroke();
+            ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(CX - 40, CY - 30); ctx.lineTo(CX - 40, CY + 30); ctx.moveTo(CX + 40, CY - 30); ctx.lineTo(CX + 40, CY + 30); ctx.stroke();
+            if (!ps) return;
+            ps.forEach(wrestler); fx.draw(ctx);
+            Kit.text(ctx, `${wins[0]}  –  ${wins[1]}`, CX, 40, 26, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (msg) Kit.text(ctx, msg, CX, CY - RING - 6, 22, "#ffc94d", "center"); else if (roundT > 0 && roundT < 99) Kit.text(ctx, T("Hakkeyoi!", "!האקיוי"), CX, CY, 34, "#3a2a1e", "center");
+            if (shrink > 0 && !msg) Kit.text(ctx, T("The ring is shrinking!", "הזירה מתכווצת!"), CX, H - 16, 16, "#ff9a3c", "center");
+        }
+        Kit.onKeys({ KeyW: "a.up", KeyS: "a.down", KeyA: "a.left", KeyD: "a.right", Space: "a.dash", ShiftLeft: "a.dash", ArrowUp: "b.up", ArrowDown: "b.down", ArrowLeft: "b.left", ArrowRight: "b.right", ShiftRight: "b.dash", Enter: "enter", Period: "b.dash" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        window.GAMEPAD_MAP = [{ up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", a: "Space", b: "Space", x: "Space", rb: "Space", rt: "Space", start: "Enter" }, { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "ShiftRight", b: "ShiftRight", x: "ShiftRight", rb: "ShiftRight", rt: "ShiftRight", start: "Enter" }];
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.sumo = { get s() { return { state, wins }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Sumo Push</h2><p>A pushy, bouncy sumo game. Two round wrestlers face off in a sandy ring. Move around, bump into your opponent, and shove them over the edge. Your charge gives a huge burst of speed and makes your next bump much stronger, but it needs a moment to recharge, shown by the yellow bar. Win three rounds to become the champion. If a round drags on, the ring slowly shrinks.</p></section>
+        <section><h3>How to play</h3><table><tr><td>W A S D / arrows</td><td>Move</td></tr><tr><td>Space / Shift</td><td>Charge</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Stay near the middle of the ring.</li><li>A charge is strongest at close range.</li><li>Dodge sideways when your rival charges.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Sumo Push</h3><p>Sumo Push is about position. The wrestler closer to the centre of the ring has the advantage, because they have room to be pushed without falling out. Try to circle around your opponent so that they're between you and the edge.</p><p>The charge makes your next bump much stronger, but it also sends you flying. If you charge and miss, you might shoot right out of the ring. Charge only when you're close and lined up.</p><p>When your opponent charges, step to the side. They'll fly past you, often toward the edge, and that's your chance to finish them off.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Win a round.</li><li><b>Getting good:</b> Beat the computer.</li><li><b>Expert:</b> Win 3–0.</li></ul><h3>Did you know?</h3><p>In real sumo wrestling, a match is often over in a few seconds. You lose if you step out of the ring or if any part of your body other than your feet touches the ground.</p><h3>Questions players ask</h3><h4>How do I charge?</h4><p>Press Space (Player 1) or Right Shift (Player 2) while moving.</p><h4>Why is the ring getting smaller?</h4><p>After 12 seconds the ring shrinks so rounds don't last forever.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TargetRush/targetrush">Target Rush</a><a href="/TimberChop/timberchop">Timber Chop</a><a href="/UltimateTicTacToe/ultimatettt">Ultimate Tic-Tac-Toe</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
