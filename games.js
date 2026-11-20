@@ -59,6 +59,10 @@ export const GAMES = {
     pool:         { name: "Noam Pool", path: "/Pool/pool",             img: "/thumbs/pool.png",         tags: ["sports", "strategy"], desc: "8-ball pool vs the computer or a friend.", isNew: true },
     bubblepop:    { name: "Bubble Pop", path: "/BubblePop/bubbles",   img: "/thumbs/bubbles.png",      tags: ["puzzle", "arcade"],   desc: "Aim, bounce and pop 3 or more bubbles.", isNew: true },
     blockfit:     { name: "Block Fit", path: "/BlockFit/blockfit",    img: "/thumbs/blockfit.png",     tags: ["puzzle"],             desc: "Drag blocks, clear rows and columns.", isNew: true },
+    fruitmerge:   { name: "Fruit Merge", path: "/FruitMerge/fruitmerge", img: "/thumbs/fruitmerge.png",   tags: ["puzzle"],             desc: "Drop fruit, merge them, make a watermelon!", isNew: true },
+    snakearena:   { name: "Snake Arena", path: "/SnakeArena/snakearena", img: "/thumbs/snakearena.png",   tags: ["arcade"],             desc: "Grow your snake and outsmart 15 rivals.", isNew: true },
+    roadhopper:   { name: "Road Hopper", path: "/RoadHopper/roadhopper", img: "/thumbs/roadhopper.png",   tags: ["arcade", "runner"],   desc: "Hop across roads, rivers and train tracks.", isNew: true },
+    hillrider:    { name: "Hill Rider", path: "/HillRider/hillrider",   img: "/thumbs/hillrider.png",    tags: ["sports", "arcade"],   desc: "Drive over the hills, do flips, upgrade your car.", isNew: true },
 };
 
 // Games that only count plays (no score)

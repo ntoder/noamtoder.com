@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A juicy physics puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Fruit Merge · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Fruit <span>Merge</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Fruit Merge</h2>
+                <p id="startText">Move left and right, then drop the fruit into the box.<br>When two of the same fruit touch, they merge into a bigger fruit: 🍒 → 🍓 → 🍇 → 🍋 → 🍊 → 🍎 → 🍐 → 🍑 → 🍍 → 🍈 → 🍉<br>Don't let the box fill up past the dashed line!<br><small>Mouse: move and click · Phone: drag and let go · Keyboard: ⬅ ➡ and Space</small></p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Keep the big fruit in one corner and build the chain next to it, so new merges roll toward each other.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Fruit Merge — drop fruit, matching fruit merge into bigger fruit
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "fruitmergeBest";
+        const BOX = { x: 30, y: 150, w: W - 60, h: H - 190 }, LINE = BOX.y + 40, DROP_Y = 95;
+        const he = () => document.documentElement.lang === "he";
+        const T = (en, hb) => (he() ? hb : en);
+        const FRUITS = [
+            { name: "Cherry", r: 15, c: "#e5223d", c2: "#9e0f24" },
+            { name: "Strawberry", r: 21, c: "#ff4d6d", c2: "#c42a49", seeds: true },
+            { name: "Grape", r: 27, c: "#9b5de5", c2: "#6a35b8" },
+            { name: "Lemon", r: 33, c: "#ffd93d", c2: "#e0b400" },
+            { name: "Orange", r: 40, c: "#ff9f1c", c2: "#d97706" },
+            { name: "Apple", r: 48, c: "#ef4444", c2: "#b91c1c" },
+            { name: "Pear", r: 56, c: "#c5e063", c2: "#8fae2f" },
+            { name: "Peach", r: 64, c: "#ffb4a2", c2: "#f08a77" },
+            { name: "Pineapple", r: 73, c: "#f7c948", c2: "#c99a16", pine: true },
+            { name: "Melon", r: 84, c: "#9ae66e", c2: "#5fb83a", net: true },
+            { name: "Watermelon", r: 98, c: "#2fa84f", c2: "#17742f", stripes: true }
+        ];
+        const PTS = FRUITS.map((_, i) => ((i + 1) * (i + 2)) / 2);
+        let fruits = [], cur, next, dropX = W / 2, cool = 0, score = 0, state = "ready", fx = Kit.particles(), floats = [], overT = 0, best = Kit.best(BEST), biggest = 0, combo = 0, comboT = 0, shake = 0;
+        Kit.stat("best", best);
+        const rnd = () => Kit.randi(0, 4) - (Math.random() < 0.3 ? 1 : 0);
+        const pickNext = () => Math.max(0, Math.min(4, rnd()));
+
+        function start() {
+            fruits = []; score = 0; cur = pickNext(); next = pickNext(); cool = 0; overT = 0; biggest = 0; combo = 0;
+            state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+        }
+        function drop() {
+            if (state !== "play" || cool > 0) return;
+            const r = FRUITS[cur].r, x = Math.max(BOX.x + r, Math.min(BOX.x + BOX.w - r, dropX));
+            fruits.push({ t: cur, x, y: DROP_Y, px: x, py: DROP_Y - 2, born: 0, id: Math.random(), rot: 0, sq: 0 });
+            cur = next; next = pickNext(); cool = 0.55;
+            beep(420, 0.05, "sine", 0.04, -120);
+        }
+
+        // ---------- physics (Verlet with position solving) ----------
+        function physics(dt) {
+            const g = 1500;
+            for (const f of fruits) {
+                const vx = (f.x - f.px) * 0.995, vy = (f.y - f.py) * 0.995;
+                f.px = f.x; f.py = f.y;
+                f.x += vx; f.y += vy + g * dt * dt;
+                f.rot += vx / FRUITS[f.t].r;
+                f.born += dt; if (f.sq > 0) f.sq -= dt * 3;
+            }
+            const merges = [];
+            for (let it = 0; it < 8; it++) {
+                for (let i = 0; i < fruits.length; i++) {
+                    const a = fruits[i], ra = FRUITS[a.t].r;
+                    for (let j = i + 1; j < fruits.length; j++) {
+                        const b = fruits[j], rb = FRUITS[b.t].r, dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), m = ra + rb;
+                        if (d >= m || d === 0) continue;
+                        if (a.t === b.t && !a.dead && !b.dead && a.t < FRUITS.length) { merges.push([a, b]); a.dead = b.dead = true; continue; }
+                        const o = (m - d), nx = dx / d, ny = dy / d, ma = ra * ra, mb = rb * rb, s = ma + mb;
+                        a.x -= nx * o * (mb / s); a.y -= ny * o * (mb / s);
+                        b.x += nx * o * (ma / s); b.y += ny * o * (ma / s);
+                    }
+                    // walls
+                    if (a.x < BOX.x + ra) a.x = BOX.x + ra;
+                    if (a.x > BOX.x + BOX.w - ra) a.x = BOX.x + BOX.w - ra;
+                    if (a.y > BOX.y + BOX.h - ra) { a.y = BOX.y + BOX.h - ra; a.px = a.x - (a.x - a.px) * 0.8; }
+                }
+            }
+            if (merges.length) doMerges(merges);
+        }
+        function doMerges(list) {
+            for (const [a, b] of list) {
+                const x = (a.x + b.x) / 2, y = (a.y + b.y) / 2, t = a.t;
+                fruits = fruits.filter((f) => f !== a && f !== b);
+                combo = comboT > 0 ? combo + 1 : 1; comboT = 0.8;
+                if (t === FRUITS.length - 1) {
+                    // two watermelons: both vanish with a huge bonus
+                    add(500, x, y); shake = 0.6; tune([523, 659, 784, 1047, 1319, 1568], 0.08, "square", 0.06);
+                    fx.burst(x, y, FRUITS[t].c, 60, 7); continue;
+                }
+                const n = t + 1;
+                fruits.push({ t: n, x, y, px: x, py: y, born: 1, id: Math.random(), rot: 0, sq: 1 });
+                add(PTS[n] * Math.min(combo, 5), x, y);
+                fx.burst(x, y, FRUITS[n].c, 10 + n * 3, 2 + n * 0.3);
+                beep(300 + n * 70, 0.08, "triangle", 0.06, 120);
+                if (n > biggest) { biggest = n; if (n >= 6) { floats = floats.filter((q) => !q.big); floats.push({ x: W / 2, y: H / 2 - 40, text: `${T("New", "חדש")}: ${tr(FRUITS[n].name)}!`, t: 1.6, big: true }); tune([660, 880, 1100], 0.08, "triangle", 0.05); } }
+            }
+        }
+        const tr = (s) => (Kit.tr ? Kit.tr(s) : s);
+        function add(p, x, y) { score += p; Kit.stat("score", score); floats.push({ x, y, text: "+" + p, t: 1 }); }
+        function gameOver() {
+            state = "over"; Kit.save(score); best = Kit.setBest(BEST, score);
+            $("overText").innerHTML = `${T("The box overflowed!", "הקופסה עלתה על גדותיה!")}<br>${T("Score", "ניקוד")}: <b>${score}</b> · ${T("Biggest fruit", "הפרי הכי גדול")}: ${tr(FRUITS[biggest].name)}<br>${T("best", "שיא")} ${best}`;
+            tune([392, 330, 262], 0.15, "triangle", 0.06); Kit.show("over");
+        }
+
+        // ---------- drawing ----------
+        function fruit(f, x, y, alpha = 1) {
+            const F = FRUITS[f.t], r = F.r * (1 + Math.max(0, f.sq || 0) * 0.15);
+            ctx.globalAlpha = alpha;
+            ctx.save(); ctx.translate(x, y);
+            const g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r); g.addColorStop(0, "#ffffffaa"); g.addColorStop(0.25, F.c); g.addColorStop(1, F.c2);
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+            ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.clip(); ctx.rotate(f.rot || 0);
+            if (F.stripes) { ctx.strokeStyle = "#0f5c25"; ctx.lineWidth = r * 0.09; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * r * 0.32, 0, r * 0.12, r * 0.95, 0, 0, 7); ctx.stroke(); } }
+            if (F.net) { ctx.strokeStyle = "#ffffff44"; ctx.lineWidth = 1.5; for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.28 - r, -r); ctx.lineTo(i * r * 0.28 + r, r); ctx.stroke(); ctx.beginPath(); ctx.moveTo(i * r * 0.28 + r, -r); ctx.lineTo(i * r * 0.28 - r, r); ctx.stroke(); } }
+            if (F.pine) { ctx.strokeStyle = "#a87a0c"; ctx.lineWidth = 2; for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.3 - r, -r); ctx.lineTo(i * r * 0.3 + r, r); ctx.stroke(); } }
+            if (F.seeds) { ctx.fillStyle = "#ffe08a"; for (let i = 0; i < 9; i++) { const a = i * 2.4, d = r * (0.35 + (i % 3) * 0.2); ctx.beginPath(); ctx.ellipse(Math.cos(a) * d, Math.sin(a) * d, 1.6, 2.4, a, 0, 7); ctx.fill(); } }
+            ctx.restore();
+            // leaf
+            ctx.fillStyle = F.pine ? "#2fa84f" : "#3cb44b";
+            if (F.pine) { for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.ellipse(i * r * 0.18, -r * 1.05, r * 0.1, r * 0.3, i * 0.4, 0, 7); ctx.fill(); } }
+            else { ctx.beginPath(); ctx.ellipse(r * 0.22, -r * 0.92, r * 0.28, r * 0.12, -0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#5b3a1a"; ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.beginPath(); ctx.moveTo(0, -r * 0.85); ctx.lineTo(r * 0.05, -r * 1.12); ctx.stroke(); }
+            // face
+            const e = r * 0.3, es = Math.max(2, r * 0.1);
+            ctx.fillStyle = "#2b1a1a"; ctx.beginPath(); ctx.arc(-e, -r * 0.05, es, 0, 7); ctx.arc(e, -r * 0.05, es, 0, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-e + es * 0.35, -r * 0.05 - es * 0.35, es * 0.35, 0, 7); ctx.arc(e + es * 0.35, -r * 0.05 - es * 0.35, es * 0.35, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#2b1a1a"; ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.beginPath(); ctx.arc(0, r * 0.12, r * 0.14, 0.2, Math.PI - 0.2); ctx.stroke();
+            ctx.fillStyle = "#ff7a9a66"; ctx.beginPath(); ctx.ellipse(-e * 1.5, r * 0.15, r * 0.12, r * 0.07, 0, 0, 7); ctx.ellipse(e * 1.5, r * 0.15, r * 0.12, r * 0.07, 0, 0, 7); ctx.fill();
+            ctx.restore(); ctx.globalAlpha = 1;
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ffe9c7"); g.addColorStop(1, "#ffc98b");
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-5, 5) * shake, Kit.rand(-5, 5) * shake);
+            // box
+            ctx.fillStyle = "#fff3df"; Kit.rr(ctx, BOX.x - 10, BOX.y, BOX.w + 20, BOX.h + 10, 16); ctx.fill();
+            ctx.strokeStyle = "#d9935a"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(BOX.x - 6, BOX.y); ctx.lineTo(BOX.x - 6, BOX.y + BOX.h + 4); ctx.lineTo(BOX.x + BOX.w + 6, BOX.y + BOX.h + 4); ctx.lineTo(BOX.x + BOX.w + 6, BOX.y); ctx.stroke();
+            ctx.strokeStyle = overT > 0 ? `rgba(255,60,60,${0.5 + Math.sin(performance.now() / 80) * 0.4})` : "#e9967a88"; ctx.lineWidth = 2; ctx.setLineDash([10, 8]);
+            ctx.beginPath(); ctx.moveTo(BOX.x, LINE); ctx.lineTo(BOX.x + BOX.w, LINE); ctx.stroke(); ctx.setLineDash([]);
+            for (const f of fruits) fruit(f, f.x, f.y);
+            if (state === "play") {
+                const r = FRUITS[cur].r, x = Math.max(BOX.x + r, Math.min(BOX.x + BOX.w - r, dropX));
+                ctx.strokeStyle = "#ffffffaa"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(x, DROP_Y + r); ctx.lineTo(x, BOX.y + BOX.h); ctx.stroke(); ctx.setLineDash([]);
+                fruit({ t: cur }, x, DROP_Y, cool > 0 ? 0.5 : 1);
+            }
+            ctx.restore();
+            // header
+            Kit.text(ctx, score.toLocaleString(), 30, 34, 30, "#7a3b12", "left", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, T("Next", "הבא"), W - 74, 22, 13, "#7a3b12", "center");
+            if (next != null) { ctx.save(); ctx.translate(W - 74, 52); ctx.scale(Math.min(1, 22 / FRUITS[next].r), Math.min(1, 22 / FRUITS[next].r)); fruit({ t: next }, 0, 0); ctx.restore(); }
+            // evolution ring
+            const ex = 30, ey = H - 22;
+            FRUITS.forEach((F, i) => { ctx.globalAlpha = i <= biggest ? 1 : 0.3; ctx.fillStyle = F.c; ctx.beginPath(); ctx.arc(ex + 8 + i * ((W - 76) / 10), ey, 4 + i * 0.7, 0, 7); ctx.fill(); });
+            ctx.globalAlpha = 1;
+            fx.draw(ctx);
+            for (const f of floats) { ctx.globalAlpha = Math.max(0, Math.min(1, f.t * 2)); Kit.text(ctx, f.text, f.x, f.y - (1 - f.t) * 40, f.big ? 26 : 18, f.big ? "#d9480f" : "#7a3b12", "center", f.big ? "'Press Start 2P', monospace" : undefined, f.big ? 400 : undefined); ctx.globalAlpha = 1; }
+        }
+        const game = Kit.loop((dt) => {
+            if (shake > 0) shake -= dt;
+            if (comboT > 0) comboT -= dt;
+            if (state === "play") {
+                cool -= dt;
+                if (Kit.keys.has("left")) dropX -= 380 * dt;
+                if (Kit.keys.has("right")) dropX += 380 * dt;
+                dropX = Math.max(BOX.x, Math.min(BOX.x + BOX.w, dropX));
+                const steps = 3; for (let i = 0; i < steps; i++) physics(Math.min(dt, 1 / 30) / steps);
+                // over the line for too long = game over
+                const high = fruits.some((f) => f.born > 1.2 && f.y - FRUITS[f.t].r < LINE && Math.abs(f.y - f.py) < 1.5);
+                overT = high ? overT + dt : 0;
+                if (overT > 2) gameOver();
+            }
+            for (const f of floats) f.t -= dt; floats = floats.filter((f) => f.t > 0);
+            fx.update(dt);
+            draw();
+        });
+        cv.addEventListener("pointermove", (e) => { const p = Kit.point(cv, e); dropX = p.x; });
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); dropX = p.x; if (e.pointerType === "mouse") drop(); else cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") drop(); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Space: "drop", ArrowDown: "drop", Enter: "enter" }, (a) => {
+            if (a === "enter" && state !== "play") return start();
+            if (a === "drop") drop();
+        });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        game.start();
+        if (window.__test) window.__test.fruit = { get s() { return { state, score, fruits, biggest, cur }; }, drop, setX(x) { dropX = x; }, start, sim(n) { for (let i = 0; i < n; i++) { cool -= 1 / 60; comboT -= 1 / 60; for (let k = 0; k < 3; k++) physics(1 / 180); } } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Fruit Merge</h2><p>A juicy physics puzzle. Drop fruit into the box one at a time. When two of the same fruit bump into each other, they squish together into the next, bigger fruit: cherries become strawberries, strawberries become grapes, and so on all the way up to a giant watermelon. Fruit rolls, stacks and bounces with real physics, and one merge can set off a chain reaction. The game ends when the fruit piles up past the line at the top.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Mouse</td><td>Move to aim, click to drop</td></tr><tr><td>Phone</td><td>Drag to aim, let go to drop</td></tr><tr><td>⬅ ➡</td><td>Move</td></tr><tr><td>Space</td><td>Drop</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Keep your biggest fruit in a corner, with smaller ones lined up next to it in order.</li><li>Look at the next fruit (top right) before you drop, so you can plan two moves ahead.</li><li>Small fruit can fill the gaps between big ones.</li><li>Chain merges score bonus points.</li><li>Don't drop fruit on top of a much bigger one in the middle of the box.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Fruit Merge</h3><p>The secret to big scores in Fruit Merge is order. Pick a corner of the box and keep your biggest fruit there. Then try to line up the next sizes beside it, getting smaller as you go, like steps. When a new fruit merges at the small end, it grows into the size next to it and can trigger a chain that rolls all the way along the line.</p><p>Always check the 'next' fruit in the top right corner before you drop. If the next fruit is a match for something on the board, you can save space for it. If it isn't, drop the current fruit somewhere it won't block your chain.</p><p>Small fruit is the biggest danger, because cherries and strawberries get trapped under big fruit where they can't reach their partners. Drop them close to another of the same kind, or into gaps on the small side of your chain. If the pile gets close to the dashed line, focus only on merges that free up space.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Just try to make an apple. Drop matching fruit next to each other.</li><li><b>Getting good:</b> Build a corner chain and reach the pineapple.</li><li><b>Expert:</b> Plan with the next fruit, set off chain reactions, and go for the watermelon.</li></ul><h3>Did you know?</h3><p>Watermelons are about 92% water. Their wild ancestors grew in Africa and were bitter. The sweet red watermelon we eat today came from thousands of years of careful farming.</p><h3>Questions players ask</h3><h4>When does the game end?</h4><p>When fruit stays above the dashed line near the top for about two seconds.</p><h4>What's the biggest fruit?</h4><p>The watermelon. If two watermelons touch, they both disappear for a huge bonus.</p><h4>Why does the fruit roll away?</h4><p>The fruit uses real physics, so round fruit rolls off slopes and bounces off the others.</p><h4>How do I score more?</h4><p>Bigger fruit is worth more points, and merges that happen one after another give a combo bonus.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

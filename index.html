@@ -373,6 +373,24 @@
             .user-btn { font-size: 15px; }
             .avatar { width: 32px; height: 32px; }
         }
+        .newshow { margin: 0 0 34px; }
+        .ns-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .ns-head h2 { margin: 0; font-size: clamp(20px, 2.4vw, 28px); }
+        .ns-arrows { display: flex; gap: 8px; }
+        .ns-arrows button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line, #2a3060); background: var(--card, #151833); color: inherit; font-size: 22px; cursor: pointer; }
+        .ns-arrows button:hover { background: #2a2f6a; }
+        .ns-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 3); gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; scrollbar-width: thin; }
+        .ns-card { position: relative; display: block; aspect-ratio: 16/10; border-radius: 18px; overflow: hidden; scroll-snap-align: start; text-decoration: none; color: #fff; background: #151833; box-shadow: 0 10px 30px #0006; transition: transform .2s; }
+        .ns-card:hover { transform: translateY(-4px); }
+        .ns-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .ns-card .ns-shade { position: absolute; inset: 0; background: linear-gradient(180deg, #0000 35%, #0b0d1aee 100%); }
+        .ns-card .ns-new { position: absolute; top: 12px; left: 12px; background: #ff4d8d; color: #fff; font: 800 12px Inter, sans-serif; padding: 4px 10px; border-radius: 999px; letter-spacing: .5px; }
+        .ns-card .ns-txt { position: absolute; left: 16px; right: 110px; bottom: 14px; text-shadow: 0 2px 8px #000a; }
+        .ns-card b { display: block; font-size: 21px; margin-bottom: 3px; }
+        .ns-card span { display: block; color: #d6d9ff; font-size: 14px; }
+        .ns-card .ns-play { position: absolute; right: 14px; bottom: 16px; background: #7c5cff; border-radius: 999px; padding: 7px 14px; font: 800 14px Inter, sans-serif; }
+        [dir="rtl"] .ns-card .ns-txt { right: 16px; left: 110px; } [dir="rtl"] .ns-card .ns-new { left: auto; right: 12px; } [dir="rtl"] .ns-card .ns-play { right: auto; left: 14px; }
+        @media (max-width: 700px) { .ns-row { grid-auto-columns: 82%; } .ns-card .ns-txt { right: 16px; } [dir="rtl"] .ns-card .ns-txt { left: 16px; } .ns-arrows { display: none; } .ns-card .ns-play { display: none; } }
     </style>
 </head>
 <body>
@@ -433,11 +451,16 @@
         <p>A collection of my favorite games and websites that I've created or enjoy. Pick a game, hit play, and have fun!</p>
         <div class="hero-actions">
             <a class="btn btn-primary" href="#games">▶ Browse games</a>
-            <a class="btn btn-ghost" href="/Noametry/noametry">Try Noametry</a>
+            <a class="btn btn-ghost" id="surpriseBtn" href="#games" role="button">🎲 Surprise me</a>
         </div>
     </header>
 
     <main class="section">
+        <section class="newshow" aria-label="New games">
+            <div class="ns-head"><h2>🔥 New games</h2><div class="ns-arrows"><button type="button" data-ns="-1" aria-label="Back">‹</button><button type="button" data-ns="1" aria-label="More">›</button></div></div>
+            <div class="ns-row" id="newRow"></div>
+        </section>
+
         <!-- Featured -->
         <section class="today" id="today">
             <div class="daily-card" id="dailyCard"></div>
@@ -564,6 +587,19 @@
         const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
         const ids = Object.keys(GAMES);
         $("gameCount").textContent = ids.length;
+
+        // ---------- New games showcase + Surprise me ----------
+        const newest = ids.slice(-9).reverse();
+        $("newRow").innerHTML = newest.map((id) => { const g = GAMES[id]; return `<a class="ns-card" href="${g.path}" data-id="${id}"><img src="${g.img}" alt="${esc(g.name)}" loading="lazy"><span class="ns-shade"></span><span class="ns-new">NEW</span><span class="ns-txt"><b>${esc(g.name)}</b><span>${esc(g.desc)}</span></span><span class="ns-play">▶ Play</span></a>`; }).join("");
+        document.querySelectorAll("[data-ns]").forEach((b) => (b.onclick = () => { const r = $("newRow"); r.scrollBy({ left: (r.clientWidth * 0.9) * (+b.dataset.ns) * (document.dir === "rtl" ? -1 : 1), behavior: "smooth" }); }));
+        $("surpriseBtn").onclick = (e) => { e.preventDefault();
+            const pool = ids.filter((id) => !isLockedGame(id));
+            const last = (() => { try { return localStorage.getItem("gh_surprise"); } catch (e) { return null; } })();
+            let id = pool[Math.floor(Math.random() * pool.length)];
+            if (id === last && pool.length > 1) id = pool[(pool.indexOf(id) + 1) % pool.length];
+            try { localStorage.setItem("gh_surprise", id); } catch (e) {}
+            location.href = GAMES[id].path;
+        };
 
         // ---------- Game grid ----------
         let filter = "all", sortBy = "default", summary = {};

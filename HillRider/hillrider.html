@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A bumpy driving game with real physics. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Hill Rider · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.garage{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px;align-items:stretch}.g-coins{width:100%;text-align:center;color:#ffc94d;font-weight:800;margin-bottom:2px}.garage button{display:flex;flex-direction:column;align-items:center;gap:3px;width:120px;padding:8px 4px;border-radius:12px;border:2px solid #2a3060;background:#171b36;color:#eef0ff;cursor:pointer;font:700 12px Inter,sans-serif}.garage button:disabled{opacity:.6;cursor:default}.garage .lv{color:#2ee6a0;letter-spacing:2px}.garage small{color:#ffc94d}.garage button.no{animation:shk .3s}@keyframes shk{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Hill <span>Rider</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 m</b><small>Distance</small></div><div class="stat"><b id="coins">0</b><small>Coins</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="960" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Hill Rider</h2>
+                <p id="startText">Drive as far as you can over the hills!<br>Gas makes you go and tips the car back, brake slows you down and tips it forward. Grab ⛽ before your fuel runs out, collect coins and land flips for bonuses. Don't land on your head!<br><small>Keyboard: ➡ gas · ⬅ brake · Phone: hold the GAS and BRAKE pedals</small><div class="garage"></div></p>
+                <button class="btn" id="startBtn">▶ Drive</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Drive again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Ease off the gas on the way down a big hill. Landing on both wheels keeps your speed, landing on your nose stops you dead.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Hill Rider — drive over the hills, watch your fuel, buy upgrades
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "hillriderBest";
+        const PX_M = 30, G = 900, STEP = 8;
+        const he = () => document.documentElement.lang === "he";
+        const T = (en, hb) => (he() ? hb : en);
+        const UPG = [
+            { id: "engine", name: "Engine", icon: "⚙️" },
+            { id: "susp", name: "Suspension", icon: "🛞" },
+            { id: "grip", name: "Tires", icon: "🧲" },
+            { id: "fuel", name: "Fuel tank", icon: "⛽" }
+        ];
+        let save = { coins: 0, engine: 0, susp: 0, grip: 0, fuel: 0 };
+        try { Object.assign(save, JSON.parse(localStorage.getItem("hillriderSave") || "{}")); } catch (e) {}
+        const store = () => { try { localStorage.setItem("hillriderSave", JSON.stringify(save)); } catch (e) {} };
+        const cost = (lv) => 60 * (lv + 1) * (lv + 1);
+        let car, cam, ground, items, state = "ready", fuel, coinsRun, dist, bestDist = Kit.best(BEST), msg = null, crashT = 0, emptyT = 0, airT = 0, airRot = 0, fx = Kit.particles(), floats = [], pedals = { gas: false, brake: false }, engineSnd = null, seed = 1;
+        Kit.stat("best", bestDist); Kit.stat("coins", save.coins);
+
+        // ---------- terrain ----------
+        function rand01(i) { const x = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453; return x - Math.floor(x); }
+        function noise(x) { const i = Math.floor(x), f = x - i, a = rand01(i), b = rand01(i + 1), t = f * f * (3 - 2 * f); return a + (b - a) * t; }
+        function heightAt(x) {
+            const d = Math.max(0, x - 400), amp = Math.min(1, d / 6000);
+            let h = 0;
+            h += (noise(x / 900) - 0.5) * (120 + 260 * amp);
+            h += (noise(x / 320 + 50) - 0.5) * (40 + 140 * amp);
+            h += (noise(x / 110 + 99) - 0.5) * (6 + 40 * amp);
+            return x < 700 ? h * Math.max(0, (x - 350) / 350) : h;
+        }
+        function groundY(x) {
+            const i = Math.floor(x / STEP);
+            while (ground.length <= i + 2) ground.push(400 - heightAt(ground.length * STEP));
+            if (i < 0) return ground[0];
+            const f = (x - i * STEP) / STEP; return ground[i] + (ground[i + 1] - ground[i]) * f;
+        }
+        const slope = (x) => (groundY(x + 4) - groundY(x - 4)) / 8;
+        function placeItems(upTo) {
+            while (items.next < upTo) {
+                const x = items.next;
+                // a curve of coins, sometimes a fuel can
+                if (x > items.fuelAt) { items.list.push({ type: "fuel", x, y: groundY(x) - 34 }); items.fuelAt = x + 8000 + save.fuel * 600 + Math.random() * 3000; items.next = x + 160; continue; }
+                const n = Kit.randi(4, 8);
+                for (let k = 0; k < n; k++) { const cx = x + k * 34; items.list.push({ type: "coin", x: cx, y: groundY(cx) - 30, v: Math.random() < 0.15 ? 5 : 1 }); }
+                items.next = x + n * 34 + Kit.rand(250, 600);
+            }
+        }
+
+        // ---------- car ----------
+        const CAR = { w: 92, wheelR: 17, rest: 26, mass: 1, inertia: 900 };
+        function newCar() {
+            return { x: 200, y: groundY(200) - 70, a: 0, vx: 0, vy: 0, w: 0, wheels: [{ ox: -34, rot: 0, c: 26, contact: false }, { ox: 34, rot: 0, c: 26, contact: false }] };
+        }
+        function start() {
+            seed = Math.random() * 1000; ground = []; car = newCar(); cam = { x: car.x, y: car.y };
+            items = { list: [], next: 600, fuelAt: 6000 }; placeItems(3000);
+            fuel = 1; coinsRun = 0; dist = 0; crashT = 0; emptyT = 0; airT = 0; airRot = 0; floats = [];
+            state = "play"; Kit.hide("start"); Kit.hide("over"); Kit.stat("score", 0); msg = null;
+            startEngine();
+        }
+        const local = (c, lx, ly) => [c.x + lx * Math.cos(c.a) - ly * Math.sin(c.a), c.y + lx * Math.sin(c.a) + ly * Math.cos(c.a)];
+        function physics(dt) {
+            const c = car, gas = state === "play" && fuel > 0 && (Kit.keys.has("gas") || pedals.gas), brake = state === "play" && (Kit.keys.has("brake") || pedals.brake);
+            const k = 75 + save.susp * 8, damp = 9 + save.susp * 1.2, engine = 400 + save.engine * 70, grip = 1.0 + save.grip * 0.16;
+            let fx2 = 0, fy2 = G, torque = 0, contacts = 0;
+            const ux = -Math.sin(c.a), uy = Math.cos(c.a);    // chassis "down" direction
+            for (const wh of c.wheels) {
+                const [ax, ay] = local(c, wh.ox, 8);
+                // where the suspension ray meets the ground (vertical approximation)
+                const gy = groundY(ax + ux * CAR.rest);
+                const distAlong = (gy - ay) / Math.max(0.35, uy) - CAR.wheelR;
+                wh.c = Math.max(4, Math.min(CAR.rest + 6, distAlong));
+                wh.contact = distAlong < CAR.rest;
+                if (!wh.contact) continue;
+                contacts++;
+                const comp = CAR.rest - distAlong;
+                // velocity of the anchor point
+                const rx = ax - c.x, ry = ay - c.y, pvx = c.vx - c.w * ry, pvy = c.vy + c.w * rx;
+                const s = slope(ax), nl = Math.hypot(s, 1), nx = s / nl, ny = -1 / nl;   // ground normal (pointing up)
+                const vn = pvx * nx + pvy * ny;
+                let f = k * comp - damp * vn; if (f < 0) f = 0;
+                f = Math.min(f, 9000);
+                let fxw = nx * f, fyw = ny * f;
+                // drive / brake along the ground
+                const tx = -ny, ty = nx, vt = pvx * tx + pvy * ty;
+                let drive = 0;
+                if (gas) drive += engine * 0.5;
+                if (brake) drive -= vt > 30 ? engine * 0.75 : engine * 0.35;
+                drive = Math.max(-f * grip * 1.6, Math.min(f * grip * 1.6, drive));
+                if (!gas && !brake) drive -= vt * (Math.abs(vt) < 60 ? 3 : 0.25);
+                fxw += tx * drive; fyw += ty * drive;
+                fx2 += fxw; fy2 += fyw;
+                torque += rx * fyw - ry * fxw;
+                wh.rot += vt * dt / CAR.wheelR;
+            }
+            // air control: lean with gas/brake
+            const lean = (gas ? 1 : 0) - (brake ? 1 : 0);
+            torque += lean * (contacts ? 1500 : 3000) * -1;
+            c.vx += fx2 * dt; c.vy += fy2 * dt; c.w += torque / CAR.inertia * dt;
+            const spd = Math.hypot(c.vx, c.vy), drag = 1 - (0.05 + spd * 0.0006) * dt; c.vx *= drag; c.vy = c.vy * (1 - spd * 0.0003 * dt); c.w *= contacts ? 1 - 2.5 * dt : 1 - 0.4 * dt;
+            c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
+            // chassis corners must stay above the ground
+            for (const [lx, ly] of [[-46, -6], [46, -6], [-44, 10], [44, 10]]) {
+                const [px, py] = local(c, lx, ly), gy = groundY(px);
+                if (py > gy) { c.y -= (py - gy); if (c.vy > 0) c.vy *= -0.2; c.vx *= 0.98; c.w *= 0.8; }
+            }
+            // the driver's head touching the ground ends the run
+            const [hx, hy] = local(c, -4, -44);
+            if (state === "play" && hy > groundY(hx) - 2) crash();
+            // air time and flips
+            if (!contacts) { airT += dt; airRot += c.w * dt; }
+            else {
+                if (airT > 1.2) bonus(Math.floor(airT * 5), `${T("Air time", "זמן באוויר")} ${airT.toFixed(1)}s`);
+                const flips = Math.floor(Math.abs(airRot) / (Math.PI * 2) + 0.15);
+                if (flips > 0 && state === "play") bonus(flips * 25, flips > 1 ? `${flips}x ${T("Flip", "סלטה")}!` : `${airRot < 0 ? T("Backflip", "סלטה לאחור") : T("Front flip", "סלטה קדימה")}!`);
+                airT = 0; airRot = 0;
+            }
+            return { gas, contacts };
+        }
+        function bonus(n, text) { coinsRun += n; floats.push({ x: W / 2, y: 150, text: `${text} +${n} 🪙`, t: 1.6 }); tune([660, 880, 1100], 0.06, "square", 0.04); }
+        function crash() {
+            state = "crash"; crashT = 0; msg = T("Crashed!", "התרסקתם!");
+            beep(90, 0.5, "sawtooth", 0.08, -40); const [hx, hy] = local(car, 0, -40);
+            fx.burst(hx - cam.x + W * 0.35, hy - cam.y + H * 0.55, "#ffffff", 30, 4);
+        }
+        function finish(why) {
+            if (state === "over") return;
+            state = "over"; stopEngine();
+            save.coins += coinsRun; store(); Kit.stat("coins", save.coins);
+            const m = Math.floor(dist);
+            Kit.save(m); bestDist = Kit.setBest(BEST, m);
+            $("overText").innerHTML = `${why}<br>${T("Distance", "מרחק")}: <b>${m} m</b> · 🪙 +${coinsRun}<br>${T("best", "שיא")} ${bestDist} m`;
+            shopUI(); Kit.show("over");
+        }
+
+        // ---------- sound ----------
+        let ac, osc, og;
+        function startEngine() {
+            if (Kit.muted) return;
+            try {
+                ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+                if (osc) return; osc = ac.createOscillator(); og = ac.createGain(); osc.type = "sawtooth"; osc.frequency.value = 50; og.gain.value = 0;
+                const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 500;
+                osc.connect(f).connect(og).connect(ac.destination); osc.start();
+            } catch (e) {}
+        }
+        function stopEngine() { if (og) og.gain.value = 0; }
+
+        // ---------- update ----------
+        const game = Kit.loop((dt) => {
+            dt = Math.min(dt, 1 / 30);
+            if (state === "play" || state === "crash") {
+                let info; for (let i = 0; i < 4; i++) info = physics(dt / 4);
+                dist = Math.max(dist, (car.x - 200) / PX_M);
+                Kit.stat("score", Math.floor(dist) + " m");
+                if (state === "play") {
+                    fuel -= dt * (info.gas ? 0.022 : 0.012) / (1 + save.fuel * 0.22);
+                    if (fuel <= 0) { fuel = 0; if (Math.abs(car.vx) < 15) emptyT += dt; else emptyT = 0; if (emptyT > 2) finish(T("Out of fuel!", "נגמר הדלק!")); }
+                    // items
+                    placeItems(car.x + 2000);
+                    for (const it of items.list) {
+                        if (it.got || Math.abs(it.x - car.x) > 70) continue;
+                        if (Math.hypot(it.x - car.x, it.y - car.y) < 60) {
+                            it.got = true;
+                            if (it.type === "fuel") { fuel = 1; tune([523, 784], 0.08, "triangle", 0.05); floats.push({ x: W / 2, y: 120, text: T("⛽ Fuel refilled!", "⛽ הדלק התמלא!"), t: 1.2 }); }
+                            else { coinsRun += it.v; beep(it.v > 1 ? 1320 : 990, 0.05, "square", 0.03); }
+                        }
+                    }
+                    items.list = items.list.filter((it) => it.x > car.x - 800 && !it.got);
+                } else { crashT += dt; if (crashT > 1.4) finish(T("You flipped over!", "התהפכתם!")); }
+                if (og && ac) { const sp = Math.min(1, Math.abs(car.vx) / 600); og.gain.value = Kit.muted || document.hidden ? 0 : (info.gas ? 0.05 : 0.025); osc.frequency.value = 45 + sp * 90 + (info.gas ? 25 : 0); }
+            }
+            for (const f of floats) f.t -= dt; floats = floats.filter((f) => f.t > 0);
+            fx.update(dt);
+            if (car) { cam.x += (car.x + car.vx * 0.35 - cam.x) * Math.min(1, dt * 4); cam.y += (car.y - cam.y) * Math.min(1, dt * 3); }
+            draw();
+        });
+
+        // ---------- drawing ----------
+        function biome() { const d = dist; return d < 800 ? 0 : d < 1800 ? 1 : 2; }
+        const SKIES = [["#7cc7ff", "#d6f0ff"], ["#ffb36b", "#ffe2b8"], ["#9ab6d6", "#e8f1ff"]];
+        const LANDS = [["#5fbf4a", "#3d8f2e", "#7a4f2a"], ["#e8c170", "#c99a4a", "#9a6b35"], ["#f2f6ff", "#bcd0e8", "#6f7f99"]];
+        function draw() {
+            const b = car ? biome() : 0, sky = SKIES[b], land = LANDS[b];
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!car) return;
+            const ox = W * 0.35 - cam.x, oy = H * 0.55 - cam.y;
+            // far hills (parallax)
+            ctx.fillStyle = b === 2 ? "#c9d8ee" : b === 1 ? "#f0c890" : "#a5dba0";
+            ctx.beginPath(); ctx.moveTo(0, H);
+            for (let x = 0; x <= W; x += 20) ctx.lineTo(x, H * 0.55 + Math.sin((x + cam.x * 0.3) / 140) * 30 + Math.sin((x + cam.x * 0.3) / 57) * 12 - (cam.y - 300) * 0.1);
+            ctx.lineTo(W, H); ctx.fill();
+            // ground
+            ctx.fillStyle = land[2]; ctx.beginPath(); ctx.moveTo(0, H);
+            for (let x = -10; x <= W + 10; x += 8) ctx.lineTo(x, groundY(x - ox) + oy);
+            ctx.lineTo(W, H); ctx.fill();
+            ctx.strokeStyle = land[0]; ctx.lineWidth = 14; ctx.beginPath();
+            for (let x = -10; x <= W + 10; x += 8) { const y = groundY(x - ox) + oy + 6; x < -9 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+            ctx.stroke();
+            ctx.strokeStyle = land[1]; ctx.lineWidth = 3; ctx.beginPath();
+            for (let x = -10; x <= W + 10; x += 8) { const y = groundY(x - ox) + oy + 13; x < -9 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+            ctx.stroke();
+            // distance markers
+            for (let m = Math.floor((cam.x - W) / PX_M / 100) * 100; m < (cam.x + W) / PX_M; m += 100) {
+                if (m <= 0) continue; const x = 200 + m * PX_M + ox, y = groundY(200 + m * PX_M) + oy;
+                ctx.fillStyle = "#ffffffcc"; ctx.fillRect(x - 1, y - 46, 3, 46); ctx.fillStyle = "#ff4d6d"; ctx.fillRect(x + 2, y - 46, 30, 16); Kit.text(ctx, m + "m", x + 17, y - 38, 10, "#fff", "center");
+            }
+            // items
+            for (const it of items.list) {
+                const x = it.x + ox, y = it.y + oy; if (x < -30 || x > W + 30) continue;
+                if (it.type === "coin") { const s = Math.abs(Math.cos(performance.now() / 250 + it.x)); ctx.fillStyle = it.v > 1 ? "#ff8a3d" : "#ffc94d"; ctx.beginPath(); ctx.ellipse(x, y, (it.v > 1 ? 11 : 8) * s + 1, it.v > 1 ? 11 : 8, 0, 0, 7); ctx.fill(); ctx.strokeStyle = "#c98a00"; ctx.lineWidth = 2; ctx.stroke(); }
+                else { ctx.fillStyle = "#e5223d"; Kit.rr(ctx, x - 12, y - 16, 24, 30, 5); ctx.fill(); ctx.fillStyle = "#fff"; Kit.text(ctx, "⛽", x, y, 15, "#fff", "center"); }
+            }
+            drawCar(ox, oy);
+            fx.draw(ctx);
+            // HUD: fuel + coins
+            ctx.fillStyle = "#0b0d1acc"; Kit.rr(ctx, 14, 14, 220, 30, 10); ctx.fill();
+            Kit.text(ctx, "⛽", 30, 29, 16, "#fff", "center");
+            ctx.fillStyle = "#2a3060"; Kit.rr(ctx, 46, 22, 178, 14, 7); ctx.fill();
+            ctx.fillStyle = fuel > 0.3 ? "#2ee6a0" : fuel > 0.15 ? "#ffc94d" : (Math.floor(performance.now() / 250) % 2 ? "#ff4d6d" : "#ff8fa3"); Kit.rr(ctx, 46, 22, 178 * fuel, 14, 7); ctx.fill();
+            ctx.fillStyle = "#0b0d1acc"; Kit.rr(ctx, 14, 50, 130, 30, 10); ctx.fill(); Kit.text(ctx, `🪙 ${save.coins + coinsRun}`, 26, 65, 15, "#ffc94d", "left");
+            Kit.text(ctx, `${Math.floor(dist)} m`, W / 2, 34, 26, "#0b0d1a", "center", "'Press Start 2P', monospace", 400);
+            if (bestDist > 0) Kit.text(ctx, `${T("Best", "שיא")}: ${bestDist} m`, W / 2, 62, 13, "#0b0d1a99", "center");
+            for (const f of floats) { ctx.globalAlpha = Math.min(1, f.t * 2); Kit.text(ctx, f.text, f.x, f.y - (1.6 - f.t) * 30, 20, "#ffffff", "center"); ctx.globalAlpha = 1; }
+            if (fuel <= 0 && state === "play") Kit.text(ctx, T("Out of fuel...", "נגמר הדלק..."), W / 2, 120, 22, "#ff4d6d", "center");
+            if (msg && state === "crash") Kit.text(ctx, msg, W / 2, H / 2 - 60, 30, "#ff4d6d", "center", "'Press Start 2P', monospace", 400);
+            if (isTouch && state === "play") {
+                ctx.globalAlpha = pedals.brake ? 0.95 : 0.6; ctx.fillStyle = "#ff4d6d"; Kit.rr(ctx, 20, H - 110, 110, 90, 18); ctx.fill(); Kit.text(ctx, T("BRAKE", "ברקס"), 75, H - 65, 16, "#fff", "center");
+                ctx.globalAlpha = pedals.gas ? 0.95 : 0.6; ctx.fillStyle = "#2ee6a0"; Kit.rr(ctx, W - 130, H - 110, 110, 90, 18); ctx.fill(); Kit.text(ctx, T("GAS", "גז"), W - 75, H - 65, 18, "#0b0d1a", "center");
+                ctx.globalAlpha = 1;
+            }
+        }
+        function drawCar(ox, oy) {
+            const c = car;
+            ctx.save(); ctx.translate(c.x + ox, c.y + oy); ctx.rotate(c.a);
+            // suspension + wheels
+            for (const wh of c.wheels) {
+                const wy = 8 + wh.c;
+                ctx.strokeStyle = "#555"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(wh.ox, 4); ctx.lineTo(wh.ox, wy); ctx.stroke();
+                ctx.save(); ctx.translate(wh.ox, wy); ctx.rotate(wh.rot);
+                ctx.fillStyle = "#1b1b1b"; ctx.beginPath(); ctx.arc(0, 0, CAR.wheelR, 0, 7); ctx.fill();
+                ctx.fillStyle = "#c0c4d6"; ctx.beginPath(); ctx.arc(0, 0, CAR.wheelR * 0.5, 0, 7); ctx.fill();
+                ctx.strokeStyle = "#7d8299"; ctx.lineWidth = 3; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(i * 2.1) * CAR.wheelR * 0.5, Math.sin(i * 2.1) * CAR.wheelR * 0.5); ctx.stroke(); }
+                ctx.restore();
+            }
+            // body
+            ctx.fillStyle = "#e5223d"; Kit.rr(ctx, -48, -12, 96, 24, 8); ctx.fill();
+            ctx.fillStyle = "#b5162b"; ctx.fillRect(-48, 4, 96, 8);
+            ctx.fillStyle = "#ffd400"; ctx.fillRect(40, -8, 8, 6);
+            // roll cage + driver
+            ctx.strokeStyle = "#333"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-26, -12); ctx.lineTo(-18, -42); ctx.lineTo(12, -42); ctx.lineTo(20, -12); ctx.stroke();
+            ctx.fillStyle = "#4da3ff"; Kit.rr(ctx, -12, -30, 16, 18, 4); ctx.fill();
+            ctx.fillStyle = "#f1c9a5"; ctx.beginPath(); ctx.arc(-4, -36, 7, 0, 7); ctx.fill();
+            ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.arc(-4, -38, 8, Math.PI, 0); ctx.fill();
+            ctx.restore();
+        }
+
+        // ---------- input ----------
+        const isTouch = matchMedia("(hover: none)").matches;
+        Kit.onKeys({ ArrowRight: "gas", KeyD: "gas", ArrowUp: "gas", ArrowLeft: "brake", KeyA: "brake", ArrowDown: "brake", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        const touches = new Map();
+        function pedalAt(e) { const p = Kit.point(cv, e); return p.x < W / 2 ? "brake" : "gas"; }
+        const syncPedals = () => { pedals.gas = [...touches.values()].includes("gas"); pedals.brake = [...touches.values()].includes("brake"); };
+        cv.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") return; touches.set(e.pointerId, pedalAt(e)); syncPedals(); cv.setPointerCapture(e.pointerId); if (ac && ac.state === "suspended") ac.resume(); });
+        cv.addEventListener("pointermove", (e) => { if (touches.has(e.pointerId)) { touches.set(e.pointerId, pedalAt(e)); syncPedals(); } });
+        const up = (e) => { touches.delete(e.pointerId); syncPedals(); };
+        cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+        cv.style.touchAction = "none";
+
+        // ---------- garage ----------
+        function shopUI() {
+            if (!document.querySelector("#over .garage")) { const d = document.createElement("div"); d.className = "garage"; $("overText").after(d); }
+            document.querySelectorAll(".garage").forEach((box) => {
+                box.innerHTML = `<div class="g-coins">🪙 ${save.coins}</div>` + UPG.map((u) => {
+                    const lv = save[u.id], max = lv >= 5;
+                    return `<button data-up="${u.id}" ${max ? "disabled" : ""}><b>${u.icon} ${u.name}</b><span class="lv">${"●".repeat(lv)}${"○".repeat(5 - lv)}</span><small>${max ? "MAX" : "🪙 " + cost(lv)}</small></button>`;
+                }).join("");
+                box.querySelectorAll("[data-up]").forEach((btn) => (btn.onclick = () => {
+                    const id = btn.dataset.up, lv = save[id];
+                    if (lv >= 5) return;
+                    if (save.coins < cost(lv)) { btn.classList.add("no"); setTimeout(() => btn.classList.remove("no"), 400); return; }
+                    save.coins -= cost(lv); save[id]++; store(); Kit.stat("coins", save.coins); tune([660, 880, 1100], 0.07, "square", 0.04); shopUI();
+                }));
+            });
+        }
+        shopUI();
+        $("startBtn").onclick = () => { start(); if (ac && ac.state === "suspended") ac.resume(); };
+        $("againBtn").onclick = () => { start(); if (ac && ac.state === "suspended") ac.resume(); };
+        document.addEventListener("visibilitychange", () => { if (og) og.gain.value = 0; });
+        ground = []; seed = 3; car = null;
+        game.start();
+        if (window.__test) window.__test.hill = { get s() { return { state, dist, fuel, car, coinsRun, save }; }, start, physics, press(k, on) { pedals[k] = on; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Hill Rider</h2><p>A bumpy driving game with real physics. Your little car has springy suspension, so it bounces over bumps, flies off hills and tips over if you're not careful. Hold the gas to speed up and the brake to slow down, and use them in the air to tilt the car so you land on your wheels. Keep an eye on the fuel gauge and grab fuel cans along the way. Coins pay for upgrades to your engine, suspension, tires and fuel tank, and the scenery changes from meadows to desert to snow the further you drive.</p></section>
+        <section><h3>How to play</h3><table><tr><td>➡ or D</td><td>Gas (tilts the car back in the air)</td></tr><tr><td>⬅ or A</td><td>Brake and reverse (tilts the car forward in the air)</td></tr><tr><td>Phone</td><td>Hold the GAS and BRAKE pedals</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Let go of the gas going down steep hills so you don't flip forward.</li><li>In the air, tap gas or brake to tilt the car and land on both wheels.</li><li>Do a full flip in the air and land it for bonus coins.</li><li>Fuel cans come every so often, so don't waste time going backward.</li><li>Upgrade the engine first, then the fuel tank so you can drive further.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Hill Rider</h3><p>Hill Rider is about balance more than speed. The car's weight shifts as you drive: pressing gas pushes the nose up, and braking pushes it down. On a steep climb, ease off the gas if the front wheels start to lift, or you'll flip over backward. On the way down, let go of the gas and use a little brake so you don't nose-dive.</p><p>The air is where you win or lose. When the car leaves a hill, use gas and brake to tilt it so both wheels touch down together. A good landing keeps your speed for the next hill, while landing on your nose slows you right down, and landing on your head ends the run. Once you're confident, try a full flip in the air: land it cleanly and you earn bonus coins.</p><p>Fuel is the other limit. The gauge drains all the time and faster when you hold the gas, so keep moving forward and grab every ⛽ can you see. Spend coins in the garage between runs: a stronger engine climbs hills more easily, better suspension soaks up big landings, grippy tires stop you sliding back, and a bigger fuel tank lets you reach the desert and the snow.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Reach 500 m in the green meadows. Practise easing off the gas on hills.</li><li><b>Getting good:</b> Get to the desert (800 m) and start using the air controls to land on your wheels.</li><li><b>Expert:</b> Upgrade your fuel tank and engine and push into the snow beyond 1800 m.</li></ul><h3>Did you know?</h3><p>Real cars use springs and shock absorbers in their suspension for the same reason this one does: the springs soak up bumps, and the shocks stop the car from bouncing up and down afterwards.</p><h3>Questions players ask</h3><h4>Why did the game end?</h4><p>Either the driver's head touched the ground, or you ran out of fuel and stopped.</p><h4>How do I earn more coins?</h4><p>Collect coins on the road, stay in the air for a long time, and land flips.</p><h4>What should I upgrade first?</h4><p>The engine helps on steep hills, and the fuel tank lets every run go further. Both are good first picks.</p><h4>Does the road change?</h4><p>Yes, the hills get bigger as you go, and the scenery changes from meadow to desert to snow.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An endless hopping adventure. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Road Hopper · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.chars{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px}.chars button{display:flex;flex-direction:column;align-items:center;gap:2px;width:78px;padding:6px 2px;border-radius:12px;border:2px solid #2a3060;background:#171b36;color:#eef0ff;cursor:pointer;font:700 12px Inter,sans-serif}.chars button.on{border-color:#ffc94d;background:#2a2f6a}.chars button.lock{opacity:.75}.chars button.no{animation:shk .3s}.chars i{width:26px;height:26px;border-radius:5px;display:block}.chars small{color:#ffc94d;font-size:11px}@keyframes shk{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Road <span>Hopper</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="coins">0</b><small>Coins</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="594" height="780"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Road Hopper</h2>
+                <p id="startText">Hop as far as you can! Dodge cars and trains, ride the logs across rivers and grab coins to unlock new characters.<br>Don't stand still too long, or an eagle swoops in!<br><small>Keyboard: arrows or WASD · Phone: tap to hop forward, swipe to go sideways or back</small><div class="chars"></div></p>
+                <button class="btn" id="startBtn">▶ Hop!</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Wait for a gap, then hop. On rivers, hop on when a log is right in front of you and watch the edges of the screen.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Road Hopper — hop across roads, rivers and train tracks
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "roadhopperBest";
+        const COLS = 11, TS = W / COLS, BASE = H - 120, DEPTH = TS * 0.55;
+        const he = () => document.documentElement.lang === "he";
+        const T = (en, hb) => (he() ? hb : en);
+        const CHARS = [
+            { id: "chicken", name: "Chicken", cost: 0, body: "#ffffff", acc: "#ff4d4d", beak: "#ffb020" },
+            { id: "frog", name: "Frog", cost: 40, body: "#4cc35a", acc: "#2a8a36", beak: "#ffffff" },
+            { id: "cat", name: "Cat", cost: 80, body: "#ff9f43", acc: "#c46b16", beak: "#ffc2c2" },
+            { id: "penguin", name: "Penguin", cost: 150, body: "#22253d", acc: "#ffffff", beak: "#ffb020" },
+            { id: "robot", name: "Robot", cost: 250, body: "#9aa0b5", acc: "#4de8ff", beak: "#ff4d6d" },
+            { id: "unicorn", name: "Unicorn", cost: 400, body: "#ffffff", acc: "#ff7ad9", beak: "#ffd400" }
+        ];
+        let save = { coins: 0, owned: ["chicken"], pick: "chicken" };
+        try { Object.assign(save, JSON.parse(localStorage.getItem("roadhopperSave") || "{}")); } catch (e) {}
+        const store = () => { try { localStorage.setItem("roadhopperSave", JSON.stringify(save)); } catch (e) {} };
+        let rows, me, cam, score, coinsRun, state = "ready", fx = Kit.particles(), deathT = 0, death = null, eagle = null, idleT = 0, best = Kit.best(BEST), shake = 0;
+        Kit.stat("best", best); Kit.stat("coins", save.coins);
+
+        // ---------- world ----------
+        function makeRow(i) {
+            if (i < 3) return grassRow(i, true);
+            if (i < 7 && Math.random() < 0.5) return grassRow(i);
+            const prev = rows[i - 1];
+            const r = Math.random(), diff = Math.min(1, i / 150);
+            let type;
+            if (prev && prev.type === "river" && prev.run < 3 && r < 0.55) type = "river";
+            else if (prev && prev.type === "road" && prev.run < 4 && r < 0.6) type = "road";
+            else type = r < 0.32 ? "grass" : r < 0.66 ? "road" : r < 0.88 ? "river" : "rail";
+            const run = prev && prev.type === type ? prev.run + 1 : 1;
+            if (type === "grass") return grassRow(i);
+            if (type === "road") {
+                const dir = Math.random() < 0.5 ? -1 : 1, speed = Kit.rand(1.4, 2.6 + diff * 2.4) * dir, n = Kit.randi(1, 3), cars = [];
+                const gap = COLS / n + 1.5;
+                let x = Math.random() * COLS;
+                for (let k = 0; k < n; k++) { const len = Math.random() < 0.25 ? 2.2 : 1.3; cars.push({ x, len, color: Kit.pick(["#ff4d6d", "#4da3ff", "#ffc94d", "#2ee6a0", "#b07cff", "#ff8a3d", "#ffffff"]), truck: len > 2 }); x += gap + Math.random() * 2; }
+                return { type, run, dir, speed, cars, coin: Math.random() < 0.15 ? Kit.randi(1, COLS - 2) : -1 };
+            }
+            if (type === "river") {
+                const dir = (prev && prev.type === "river" ? -prev.dir : (Math.random() < 0.5 ? -1 : 1)), speed = Kit.rand(1, 1.8 + diff * 1.2) * dir;
+                if (Math.random() < 0.18 && !(prev && prev.type === "river" && prev.pads)) {
+                    const pads = []; for (let c = 1; c < COLS - 1; c++) if (Math.random() < 0.45) pads.push(c);
+                    if (!pads.length) pads.push(Kit.randi(2, COLS - 3));
+                    return { type, run, dir: 0, speed: 0, pads, logs: [] };
+                }
+                const logs = []; let x = Math.random() * 3;
+                while (x < COLS + 4) { const len = Kit.randi(2, 4); logs.push({ x, len }); x += len + Kit.rand(1.2, 2.6 + diff); }
+                return { type, run, dir, speed, logs };
+            }
+            return { type: "rail", run, train: null, warn: 0, next: Kit.rand(1.5, 5) };
+        }
+        function grassRow(i, safe) {
+            const trees = new Set();
+            if (!safe || i === 0) { for (let c = 0; c < COLS; c++) if (c === 0 || c === COLS - 1 || (!safe && Math.random() < 0.18)) trees.add(c); }
+            trees.delete(Math.floor(COLS / 2)); if (!safe) { trees.delete(Kit.randi(1, COLS - 2)); }
+            let coin = -1; if (!safe && Math.random() < 0.3) { const c = Kit.randi(1, COLS - 2); if (!trees.has(c)) coin = c; }
+            return { type: "grass", run: 1, trees, coin, shade: i % 2 };
+        }
+        const rowAt = (i) => { while (rows.length <= i + 30) rows.push(makeRow(rows.length)); return rows[i]; };
+
+        function start() {
+            rows = []; for (let i = 0; i < 40; i++) rows.push(makeRow(i));
+            // first rows are safe meadow
+            me = { r: 0, c: Math.floor(COLS / 2), x: Math.floor(COLS / 2), hop: 0, from: null, face: 0, ch: CHARS.find((c) => c.id === save.pick) || CHARS[0], squish: 0 };
+            cam = 0; score = 0; coinsRun = 0; state = "play"; deathT = 0; death = null; eagle = null; idleT = 0;
+            Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+        }
+        function blocked(r, c) {
+            if (c < 0 || c >= COLS || r < 0) return true;
+            const row = rowAt(r); return row.type === "grass" && row.trees.has(c);
+        }
+        function hop(dr, dc) {
+            if (state !== "play" || me.hop > 0 || death) return;
+            const tc = Math.round(me.x) + dc, tr = me.r + dr;
+            me.face = dc ? (dc > 0 ? 1 : 3) : dr > 0 ? 0 : 2;
+            if (blocked(tr, tc)) { me.squish = 0.15; beep(160, 0.04, "sine", 0.03); return; }
+            me.from = { r: me.r, x: me.x }; me.r = tr; me.c = tc; me.hop = 1; idleT = 0;
+            beep(dr > 0 ? 520 : 420, 0.04, "square", 0.025, 120);
+        }
+        function die(kind) {
+            if (death) return;
+            death = kind; deathT = 0; shake = kind === "car" || kind === "train" ? 0.5 : 0.2;
+            if (kind === "water") { beep(200, 0.3, "sine", 0.06, -160); fx.burst(...scr(me.x + 0.5, me.r, 0), "#9fdcff", 24, 3); }
+            else if (kind === "eagle") beep(900, 0.4, "sawtooth", 0.04, -300);
+            else { beep(90, 0.3, "sawtooth", 0.08, -40); fx.burst(...scr(me.x + 0.5, me.r, 10), "#ffffff", 26, 4); }
+        }
+        function gameOver() {
+            state = "over"; save.coins += coinsRun; store();
+            Kit.save(score); best = Kit.setBest(BEST, score); Kit.stat("coins", save.coins);
+            const msgs = { car: T("Squashed by a car!", "נמעכתם ממכונית!"), truck: T("Squashed by a truck!", "נמעכתם ממשאית!"), train: T("Hit by a train!", "רכבת פגעה בכם!"), water: T("Splash! You fell in the river.", "שפלאש! נפלתם לנהר."), edge: T("You floated away!", "נסחפתם מהמסך!"), eagle: T("An eagle grabbed you! Keep moving.", "נשר חטף אתכם! תמשיכו לזוז.") };
+            $("overText").innerHTML = `${msgs[death] || ""}<br>${T("Score", "ניקוד")}: <b>${score}</b> · 🪙 +${coinsRun}<br>${T("best", "שיא")} ${best}`;
+            shopUI(); Kit.show("over");
+        }
+
+        // ---------- update ----------
+        function update(dt) {
+            // lanes move
+            for (let i = Math.max(0, Math.floor(cam) - 4); i < Math.floor(cam) + 22; i++) {
+                const row = rowAt(i);
+                if (row.type === "road") for (const car of row.cars) { car.x += row.speed * dt; const span = COLS + 6; if (row.speed > 0 && car.x > COLS + 2) car.x -= span; if (row.speed < 0 && car.x < -car.len - 2) car.x += span; }
+                if (row.type === "river") for (const lg of row.logs) { lg.x += row.speed * dt; const span = COLS + 8; if (row.speed > 0 && lg.x > COLS + 3) lg.x -= span; if (row.speed < 0 && lg.x < -lg.len - 3) lg.x += span; }
+                if (row.type === "rail") {
+                    if (row.train) { row.train.x += row.train.v * dt; if ((row.train.v > 0 && row.train.x > COLS + 2) || (row.train.v < 0 && row.train.x < -row.train.len - 2)) { row.train = null; row.next = Kit.rand(2, 6); } }
+                    else { row.next -= dt; if (row.next < 1.1 && !row.warn) { row.warn = 1; if (Math.abs(i - me.r) < 6) beep(1000, 0.08, "square", 0.02); } if (row.next <= 0) { const v = (Math.random() < 0.5 ? -1 : 1) * 22, len = 9; row.train = { v, len, x: v > 0 ? -len - 1 : COLS + 1 }; row.warn = 0; if (Math.abs(i - me.r) < 6) beep(120, 0.5, "sawtooth", 0.03); } }
+                }
+            }
+            if (death) { deathT += dt; if (death === "eagle" && eagle) eagle.y -= dt * 10; if (deathT > 1.3 && state === "play") gameOver(); return; }
+            // hop animation
+            if (me.hop > 0) { me.hop -= dt / 0.13; if (me.hop <= 0) { me.hop = 0; landed(); } else { const t = 1 - me.hop; me.x = me.from.x + (me.c - me.from.x) * t; } }
+            const row = rowAt(me.r);
+            if (me.hop === 0) {
+                if (row.type === "river") {
+                    if (row.pads) { if (!row.pads.includes(Math.round(me.x))) return die("water"); }
+                    else { const lg = row.logs.find((l) => me.x + 0.5 > l.x && me.x + 0.5 < l.x + l.len); if (!lg) return die("water"); me.x += row.speed * dt; me.c = Math.round(me.x); if (me.x < -0.6 || me.x > COLS - 0.4) return die("edge"); }
+                }
+            }
+            // cars and trains (also mid-hop on the row you're entering)
+            if (row.type === "road") for (const car of row.cars) if (me.x + 0.75 > car.x && me.x + 0.25 < car.x + car.len) return die(car.truck ? "truck" : "car");
+            if (row.type === "rail" && row.train && me.x + 0.8 > row.train.x && me.x + 0.2 < row.train.x + row.train.len) return die("train");
+            // camera creeps forward
+            const target = Math.max(cam, me.r - 3);
+            cam += (target - cam) * Math.min(1, dt * 4) + dt * Math.min(0.55, 0.12 + score / 400);
+            idleT += dt;
+            if (me.r < cam - 2.2 || idleT > 7) { eagle = { x: me.x, y: -2 }; die("eagle"); }
+        }
+        function landed() {
+            const row = rowAt(me.r);
+            if (me.r > score) { score = me.r; Kit.stat("score", score); }
+            if ((row.type === "grass" || row.type === "road") && row.coin === me.c) { row.coin = -1; coinsRun++; tune([988, 1319], 0.05, "square", 0.04); fx.burst(...scr(me.c + 0.5, me.r, 14), "#ffc94d", 12, 2); }
+            if (row.type === "river" && !row.pads) { const lg = row.logs.find((l) => me.x + 0.5 > l.x && me.x + 0.5 < l.x + l.len); if (lg) beep(260, 0.03, "sine", 0.03); }
+        }
+
+        // ---------- drawing ----------
+        const scr = (col, r, z = 0) => [col * TS, BASE - (r - cam) * TS - z];
+        function box(x, y, w, d, h, top, front, side) {
+            // a block whose footprint front edge is at y, depth d going up the screen, height h
+            ctx.fillStyle = front; ctx.fillRect(x, y - h, w, h);
+            ctx.fillStyle = top; ctx.fillRect(x, y - h - d, w, d);
+            if (side) { ctx.fillStyle = side; ctx.fillRect(x + w - 3, y - h - d, 3, d + h); }
+        }
+        function drawRow(i) {
+            const row = rowAt(i), [, y] = scr(0, i);
+            if (y < -TS * 2 || y > H + TS) return;
+            const top = y - TS;
+            if (row.type === "grass") { ctx.fillStyle = row.shade ? "#8fd16a" : "#86c95f"; ctx.fillRect(0, top, W, TS); }
+            if (row.type === "road") {
+                ctx.fillStyle = "#4a4e63"; ctx.fillRect(0, top, W, TS);
+                const nxt = rowAt(i + 1); if (nxt.type === "road") { ctx.fillStyle = "#c9cbe0"; for (let x = 8; x < W; x += 44) ctx.fillRect(x, top - 2, 22, 4); }
+            }
+            if (row.type === "river") { ctx.fillStyle = "#4fb8f0"; ctx.fillRect(0, top, W, TS); ctx.fillStyle = "#7ccbf5"; for (let k = 0; k < 6; k++) { const wx = ((k * 97 + performance.now() / 30 * (row.dir || 0.3)) % (W + 60)) - 30; ctx.fillRect(wx, top + 12 + (k % 3) * 12, 26, 3); } }
+            if (row.type === "rail") {
+                ctx.fillStyle = "#7d6a5a"; ctx.fillRect(0, top, W, TS);
+                ctx.fillStyle = "#5a4636"; for (let x = 4; x < W; x += 18) ctx.fillRect(x, top + 8, 10, TS - 16);
+                ctx.fillStyle = "#c0c4d6"; ctx.fillRect(0, top + 16, W, 4); ctx.fillRect(0, top + TS - 20, W, 4);
+                // warning light
+                const on = row.warn && Math.floor(performance.now() / 150) % 2;
+                ctx.fillStyle = "#333"; ctx.fillRect(W - 16, top - 26, 4, 30); ctx.fillStyle = on ? "#ff3b3b" : "#552222"; ctx.beginPath(); ctx.arc(W - 14, top - 28, 6, 0, 7); ctx.fill();
+            }
+        }
+        function drawRowObjects(i) {
+            const row = rowAt(i), [, y] = scr(0, i);
+            if (y < -TS * 2 || y > H + TS * 2) return;
+            if (row.type === "river") {
+                if (row.pads) for (const c of row.pads) { ctx.fillStyle = "#3aa64a"; ctx.beginPath(); ctx.ellipse(c * TS + TS / 2, y - TS / 2, TS * 0.42, TS * 0.32, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#2b8a39"; ctx.beginPath(); ctx.moveTo(c * TS + TS / 2, y - TS / 2); ctx.lineTo(c * TS + TS * 0.9, y - TS * 0.4); ctx.lineTo(c * TS + TS * 0.9, y - TS * 0.62); ctx.fill(); }
+                for (const lg of row.logs) box(lg.x * TS, y - 6, lg.len * TS, TS - 14, 10, "#a8713f", "#7a4d26");
+            }
+            if (row.type === "grass") {
+                for (const c of row.trees) {
+                    const x = c * TS;
+                    if ((c * 7 + i * 3) % 5 === 0) { box(x + 8, y - 10, TS - 16, TS - 24, 16, "#b0b4c6", "#8a8ea3"); continue; }
+                    box(x + TS * 0.38, y - 14, TS * 0.24, 8, 14, "#8a5a33", "#6b4425");
+                    const h = 26 + ((c * 13 + i * 7) % 3) * 12;
+                    box(x + 6, y - 22, TS - 12, TS - 22, h, "#3fae4f", "#2e8a3c");
+                }
+            }
+            if ((row.type === "grass" || row.type === "road") && row.coin >= 0) {
+                const cx = row.coin * TS + TS / 2, cy = y - TS / 2 - 10 + Math.sin(performance.now() / 200) * 3;
+                ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.ellipse(cx, cy, 9 * Math.abs(Math.cos(performance.now() / 300)) + 2, 11, 0, 0, 7); ctx.fill();
+                ctx.strokeStyle = "#d9a011"; ctx.lineWidth = 2; ctx.stroke();
+            }
+            if (row.type === "road") for (const car of row.cars) {
+                const x = car.x * TS, w = car.len * TS;
+                box(x, y - 8, w, TS - 18, 20, car.color, shade(car.color));
+                if (car.truck) box(x + (row.speed > 0 ? w - TS * 0.7 : 0), y - 8, TS * 0.7, TS - 18, 34, "#e8e8f0", "#b9bbcc");
+                else box(x + w * 0.25, y - 28, w * 0.5, TS - 30, 12, "#bfe6ff", "#8fb8d6");
+                ctx.fillStyle = "#151515"; ctx.fillRect(x + 6, y - 10, 10, 6); ctx.fillRect(x + w - 16, y - 10, 10, 6);
+            }
+            if (row.type === "rail" && row.train) {
+                const x = row.train.x * TS, w = row.train.len * TS;
+                box(x, y - 6, w, TS - 14, 34, "#e8e8f0", "#c8102e");
+                ctx.fillStyle = "#4da3ff"; for (let k = x + 14; k < x + w - 20; k += 34) ctx.fillRect(k, y - 32, 18, 12);
+            }
+        }
+        function shade(hex) { const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255; return `rgb(${r * 0.72 | 0},${g * 0.72 | 0},${b * 0.72 | 0})`; }
+        function drawHero() {
+            const ch = me.ch;
+            const t = me.hop > 0 ? 1 - me.hop : 0, z = Math.sin(t * Math.PI) * 16;
+            const fromR = me.from && me.hop > 0 ? me.from.r + (me.r - me.from.r) * t : me.r;
+            const [x, y] = scr(me.x, fromR);
+            if (death === "water") return;
+            if (death === "eagle") return;
+            const flat = death === "car" || death === "truck" || death === "train";
+            const sq = me.squish > 0 ? 0.85 : 1, s = TS * 0.62, cx = x + TS / 2 - s / 2, by = y - 12 - z;
+            ctx.fillStyle = "#0000002a"; ctx.beginPath(); ctx.ellipse(x + TS / 2, y - 12, s * 0.5, 6, 0, 0, 7); ctx.fill();
+            if (flat) { box(cx - 6, y - 10, s + 12, s * 0.9, 5, ch.body, shade(ch.body)); return; }
+            const h = s * 0.95 * sq;
+            box(cx, by, s, s * 0.5, h, ch.body, shade(ch.body));
+            // face details depend on direction
+            const fx2 = me.face === 1 ? s * 0.25 : me.face === 3 ? -s * 0.25 : 0, back = me.face === 0;
+            if (ch.id === "chicken") { box(cx + s * 0.35, by - h - s * 0.5 + 2, s * 0.3, s * 0.25, 7, ch.acc, shade(ch.acc)); }
+            if (ch.id === "unicorn") { ctx.fillStyle = ch.beak; ctx.beginPath(); ctx.moveTo(cx + s / 2 - 4, by - h - s * 0.45); ctx.lineTo(cx + s / 2 + 4, by - h - s * 0.45); ctx.lineTo(cx + s / 2, by - h - s * 0.45 - 16); ctx.fill(); ctx.fillStyle = ch.acc; ctx.fillRect(cx - 3, by - h, 5, h * 0.7); }
+            if (ch.id === "cat") { ctx.fillStyle = ch.acc; ctx.beginPath(); ctx.moveTo(cx + 2, by - h - s * 0.45); ctx.lineTo(cx + 10, by - h - s * 0.45 - 9); ctx.lineTo(cx + 16, by - h - s * 0.45); ctx.moveTo(cx + s - 2, by - h - s * 0.45); ctx.lineTo(cx + s - 10, by - h - s * 0.45 - 9); ctx.lineTo(cx + s - 16, by - h - s * 0.45); ctx.fill(); }
+            if (ch.id === "penguin") { ctx.fillStyle = ch.acc; ctx.fillRect(cx + s * 0.18, by - h * 0.8, s * 0.64, h * 0.75); }
+            if (ch.id === "robot") { ctx.fillStyle = "#555"; ctx.fillRect(cx + s / 2 - 1, by - h - s * 0.5 - 10, 2, 10); ctx.fillStyle = ch.acc; ctx.beginPath(); ctx.arc(cx + s / 2, by - h - s * 0.5 - 11, 3, 0, 7); ctx.fill(); }
+            if (!back) {
+                ctx.fillStyle = ch.id === "robot" ? ch.acc : "#151515";
+                ctx.fillRect(cx + s * 0.2 + fx2, by - h * 0.78, 5, 5); ctx.fillRect(cx + s * 0.68 + fx2, by - h * 0.78, 5, 5);
+                ctx.fillStyle = ch.beak; ctx.fillRect(cx + s * 0.4 + fx2, by - h * 0.6, s * 0.2, 6);
+                if (ch.id === "frog") { ctx.fillStyle = "#fff"; ctx.fillRect(cx + 3, by - h - s * 0.5 - 4, 9, 7); ctx.fillRect(cx + s - 12, by - h - s * 0.5 - 4, 9, 7); }
+            }
+        }
+        function draw() {
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-4, 4) * shake, Kit.rand(-4, 4) * shake);
+            ctx.fillStyle = "#86c95f"; ctx.fillRect(0, 0, W, H);
+            if (rows) {
+                const lo = Math.max(0, Math.floor(cam) - 3), hi = Math.floor(cam) + 17;
+                for (let i = hi; i >= lo; i--) drawRow(i);
+                const heroRow = me.hop > 0 && me.from ? Math.min(me.r, me.from.r) : me.r;
+                for (let i = hi; i >= lo; i--) { drawRowObjects(i); if (i === heroRow) drawHero(); }
+                if (eagle) { const [x, y] = scr(eagle.x, me.r); const ey = y - 40 + eagle.y * 20; ctx.fillStyle = "#5b3a1a"; ctx.beginPath(); ctx.moveTo(x - 40, ey); ctx.lineTo(x + TS / 2, ey - 18); ctx.lineTo(x + TS + 40, ey); ctx.lineTo(x + TS / 2, ey + 12); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(x + TS / 2 - 6, ey - 24, 12, 10); }
+                // edge shading to show you can't go off the sides
+                ctx.fillStyle = "#0000001f"; ctx.fillRect(0, 0, TS * 0.5, H); ctx.fillRect(W - TS * 0.5, 0, TS * 0.5, H);
+            }
+            ctx.restore();
+            fx.draw(ctx);
+            if (rows) {
+                Kit.text(ctx, String(score), 24, 40, 34, "#ffffff", "left", "'Press Start 2P', monospace", 400);
+                Kit.text(ctx, `🪙 ${save.coins + coinsRun}`, W - 20, 36, 20, "#ffffff", "right");
+                if (idleT > 4.5 && !death && state === "play") Kit.text(ctx, T("Keep moving! 🦅", "תמשיכו לזוז! 🦅"), W / 2, 90, 18, "#ffffff", "center");
+            }
+        }
+        const game = Kit.loop((dt) => {
+            if (shake > 0) shake -= dt;
+            if (me && me.squish > 0) me.squish -= dt;
+            if (state === "play") update(Math.min(dt, 1 / 30));
+            fx.update(dt);
+            draw();
+        });
+
+        // ---------- input ----------
+        Kit.onKeys({ ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Space: "up", Enter: "enter" }, (a) => {
+            if (a === "enter" && state !== "play") return start();
+            if (a === "up") hop(1, 0); if (a === "down") hop(-1, 0); if (a === "left") hop(0, -1); if (a === "right") hop(0, 1);
+        });
+        let sw = null;
+        cv.addEventListener("pointerdown", (e) => { sw = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointerup", (e) => {
+            if (!sw) return; const p = Kit.point(cv, e), dx = p.x - sw.x, dy = p.y - sw.y; sw = null;
+            if (Math.hypot(dx, dy) < 22) return hop(1, 0);
+            if (Math.abs(dx) > Math.abs(dy)) hop(0, dx > 0 ? 1 : -1); else hop(dy < 0 ? 1 : -1, 0);
+        });
+        cv.style.touchAction = "none";
+
+        // ---------- characters ----------
+        function shopUI() {
+            if (!document.querySelector("#over .chars")) { const d = document.createElement("div"); d.className = "chars"; $("overText").after(d); }
+            const boxes = document.querySelectorAll(".chars"); if (!boxes.length) return;
+            boxes.forEach((b) => {
+                b.innerHTML = CHARS.map((c) => {
+                    const own = save.owned.includes(c.id), on = save.pick === c.id;
+                    return `<button data-ch="${c.id}" class="${on ? "on" : ""} ${own ? "" : "lock"}"><i style="background:${c.body};box-shadow:inset 0 -6px ${c.acc}"></i><span>${c.name}</span><small>${own ? (on ? "✓" : T("Pick", "בחירה")) : "🪙 " + c.cost}</small></button>`;
+                }).join("");
+                b.querySelectorAll("[data-ch]").forEach((btn) => (btn.onclick = () => {
+                    const c = CHARS.find((x) => x.id === btn.dataset.ch);
+                    if (!save.owned.includes(c.id)) { if (save.coins < c.cost) { btn.classList.add("no"); setTimeout(() => btn.classList.remove("no"), 400); return; } save.coins -= c.cost; save.owned.push(c.id); tune([660, 880, 1100], 0.07, "square", 0.04); }
+                    save.pick = c.id; store(); Kit.stat("coins", save.coins); shopUI();
+                }));
+            });
+        }
+        shopUI();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        game.start();
+        if (window.__test) window.__test.hopper = { get s() { return { state, score, me, rows, cam, death, coinsRun, save }; }, hop, start, update };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Road Hopper</h2><p>An endless hopping adventure. Every hop forward takes you to a new lane: busy roads full of cars and trucks, rivers where you have to ride floating logs or jump across lily pads, and train tracks where a flashing light warns that a train is coming. Grab coins along the way and spend them on new characters like a frog, a cat, a penguin, a robot and a unicorn. Keep moving, because if you wait too long an eagle swoops down!</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrow keys or WASD</td><td>Hop forward, back, left or right</td></tr><tr><td>Phone</td><td>Tap to hop forward, swipe to hop sideways or back</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Watch the red light on the train tracks. When it flashes, a train is coming.</li><li>On rivers, logs carry you sideways, so don't ride one off the edge of the screen.</li><li>You can hop backward to dodge a car.</li><li>Coins on the road are risky. Only grab them when the lane is clear.</li><li>Don't wait too long in one spot, or the eagle gets you.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Road Hopper</h3><p>Road Hopper is about timing, not speed. Before each road, look at the cars in the lane you're about to enter and wait for a gap that's bigger than one car. Hopping takes a moment, so you need to be moving into the gap as the last car passes, not after. Remember that you can also hop backward or sideways to get out of trouble.</p><p>Rivers work the opposite way: the water is deadly, so you need something to stand on. Wait until a log is right in front of you, then hop on and let it carry you. Logs drift sideways, so keep an eye on the edges of the screen and hop forward again before you float away. Lily-pad rivers stay still, so just pick a path from pad to pad.</p><p>Train tracks look empty most of the time, which is what makes them dangerous. When the red light at the side starts flashing, a train is about to rush through, so wait for it. And don't stop for too long anywhere: the screen keeps moving forward, and if you fall behind or stand still, the eagle swoops in.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Get to 25 hops. Practise waiting for gaps in the traffic.</li><li><b>Getting good:</b> Get to 75. Learn to ride the logs and watch for train lights.</li><li><b>Expert:</b> Beat 150. The roads and rivers get faster the further you go.</li></ul><h3>Did you know?</h3><p>The first video games about crossing busy roads came out in the early 1980s. Real road-crossing safety lessons for kids use the same rule the game does: stop, look both ways, and wait for a big enough gap.</p><h3>Questions players ask</h3><h4>How do I unlock characters?</h4><p>Collect coins while you play. On the start or game-over screen, tap a locked character to buy it with your coins.</p><h4>Why did an eagle grab me?</h4><p>You stood still for too long, or the screen moved past you. Keep hopping forward!</p><h4>Can I swim?</h4><p>No, falling in the water ends the game. Stand on logs or lily pads.</p><h4>Does the game get harder?</h4><p>Yes. Cars, logs and rivers get faster the further you go.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/Noametry/noametry">Noametry</a><a href="/Game2048/2048">2048</a><a href="/SubwaySurfer/subwaysurf">Subway Runner</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
