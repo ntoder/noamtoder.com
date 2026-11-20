@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A falling-sand toy where every tiny grain follows simple rules. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Sand Box · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.sbbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:12px auto 0}.sbbar .seg button{padding:6px 10px}.sbbar .btn{padding:8px 14px}.sbbar .ghost{background:#262a4d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Sand <span>Box</span></h1>
+        <div class="stats"></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Sand Box</h2>
+                <p id="startText">Pick a material under the box, then click and drag to pour it.<br>Sand piles up, water flows, plants grow in water, fire burns wood and plants, and lava turns water into steam and becomes stone. What can you build?</p>
+                <button class="btn" id="startBtn">🏖 Start playing</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Sand Box</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Try building a stone cup, filling it with water, then pouring lava on top. Or plant a garden and set it on fire!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Sand Box — falling-sand toy: sand, water, stone, fire, wood, plant, lava, eraser
+        const { $ } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const S = 4, GW = W / S | 0, GH = H / S | 0;
+        const E = 0, SAND = 1, WATER = 2, STONE = 3, FIRE = 4, WOOD = 5, PLANT = 6, LAVA = 7, STEAM = 8, SMOKE = 9;
+        const TOOLS = [[SAND, "🟨", "Sand", "חול"], [WATER, "💧", "Water", "מים"], [STONE, "🪨", "Stone", "אבן"], [WOOD, "🪵", "Wood", "עץ"], [PLANT, "🌱", "Plant", "צמח"], [FIRE, "🔥", "Fire", "אש"], [LAVA, "🌋", "Lava", "לבה"], [E, "🧽", "Eraser", "מחק"]];
+        let g = new Uint8Array(GW * GH), life = new Uint8Array(GW * GH), tool = SAND, brush = 3, down = false, mp = null, img = ctx.createImageData(GW, GH), frame = 0;
+        const COL = { [SAND]: [230, 196, 110], [WATER]: [60, 140, 255], [STONE]: [120, 124, 140], [FIRE]: [255, 120, 30], [WOOD]: [130, 82, 40], [PLANT]: [60, 190, 80], [LAVA]: [255, 80, 20], [STEAM]: [200, 210, 230], [SMOKE]: [90, 90, 100] };
+        const at = (x, y) => (x < 0 || y < 0 || x >= GW || y >= GH ? STONE : g[y * GW + x]);
+        function set(x, y, v, l = 0) { if (x < 0 || y < 0 || x >= GW || y >= GH) return; g[y * GW + x] = v; life[y * GW + x] = l; }
+        function swap(a, b) { const t = g[a]; g[a] = g[b]; g[b] = t; const l = life[a]; life[a] = life[b]; life[b] = l; }
+        function step() {
+            frame++;
+            const ltr = frame % 2;
+            for (let y = GH - 1; y >= 0; y--) for (let xi = 0; xi < GW; xi++) {
+                const x = ltr ? xi : GW - 1 - xi, i = y * GW + x, v = g[i]; if (!v || v === STONE || v === WOOD) continue;
+                const dn = i + GW, r = Math.random() < 0.5 ? 1 : -1;
+                if (v === SAND) { if (y < GH - 1 && (g[dn] === E || g[dn] === WATER || g[dn] === STEAM)) swap(i, dn); else if (y < GH - 1 && x + r >= 0 && x + r < GW && (g[dn + r] === E || g[dn + r] === WATER)) swap(i, dn + r); }
+                else if (v === WATER || v === LAVA) {
+                    if (v === LAVA && frame % 3) continue;
+                    if (y < GH - 1 && g[dn] === E) swap(i, dn); else if (y < GH - 1 && x + r >= 0 && x + r < GW && g[dn + r] === E) swap(i, dn + r); else if (x + r >= 0 && x + r < GW && g[i + r] === E) swap(i, i + r);
+                    if (v === LAVA) { for (const n of [i - 1, i + 1, i - GW, i + GW]) { if (n < 0 || n >= g.length) continue; if (g[n] === WATER) { g[n] = STEAM; life[n] = 60; g[i] = STONE; break; } if ((g[n] === WOOD || g[n] === PLANT) && Math.random() < 0.1) { g[n] = FIRE; life[n] = 40; } } }
+                }
+                else if (v === PLANT) { if (Math.random() < 0.05) for (const n of [i - 1, i + 1, i - GW, i + GW]) if (n >= 0 && n < g.length && g[n] === WATER) { g[n] = PLANT; break; } }
+                else if (v === FIRE) {
+                    life[i]--; if (life[i] <= 0) { g[i] = Math.random() < 0.3 ? SMOKE : E; life[i] = 40; continue; }
+                    for (const n of [i - 1, i + 1, i - GW, i + GW]) { if (n < 0 || n >= g.length) continue; if ((g[n] === WOOD || g[n] === PLANT) && Math.random() < (g[n] === PLANT ? 0.2 : 0.05)) { g[n] = FIRE; life[n] = 30 + Math.random() * 40; } if (g[n] === WATER) { g[i] = STEAM; life[i] = 50; g[n] = Math.random() < 0.5 ? E : WATER; break; } }
+                    const up = i - GW; if (y > 0 && g[up] === E && Math.random() < 0.3) { swap(i, up + (Math.random() < 0.5 ? 0 : r)); }
+                }
+                else if (v === STEAM || v === SMOKE) {
+                    life[i]--; if (life[i] <= 0) { g[i] = v === STEAM && Math.random() < 0.3 ? WATER : E; continue; }
+                    const up = i - GW; if (y > 0 && g[up] === E) swap(i, up); else if (y > 0 && x + r >= 0 && x + r < GW && g[up + r] === E) swap(i, up + r); else if (x + r >= 0 && x + r < GW && g[i + r] === E) swap(i, i + r);
+                }
+            }
+        }
+        function paint() {
+            if (!down || !mp) return;
+            const cx = mp.x / S | 0, cy = mp.y / S | 0;
+            for (let dy = -brush; dy <= brush; dy++) for (let dx = -brush; dx <= brush; dx++) {
+                if (dx * dx + dy * dy > brush * brush) continue; const x = cx + dx, y = cy + dy;
+                if (tool === E) { set(x, y, E); continue; }
+                if (at(x, y) !== E) continue;
+                if ((tool === SAND || tool === WATER || tool === LAVA) && Math.random() < 0.6) continue;
+                set(x, y, tool, tool === FIRE ? 40 + Math.random() * 30 : 0);
+            }
+        }
+        function draw() {
+            const d = img.data;
+            for (let i = 0; i < g.length; i++) {
+                const v = g[i], o = i * 4;
+                if (!v) { d[o] = 16; d[o + 1] = 18; d[o + 2] = 36; d[o + 3] = 255; continue; }
+                const c = COL[v], n = ((i * 2654435761) >>> 24) % 24 - 12, fl = v === FIRE || v === LAVA ? Math.random() * 60 - 30 : 0;
+                d[o] = Math.max(0, Math.min(255, c[0] + n + fl)); d[o + 1] = Math.max(0, Math.min(255, c[1] + n + fl * 0.5)); d[o + 2] = Math.max(0, Math.min(255, c[2] + n)); d[o + 3] = 255;
+            }
+            const off = draw.off || (draw.off = Object.assign(document.createElement("canvas"), { width: GW, height: GH }));
+            off.getContext("2d").putImageData(img, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, W, H);
+            if (mp) { ctx.strokeStyle = "#ffffff66"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(mp.x, mp.y, brush * S, 0, 7); ctx.stroke(); }
+        }
+        cv.addEventListener("pointerdown", (e) => { down = true; mp = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); Kit.save(5); });
+        cv.addEventListener("pointermove", (e) => (mp = Kit.point(cv, e)));
+        cv.addEventListener("pointerup", () => (down = false));
+        cv.style.touchAction = "none";
+        const bar = document.createElement("div"); bar.className = "sbbar";
+        bar.innerHTML = `<span class="seg" id="tools">${TOOLS.map(([v, e, en, he], i) => `<button data-t="${v}" class="${i ? "" : "on"}">${e} ${T(en, he)}</button>`).join("")}</span>
+        <span class="seg" id="sizes"><button data-b="1">•</button><button data-b="3" class="on">●</button><button data-b="6">⬤</button></span>
+        <button id="clearBtn" class="btn ghost">${T("🗑 Clear", "🗑 ניקוי")}</button><button id="demoBtn" class="btn ghost">${T("✨ Surprise", "✨ הפתעה")}</button>`;
+        cv.parentElement.after(bar);
+        document.querySelectorAll("#tools button").forEach((b) => (b.onclick = () => { document.querySelectorAll("#tools button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); tool = +b.dataset.t; }));
+        document.querySelectorAll("#sizes button").forEach((b) => (b.onclick = () => { document.querySelectorAll("#sizes button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); brush = +b.dataset.b; }));
+        $("clearBtn").onclick = () => { g.fill(0); life.fill(0); };
+        function demo() { g.fill(0); for (let x = 0; x < GW; x++) for (let y = GH - 8; y < GH; y++) set(x, y, STONE); for (let x = 20; x < 60; x++) set(x, GH - 40, WOOD); for (let x = 30; x < 50; x++) for (let y = GH - 60; y < GH - 41; y++) set(x, y, SAND); for (let x = GW - 70; x < GW - 20; x++) for (let y = GH - 50; y < GH - 8; y++) if (y > GH - 30) set(x, y, WATER); for (let x = GW - 70; x < GW - 66; x++) for (let y = GH - 50; y < GH - 8; y++) set(x, y, STONE); for (let i = 0; i < 20; i++) set(Kit.randi(GW - 64, GW - 22), GH - 31, PLANT); for (let x = 24; x < 28; x++) set(x, GH - 41, FIRE, 60); }
+        $("demoBtn").onclick = demo; demo();
+        $("startBtn").onclick = () => Kit.hide("start");
+        Kit.loop(() => { paint(); step(); draw(); }).start();
+        if (window.__test) window.__test.sand = { get s() { let n = 0; for (const v of g) if (v) n++; return { n }; } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Sand Box</h2><p>A falling-sand toy where every tiny grain follows simple rules. Sand falls and piles into hills. Water flows and spreads out. Stone and wood stay where you put them. Plants grow by drinking nearby water. Fire burns wood and plants and turns into smoke, and lava flows slowly, sets things alight and hardens into stone when it touches water. Mix them together and see what happens.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click and drag</td><td>Pour the material</td></tr><tr><td>Tool buttons</td><td>Pick sand, water, fire…</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Water puts out fire and makes steam.</li><li>Lava + water = stone.</li><li>Plants spread through water.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Sand Box</h3><p>Sand Box has no goal. It's a little science lab. Every grain follows a simple rule: sand falls and slides off piles, water falls and spreads sideways, steam and smoke rise. Lots of simple rules together make surprisingly realistic results.</p><p>Try experiments. Build a stone container and fill it with water. Plant seeds next to the water and watch them grow. Then drop fire on the plants and see how fast it spreads.</p><p>Lava is the most powerful material. It flows slowly, sets wood and plants on fire, and when it touches water it hardens into stone and makes steam. You can build volcano islands by pouring lava into a lake.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Grow a plant using water.</li><li><b>Getting good:</b> Turn lava into stone.</li><li><b>Expert:</b> Build a castle that survives a fire.</li></ul><h3>Did you know?</h3><p>Falling-sand games are a simple kind of cellular automaton: a grid where every cell changes based on its neighbours. A famous example is the Game of Life, invented in 1970.</p><h3>Questions players ask</h3><h4>Is there a goal?</h4><p>No, it's a creative toy. Build, mix and experiment!</p><h4>How do I start over?</h4><p>Press Clear for an empty box, or Surprise for a ready-made scene.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/SkiSlope/skislope">Ski Slope</a><a href="/SnakesLadders/snakesladders">Snakes & Ladders</a><a href="/TileMatch/tilematch">Tile Match</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -107,6 +107,8 @@ export const GAMES = {
     colorhop: { name: "Color Hop", path: "/ColorHop/colorhop", img: "/thumbs/colorhop.png", tags: ["arcade"], desc: "Hop through the spinning shapes, but only through your own colour!", isNew: true },
     beatmaker: { name: "Beat Maker", path: "/BeatMaker/beatmaker", img: "/thumbs/beatmaker.png", tags: ["creative", "music"], desc: "Make your own beats with drums, bass and melody. Share them with a link!", isNew: true },
     targetrush: { name: "Target Rush", path: "/TargetRush/targetrush", img: "/thumbs/targetrush.png", tags: ["arcade", "brain"], desc: "Click the targets before they vanish. How sharp is your aim?", isNew: true },
+    sandbox: { name: "Sand Box", path: "/SandBox/sandbox", img: "/thumbs/sandbox.png", tags: ["creative", "physics"], desc: "Pour sand, water, lava and fire and watch them mix and react.", isNew: true },
+    blackhole: { name: "Black Hole", path: "/BlackHole/blackhole", img: "/thumbs/blackhole.png", tags: ["arcade"], desc: "Be a hole in the ground. Swallow flowers, cars, houses… the whole city!", isNew: true },
 };
 
 // Games that only count plays (no score)

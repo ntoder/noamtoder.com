@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A silly, satisfying growing game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Black Hole · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Black <span>Hole</span></h1>
+        <div class="stats"><div class="stat"><b id="time">90s</b><small>Time</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Black Hole</h2>
+                <p id="startText">You're a hole in the ground! Move with WASD / arrows, or hold and drag on the screen.<br>Anything smaller than you falls in and makes you bigger. Start with flowers and people, then cars, buses, houses and towers. How big can you get in 90 seconds?</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Time's up!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Things too big for you wobble when you touch them. Come back when you've grown!</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Black Hole — move a hole around a city, swallow things smaller than you to grow. 90 seconds
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "blackholeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const WORLD = 1600;
+        const KINDS = [["🌼", 8, 1], ["🧍", 10, 2], ["🗑️", 11, 2], ["🌳", 16, 4], ["🚲", 15, 4], ["🚗", 22, 8], ["🚌", 30, 14], ["🏠", 38, 22], ["🏢", 50, 40], ["🏰", 64, 70]];
+        let hole, items, cam, time, score, state = "ready", target = null, falling = [], fx = Kit.particles();
+        Kit.stat("best", Kit.best(BEST));
+        function start() {
+            hole = { x: WORLD / 2, y: WORLD / 2, r: 18 }; items = []; falling = []; time = 90; score = 0;
+            for (let i = 0; i < 520; i++) { const ki = Math.min(KINDS.length - 1, Math.floor(Math.pow(Math.random(), 2.2) * KINDS.length)); const [e, s, pts] = KINDS[ki]; items.push({ x: Kit.rand(40, WORLD - 40), y: Kit.rand(40, WORLD - 40), e, s, pts }); }
+            items = items.filter((it) => Math.hypot(it.x - hole.x, it.y - hole.y) > 60);
+            cam = { x: hole.x, y: hole.y }; target = null; state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over");
+        }
+        function update(dt) {
+            time -= dt; if (time <= 0) return end();
+            const k = Kit.keys; let mx = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0), my = (k.has("down") ? 1 : 0) - (k.has("up") ? 1 : 0);
+            if (!mx && !my && target) { const wx = cam.x + (target.x - W / 2) / zoom(), wy = cam.y + (target.y - H / 2) / zoom(); mx = wx - hole.x; my = wy - hole.y; const d = Math.hypot(mx, my); if (d < 4) mx = my = 0; }
+            const ml = Math.hypot(mx, my); if (ml) { const sp = 190 + hole.r * 1.2; hole.x += (mx / ml) * sp * dt; hole.y += (my / ml) * sp * dt; }
+            hole.x = Math.max(hole.r, Math.min(WORLD - hole.r, hole.x)); hole.y = Math.max(hole.r, Math.min(WORLD - hole.r, hole.y));
+            for (const it of items) { if (it.gone) continue; const d = Math.hypot(it.x - hole.x, it.y - hole.y); if (d < hole.r - it.s * 0.3 && it.s < hole.r * 0.95) { it.gone = true; falling.push({ ...it, t: 0 }); score += it.pts; hole.r = Math.sqrt(hole.r * hole.r + it.s * it.s * 0.24); Kit.stat("score", score); beep(300 + Math.min(it.s, 60) * 12, 0.06, "sine", 0.03, -200); } else if (d < hole.r + 4 && it.s >= hole.r * 0.95) { it.wob = 0.3; } }
+            items = items.filter((i) => !i.gone);
+            for (const f of falling) f.t += dt * 2.5; falling = falling.filter((f) => f.t < 1);
+            cam.x += (hole.x - cam.x) * Math.min(1, dt * 5); cam.y += (hole.y - cam.y) * Math.min(1, dt * 5);
+            Kit.stat("time", Math.ceil(time) + "s");
+        }
+        const zoom = () => Math.max(0.3, Math.min(1.4, 1.4 * 22 / Math.max(22, hole.r)));
+        function end() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); tune([523, 659, 784], 0.08, "square", 0.04); $("overText").innerHTML = `${T("Time's up! Your hole grew to", "הזמן נגמר! החור גדל ל-")} ${Math.round(hole.r * 2)} ${T("metres wide", "מטר רוחב")}.<br>${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#7cc46a"; ctx.fillRect(0, 0, W, H);
+            if (!hole) return;
+            const z = zoom(), tx = (x) => (x - cam.x) * z + W / 2, ty = (y) => (y - cam.y) * z + H / 2;
+            ctx.fillStyle = "#9aa0a8"; for (let r = 0; r <= WORLD; r += 200) { ctx.fillRect(tx(r) - 14 * z, ty(0), 28 * z, WORLD * z); ctx.fillRect(tx(0), ty(r) - 14 * z, WORLD * z, 28 * z); }
+            ctx.strokeStyle = "#fff"; ctx.setLineDash([10 * z, 10 * z]); ctx.lineWidth = 2 * z; for (let r = 0; r <= WORLD; r += 200) { ctx.beginPath(); ctx.moveTo(tx(r), ty(0)); ctx.lineTo(tx(r), ty(WORLD)); ctx.moveTo(tx(0), ty(r)); ctx.lineTo(tx(WORLD), ty(r)); ctx.stroke(); } ctx.setLineDash([]);
+            ctx.strokeStyle = "#3a5a2a"; ctx.lineWidth = 6; ctx.strokeRect(tx(0), ty(0), WORLD * z, WORLD * z);
+            // hole
+            const hx = tx(hole.x), hy = ty(hole.y), hr = hole.r * z;
+            const gr = ctx.createRadialGradient(hx, hy, hr * 0.3, hx, hy, hr); gr.addColorStop(0, "#000"); gr.addColorStop(0.85, "#111"); gr.addColorStop(1, "#4a3a8a"); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.fill();
+            for (const f of falling) { const x = tx(f.x + (hole.x - f.x) * f.t), y = ty(f.y + (hole.y - f.y) * f.t); ctx.globalAlpha = 1 - f.t; Kit.text(ctx, f.e, x, y + f.s * z * 0.35, f.s * z * (1 - f.t * 0.7), "#000", "center"); } ctx.globalAlpha = 1;
+            const vis = items.filter((it) => { const x = tx(it.x), y = ty(it.y); return x > -80 && x < W + 80 && y > -80 && y < H + 80; }).sort((a, b) => a.y - b.y);
+            for (const it of vis) { const sh = it.wob > 0 ? Kit.rand(-2, 2) : 0; if (it.wob > 0) it.wob -= 0.016; Kit.text(ctx, it.e, tx(it.x) + sh, ty(it.y) + it.s * z * 0.35, it.s * z, it.s < hole.r * 0.95 ? "#000" : "#000", "center"); }
+            ctx.strokeStyle = "#a88cff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.stroke();
+            Kit.text(ctx, `${Math.ceil(Math.max(0, time))}s`, W / 2, 40, 26, "#fff", "center", "'Press Start 2P', monospace", 400);
+            ctx.fillStyle = "#0006"; ctx.fillRect(W - 112, H - 112, 100, 100); ctx.fillStyle = "#a88cff"; ctx.beginPath(); ctx.arc(W - 112 + (hole.x / WORLD) * 100, H - 112 + (hole.y / WORLD) * 100, 3 + hole.r / 30, 0, 7); ctx.fill();
+        }
+        cv.addEventListener("pointerdown", (e) => { target = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (target) target = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => (target = null));
+        cv.style.touchAction = "none";
+        Kit.onKeys({ KeyW: "up", KeyA: "left", KeyS: "down", KeyD: "right", ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); draw(); }).start();
+        if (window.__test) window.__test.bh = { get s() { return { state, score, r: hole && hole.r }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Black Hole</h2><p>A silly, satisfying growing game. You control a black hole that roams around a small town. Everything smaller than the hole falls in: flowers and bins first, then people, bikes and cars. Every swallow makes you a bit bigger, so soon you can gulp down buses, houses, office towers and even castles. Bigger objects give more points. You have 90 seconds to grow as big as you can.</p></section>
+        <section><h3>How to play</h3><table><tr><td>WASD or arrows</td><td>Move</td></tr><tr><td>Hold and drag</td><td>Move (touch / mouse)</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Small things add up fast early on.</li><li>Objects that are too big wobble when you touch them.</li><li>The minimap shows where you are in town.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Black Hole</h3><p>Black Hole is about growing efficiently. In the first seconds you can only swallow tiny things, so sweep through patches of flowers, people and bins. Every small thing helps, and soon cars start falling in.</p><p>Bigger objects grow you much more than small ones, and they're worth more points. Once something stops wobbling when you touch it, it's small enough: go after all of that kind you can see.</p><p>Plan a route. Don't waste time crossing empty roads. Look for crowded blocks and sweep through them in long lines. The minimap helps you see which parts of town you haven't visited yet.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Swallow a car.</li><li><b>Getting good:</b> Swallow a house.</li><li><b>Expert:</b> Swallow a castle.</li></ul><h3>Did you know?</h3><p>Real black holes are places in space where gravity is so strong that not even light can escape. The nearest known one is about 1,500 light-years from Earth.</p><h3>Questions players ask</h3><h4>Why won't something fall in?</h4><p>It's bigger than your hole. If it wobbles, grow a bit more and come back.</p><h4>How do I move on a phone?</h4><p>Hold your finger on the screen and drag where you want the hole to go.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/BrickBalls/brickballs">Brick Balls</a><a href="/CellEater/celleater">Cell Eater</a><a href="/ColorTrick/colortrick">Color Trick</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
