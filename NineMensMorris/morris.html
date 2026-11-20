@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="One of the oldest board games in the world. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Nine Men&#x27;s Morris · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Nine Men's <span>Morris</span></h1>
+        <div class="stats"><div class="stat"><b id="best">0</b><small>Wins</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="640" height="640"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Nine Men's Morris</h2>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>Take turns placing your 9 pieces on the dots. Three of your pieces in a straight line is a <b>mill</b>, and a mill lets you remove one of your rival's pieces!<br>When everyone has placed their pieces, slide them along the lines to make more mills. With only 3 pieces left you can fly anywhere. Leave your rival with 2 pieces, or no moves, to win.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Try to set up a piece that can slide back and forth between two mills. You'll make a mill every turn!</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Nine Men's Morris — place 9 pieces, form mills (3 in a line) to remove opponent pieces. vs computer or 2 players
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "morrisBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const PTS = []; for (const r of [0, 1, 2]) { const s = 3 - r; for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]]) PTS.push([dx * s, dy * s]); }
+        const ADJ = PTS.map(() => []); const link = (a, b) => { ADJ[a].push(b); ADJ[b].push(a); };
+        for (let r = 0; r < 3; r++) for (let i = 0; i < 8; i++) link(r * 8 + i, r * 8 + ((i + 1) % 8));
+        for (const i of [1, 3, 5, 7]) { link(i, 8 + i); link(8 + i, 16 + i); }
+        const MILLS = []; for (let r = 0; r < 3; r++) for (const i of [0, 2, 4, 6]) MILLS.push([r * 8 + i, r * 8 + i + 1, r * 8 + ((i + 2) % 8)]); for (const i of [1, 3, 5, 7]) MILLS.push([i, 8 + i, 16 + i]);
+        const CX = W / 2, CY = H / 2 + 10, SC = 72;
+        let board, toPlace, onBoard, turn, phase, sel, state = "ready", two = false, msg = "", busy = false, mustRemove = false;
+        document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
+        Kit.stat("best", Kit.best(BEST));
+        const xy = (i) => [CX + PTS[i][0] * SC, CY + PTS[i][1] * SC];
+        function start() { board = Array(24).fill(0); toPlace = [9, 9]; turn = 1; sel = -1; mustRemove = false; busy = false; state = "play"; setMsg(); Kit.hide("start"); Kit.hide("over"); }
+        const pi = (p) => (p === 1 ? 0 : 1), count = (b, p) => b.filter((v) => v === p).length;
+        const inMill = (b, i) => MILLS.some((m) => m.includes(i) && m.every((k) => b[k] === b[i] && b[i]));
+        const flying = (b, p, tp) => tp[pi(p)] === 0 && count(b, p) === 3;
+        function moves(b, p, tp) {
+            const out = []; if (tp[pi(p)] > 0) { for (let i = 0; i < 24; i++) if (!b[i]) out.push([-1, i]); return out; }
+            const fly = flying(b, p, tp); for (let i = 0; i < 24; i++) if (b[i] === p) { const to = fly ? [...Array(24).keys()] : ADJ[i]; for (const j of to) if (!b[j]) out.push([i, j]); } return out;
+        }
+        function removable(b, p) { const opp = -p, all = []; for (let i = 0; i < 24; i++) if (b[i] === opp) all.push(i); const free = all.filter((i) => !inMill(b, i)); return free.length ? free : all; }
+        const NAME = (p) => (two ? (p === 1 ? T("White", "לבן") : T("Black", "שחור")) : p === 1 ? T("You", "אתם") : T("Computer", "המחשב"));
+        function setMsg() { if (state !== "play") return; const p = turn; msg = mustRemove ? `${NAME(p)}: ${T("mill! Remove a piece", "טחנה! הסירו כלי")}` : toPlace[pi(p)] > 0 ? `${NAME(p)}: ${T("place a piece", "הניחו כלי")} (${toPlace[pi(p)]} ${T("left", "נשארו")})` : flying(board, p, toPlace) ? `${NAME(p)}: ${T("fly a piece anywhere!", "העיפו כלי לכל מקום!")}` : `${NAME(p)}: ${T("move a piece", "הזיזו כלי")}`; }
+        function doMove(f, t) {
+            if (f < 0) toPlace[pi(turn)]--; else board[f] = 0; board[t] = turn; beep(400, 0.05, "triangle", 0.04);
+            if (inMill(board, t)) { mustRemove = true; tune([660, 880], 0.06, "square", 0.04); setMsg(); if (!two && turn === -1) { busy = true; setTimeout(cpuRemove, 500); } return; }
+            endTurn();
+        }
+        function remove(i) { board[i] = 0; mustRemove = false; beep(150, 0.2, "sawtooth", 0.05); endTurn(); }
+        function endTurn() {
+            turn = -turn; sel = -1; busy = false;
+            const opp = turn; if ((toPlace[pi(opp)] === 0 && count(board, opp) < 3) || !moves(board, opp, toPlace).length) return finish(-opp);
+            setMsg(); if (!two && turn === -1) { busy = true; setTimeout(cpu, 600); }
+        }
+        function finish(w) { state = "over"; msg = ""; tune(w === 1 ? [523, 659, 784, 1047] : [392, 330, 262], 0.1, "triangle", 0.05); if (!two && w === 1) { Kit.save(100); Kit.setBest(BEST, (Kit.best(BEST) || 0) + 1); } setTimeout(() => { $("overText").innerHTML = two ? `🏆 ${NAME(w)} ${T("wins!", "ניצח!")}` : w === 1 ? T("🏆 You win!", "🏆 ניצחתם!") : T("😢 The computer wins", "😢 המחשב ניצח"); Kit.show("over"); }, 700); }
+        function score(b, tp) { let s = (count(b, -1) + tp[1] - count(b, 1) - tp[0]) * 10; for (const m of MILLS) { const v = m.map((k) => b[k]); const c = v.filter((x) => x === -1).length, h = v.filter((x) => x === 1).length; if (c === 2 && !h) s += 3; if (h === 2 && !c) s -= 4; } return s; }
+        function cpu() {
+            if (state !== "play") return; const ms = moves(board, -1, toPlace); let best = ms[0], bs = -1e9;
+            for (const [f, t] of ms) { const b = board.slice(), tp = toPlace.slice(); if (f < 0) tp[1]--; else b[f] = 0; b[t] = -1; let s = score(b, tp) + Math.random(); if (inMill(b, t)) s += 25; // block human mills
+                const hb = board.slice(); hb[t] = 1; if (inMill(hb, t)) s += 18;
+                // danger: can human make a mill next?
+                for (const [hf, ht] of moves(b, 1, tp).slice(0, 60)) { const b2 = b.slice(); if (hf >= 0) b2[hf] = 0; b2[ht] = 1; if (inMill(b2, ht)) { s -= 12; break; } }
+                if (s > bs) { bs = s; best = [f, t]; } }
+            doMove(best[0], best[1]);
+        }
+        function cpuRemove() { const opts = removable(board, -1); let best = opts[0], bs = -1e9; for (const i of opts) { const b = board.slice(); b[i] = 0; const s = -score(b, toPlace) * -1 + (MILLS.some((m) => m.includes(i) && m.filter((k) => board[k] === 1).length === 2) ? 10 : 0) + Math.random(); if (s > bs) { bs = s; best = i; } } remove(best); }
+        function tap(px, py) {
+            if (state !== "play" || busy || (!two && turn === -1)) return;
+            let i = -1, bd = 26; for (let k = 0; k < 24; k++) { const [x, y] = xy(k), d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; i = k; } } if (i < 0) return;
+            if (mustRemove) { if (removable(board, turn).includes(i)) remove(i); else beep(150, 0.05, "square", 0.02); return; }
+            const ms = moves(board, turn, toPlace);
+            if (toPlace[pi(turn)] > 0) { if (ms.some(([f, t]) => t === i)) doMove(-1, i); return; }
+            if (board[i] === turn) { sel = i; beep(600, 0.03, "sine", 0.02); return; }
+            if (sel >= 0 && ms.some(([f, t]) => f === sel && t === i)) doMove(sel, i);
+        }
+        function draw() {
+            ctx.fillStyle = "#2a1f14"; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#d9b37a"; Kit.rr(ctx, CX - SC * 3.5, CY - SC * 3.5, SC * 7, SC * 7, 18); ctx.fill();
+            ctx.strokeStyle = "#5a3b22"; ctx.lineWidth = 5; for (let k = 0; k < 24; k++) for (const j of ADJ[k]) if (j > k) { const [a, b] = xy(k), [c, d] = xy(j); ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); }
+            if (!board) return;
+            const hl = state === "play" && !busy && (two || turn === 1) ? (mustRemove ? removable(board, turn) : toPlace[pi(turn)] > 0 ? [] : sel >= 0 ? moves(board, turn, toPlace).filter(([f]) => f === sel).map(([, t]) => t) : []) : [];
+            for (let k = 0; k < 24; k++) { const [x, y] = xy(k); ctx.fillStyle = "#5a3b22"; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); if (hl.includes(k) && !mustRemove) { ctx.fillStyle = "#2ee6a088"; ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.fill(); } }
+            for (let k = 0; k < 24; k++) if (board[k]) { const [x, y] = xy(k); ctx.fillStyle = "#0006"; ctx.beginPath(); ctx.arc(x + 2, y + 4, 22, 0, 7); ctx.fill(); ctx.fillStyle = board[k] === 1 ? "#f4f1ea" : "#1f1a24"; ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.fill(); ctx.strokeStyle = k === sel ? "#2ee6a0" : mustRemove && hl.includes(k) ? "#ff4d6d" : "#0004"; ctx.lineWidth = k === sel || (mustRemove && hl.includes(k)) ? 5 : 2; ctx.stroke(); }
+            for (const [p, x] of [[1, 40], [-1, W - 40]]) for (let k = 0; k < toPlace[pi(p)]; k++) { ctx.fillStyle = p === 1 ? "#f4f1ea" : "#1f1a24"; ctx.beginPath(); ctx.arc(x, 90 + k * 34, 13, 0, 7); ctx.fill(); ctx.strokeStyle = "#0006"; ctx.lineWidth = 2; ctx.stroke(); }
+            Kit.text(ctx, msg, W / 2, 36, 20, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); tap(p.x, p.y); });
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.morris = { get s() { return { state, turn, toPlace, n: board && [count(board, 1), count(board, -1)] }; }, start, tap, autoplay: () => { two = false; const go = () => { if (state !== "play") return; if (turn === 1 && !busy) { if (mustRemove) remove(removable(board, 1)[0]); else { const ms = moves(board, 1, toPlace); const m = Kit.pick(ms); doMove(m[0], m[1]); } } setTimeout(go, 150); }; go(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Nine Men's Morris</h2><p>One of the oldest board games in the world. The board has 24 dots on three nested squares joined by lines. Each player has nine pieces. First you take turns placing them; then you take turns sliding them to a neighbouring empty dot. Whenever you line up three of your pieces along a line, you've made a mill and can remove an opponent's piece, though not one that's in a mill unless there's no other choice. A player down to three pieces may fly to any empty dot. Reduce your opponent to two pieces, or leave them stuck with no move, to win.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a dot</td><td>Place a piece</td></tr><tr><td>Tap your piece, then a dot</td><td>Move it</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Pieces in a mill are safe from being removed (unless all are in mills).</li><li>Block your rival when they have two in a line.</li><li>Spread out during placement so you can move later.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Nine Men&#x27;s Morris</h3><p>Nine Men's Morris has two halves. During placement, don't just rush to make a mill: your rival will block it. Instead, set up two possible mills at once, so they can only block one.</p><p>In the moving phase, mobility matters. A piece with no empty neighbour is stuck. Keep your pieces able to move, and try to box your rival's pieces in. If they can't move at all, you win.</p><p>The strongest pattern is a 'running mill': a piece that can slide out of a mill and back in, making a new mill every two turns. Each time, you remove one of your rival's pieces.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Make your first mill.</li><li><b>Getting good:</b> Beat the computer.</li><li><b>Expert:</b> Win with all nine pieces still on the board... almost!</li></ul><h3>Did you know?</h3><p>A Nine Men's Morris board was found carved into the roof of an ancient Egyptian temple from around 1400 BC, and boards have been found on Viking ships too.</p><h3>Questions players ask</h3><h4>What is a mill?</h4><p>Three of your pieces in a straight line on the board's lines.</p><h4>What does 'flying' mean?</h4><p>When you're down to three pieces, you can move a piece to any empty dot, not just a neighbouring one.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/NeonSlope/neonslope">Neon Slope</a><a href="/ParkingPro/parking">Parking Pro</a><a href="/Pinball/pinball">Pinball</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

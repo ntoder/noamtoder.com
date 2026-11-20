@@ -119,6 +119,7 @@ export const GAMES = {
     jigsaw: { name: "Jigsaw", path: "/Jigsaw/jigsaw", img: "/thumbs/jigsaw.png", tags: ["puzzle", "relaxing"], desc: "Drag real jigsaw pieces into place. A new painted picture every time!", isNew: true },
     turbokart: { name: "Turbo Kart", path: "/TurboKart/turbokart", img: "/thumbs/turbokart.png", tags: ["sports", "arcade"], desc: "Race three computer karts for 3 laps. Hit the boost arrows!", isNew: true },
     spotthedifference: { name: "Spot the Difference", path: "/SpotTheDifference/spotdiff", img: "/thumbs/spotthedifference.png", tags: ["puzzle", "brain"], desc: "Two pictures, five differences. Can you find them all in time?", isNew: true },
+    ninemensmorris: { name: "Nine Men's Morris", path: "/NineMensMorris/morris", img: "/thumbs/ninemensmorris.png", tags: ["board", "strategy", "2p"], desc: "An ancient strategy game: line up three to capture your rival's pieces.", isNew: true },
 };
 
 // Games that only count plays (no score)
