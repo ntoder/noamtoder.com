@@ -122,6 +122,7 @@ export const GAMES = {
     ninemensmorris: { name: "Nine Men's Morris", path: "/NineMensMorris/morris", img: "/thumbs/ninemensmorris.png", tags: ["board", "strategy", "2p"], desc: "An ancient strategy game: line up three to capture your rival's pieces.", isNew: true },
     slimevolley: { name: "Slime Volley", path: "/SlimeVolley/slimevolley", img: "/thumbs/slimevolley.png", tags: ["sports", "2p"], desc: "Bounce the ball over the net with your slime. First to 7 wins!", isNew: true },
     dodge: { name: "Dodge!", path: "/Dodge/dodge", img: "/thumbs/dodge.png", tags: ["arcade"], desc: "Dodge balls, lasers and homing stars. How long can you survive?", isNew: true },
+    watersort: { name: "Water Sort", path: "/WaterSort/watersort", img: "/thumbs/watersort.png", tags: ["puzzle", "relaxing"], desc: "Pour coloured water between tubes until every tube is one colour.", isNew: true },
 };
 
 // Games that only count plays (no score)

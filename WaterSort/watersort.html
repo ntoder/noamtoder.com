@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A calm colour-sorting puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Water Sort · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.wsbar{display:flex;gap:10px;justify-content:center;margin:12px auto 0}.wsbar .btn{padding:8px 16px}.wsbar .ghost{background:#262a4d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Water <span>Sort</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="moves">0</b><small>Moves</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="720" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Water Sort</h2>
+                <p id="startText">Tap a tube, then tap another tube to pour into it. You can only pour onto the same colour, or into an empty tube, and a tube holds 4 layers.<br>Sort the water so each tube is a single colour! Every level is checked to be solvable. Stuck? Undo, restart, or add one extra tube.</p>
+                <button class="btn" id="startBtn">💧 Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Water Sort</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Use the empty tubes as parking spots, and try to fill one tube with a single colour as soon as you can.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Water Sort — pour coloured water between tubes until each tube holds one colour
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "watersortBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = ["#ff4d6d", "#2a74ff", "#2ee6a0", "#ffc94d", "#a64dff", "#ff9a3c", "#5cc8ff", "#ff4dd2", "#8a5a2b", "#9aa0b5", "#1f9a4b", "#ffffff"];
+        const CAP = 4;
+        let tubes, sel, level, moves, hist, state = "ready", pour = null, winT = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function gen(lv) {
+            const n = Math.min(COLS.length, 3 + Math.floor(lv / 2)), empty = 2;
+            for (let tries = 0; tries < 200; tries++) {
+                const all = []; for (let c = 0; c < n; c++) for (let k = 0; k < CAP; k++) all.push(c);
+                for (let i = all.length - 1; i > 0; i--) { const j = Kit.randi(0, i); [all[i], all[j]] = [all[j], all[i]]; }
+                const t = []; for (let c = 0; c < n; c++) t.push(all.slice(c * CAP, c * CAP + CAP)); for (let e = 0; e < empty; e++) t.push([]);
+                if (!t.some((x) => x.length === CAP && x.every((v) => v === x[0])) && solvable(t)) return t;
+            }
+            return null;
+        }
+        function topRun(t) { if (!t.length) return 0; const c = t[t.length - 1]; let k = 0; for (let i = t.length - 1; i >= 0 && t[i] === c; i--) k++; return k; }
+        function canPour(a, b) { return a !== b && tubes[a].length && tubes[b].length < CAP && (!tubes[b].length || tubes[b][tubes[b].length - 1] === tubes[a][tubes[a].length - 1]); }
+        function solvable(start) {
+            const key = (t) => t.map((x) => x.join("")).sort().join("|"); const seen = new Set([key(start)]); const st = [start]; let n = 0;
+            while (st.length && n++ < 20000) {
+                const t = st.pop(); if (t.every((x) => !x.length || (x.length === CAP && x.every((v) => v === x[0])))) return true;
+                for (let a = 0; a < t.length; a++) for (let b = 0; b < t.length; b++) { if (a === b || !t[a].length || t[b].length >= CAP) continue; const c = t[a][t[a].length - 1]; if (t[b].length && t[b][t[b].length - 1] !== c) continue; if (!t[b].length && topRun(t[a]) === t[a].length) continue; const nt = t.map((x) => x.slice()); let k = Math.min(topRun(nt[a]), CAP - nt[b].length); while (k--) nt[b].push(nt[a].pop()); const kk = key(nt); if (!seen.has(kk)) { seen.add(kk); st.push(nt); } }
+            }
+            return false;
+        }
+        function load(lv) { level = lv; tubes = gen(lv) || gen(1); sel = -1; moves = 0; hist = []; winT = 0; Kit.stat("level", lv); Kit.stat("moves", 0); state = "play"; }
+        function start() { load(Math.max(1, +(localStorage.getItem("watersortLevel") || 1))); Kit.hide("start"); Kit.hide("over"); }
+        function layout() { const n = tubes.length, perRow = n > 7 ? Math.ceil(n / 2) : n, rows = Math.ceil(n / perRow), tw = 54, th = 190, gap = Math.min(40, (W - perRow * tw) / (perRow + 1)); return tubes.map((_, i) => { const r = Math.floor(i / perRow), c = i % perRow, cnt = Math.min(perRow, n - r * perRow), x0 = (W - (cnt * tw + (cnt - 1) * gap)) / 2; return { x: x0 + c * (tw + gap), y: rows === 1 ? 150 : 70 + r * (th + 50), w: tw, h: th }; }); }
+        function tap(i) {
+            if (state !== "play" || pour || winT) return;
+            if (sel < 0) { if (tubes[i].length) { sel = i; beep(500, 0.03, "sine", 0.02); } return; }
+            if (sel === i) { sel = -1; return; }
+            if (canPour(sel, i)) { hist.push(tubes.map((x) => x.slice())); const k = Math.min(topRun(tubes[sel]), CAP - tubes[i].length); pour = { a: sel, b: i, k, t: 0, c: tubes[sel][tubes[sel].length - 1] }; sel = -1; beep(300, 0.25, "sine", 0.03, 300); }
+            else { sel = tubes[i].length ? i : -1; beep(150, 0.05, "square", 0.02); }
+        }
+        function finishPour() { const { a, b, k } = pour; for (let n = 0; n < k; n++) tubes[b].push(tubes[a].pop()); pour = null; moves++; Kit.stat("moves", moves);
+            if (tubes[b].length === CAP && tubes[b].every((v) => v === tubes[b][0])) tune([880, 1175], 0.05, "triangle", 0.04);
+            if (tubes.every((x) => !x.length || (x.length === CAP && x.every((v) => v === x[0])))) { winT = 1.3; tune([523, 659, 784, 1047], 0.08, "square", 0.05); Kit.save(20); Kit.setBest(BEST, level); localStorage.setItem("watersortLevel", level + 1); } }
+        function undo() { if (pour || !hist.length) return; tubes = hist.pop(); moves = Math.max(0, moves - 1); Kit.stat("moves", moves); sel = -1; }
+        function addTube() { if (tubes.length < 14 && !addTube.used) { tubes.push([]); addTube.used = level; } }
+        function draw() {
+            ctx.fillStyle = "#16203a"; ctx.fillRect(0, 0, W, H);
+            if (!tubes) return;
+            const L = layout(), unit = 190 / CAP - 4;
+            L.forEach((p, i) => {
+                let lift = i === sel ? -24 : 0; let tilt = 0;
+                if (pour && pour.a === i) { const to = L[pour.b]; lift = -60; tilt = (to.x > p.x ? 1 : -1) * Math.min(1, pour.t * 3) * 1.1; }
+                ctx.save(); ctx.translate(p.x + p.w / 2, p.y + lift); ctx.rotate(tilt);
+                ctx.save(); ctx.beginPath(); ctx.moveTo(-p.w / 2, 0); ctx.lineTo(-p.w / 2, p.h - p.w / 2); ctx.arc(0, p.h - p.w / 2, p.w / 2, Math.PI, 0, true); ctx.lineTo(p.w / 2, 0); ctx.clip();
+                let level2 = tubes[i].length; if (pour && pour.a === i) level2 -= pour.k * Math.min(1, pour.t * 1.6); if (pour && pour.b === i) level2 = tubes[i].length;
+                tubes[i].forEach((c, k) => { if (k >= Math.ceil(level2)) return; ctx.fillStyle = COLS[c]; const hh = k + 1 > level2 ? (level2 - k) * (unit + 4) : unit + 4; ctx.fillRect(-p.w / 2, p.h - (k + 1) * (unit + 4) + (unit + 4 - hh), p.w, hh); });
+                if (pour && pour.b === i) { const add = pour.k * Math.min(1, Math.max(0, pour.t * 1.6 - 0.3)); ctx.fillStyle = COLS[pour.c]; ctx.fillRect(-p.w / 2, p.h - (tubes[i].length + add) * (unit + 4), p.w, add * (unit + 4)); }
+                ctx.restore();
+                ctx.strokeStyle = "#dfe8ff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-p.w / 2, 0); ctx.lineTo(-p.w / 2, p.h - p.w / 2); ctx.arc(0, p.h - p.w / 2, p.w / 2, Math.PI, 0, true); ctx.lineTo(p.w / 2, 0); ctx.stroke(); ctx.fillStyle = "#ffffff22"; ctx.fillRect(-p.w / 2 + 6, 8, 6, p.h - 40);
+                ctx.restore();
+                if (pour && pour.b === i && pour.t > 0.2 && pour.t < 0.8) { ctx.strokeStyle = COLS[pour.c]; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(p.x + p.w / 2, p.y - 40); ctx.lineTo(p.x + p.w / 2, p.y + p.h - tubes[i].length * (unit + 4)); ctx.stroke(); }
+            });
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, 40, 24, "#fff", "center");
+            if (winT) Kit.text(ctx, T("Sorted! 🎉", "מסודר! 🎉"), W / 2, H - 30, 28, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { const p = Kit.point(cv, e); const L = layout(); L.forEach((q, i) => { if (p.x > q.x - 10 && p.x < q.x + q.w + 10 && p.y > q.y - 40 && p.y < q.y + q.h + 10) tap(i); }); });
+        const bar = document.createElement("div"); bar.className = "wsbar"; bar.innerHTML = `<button id="undoBtn" class="btn ghost">${T("↶ Undo", "↶ ביטול")}</button><button id="resetBtn" class="btn ghost">${T("⟲ Restart", "⟲ מחדש")}</button><button id="tubeBtn" class="btn ghost">${T("➕ Extra tube", "➕ מבחנה נוספת")}</button>`; cv.parentElement.after(bar);
+        $("undoBtn").onclick = undo; $("resetBtn").onclick = () => { if (hist.length) { tubes = hist[0]; hist = []; moves = 0; Kit.stat("moves", 0); sel = -1; } }; $("tubeBtn").onclick = () => { if (addTube.used !== level) { addTube.used = -1; addTube(); } };
+        let ksel = 0;
+        Kit.onKeys({ ArrowLeft: "l", ArrowRight: "r", Space: "go", KeyZ: "undo", Enter: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); else tap(ksel); return; } if (!tubes) return; if (a === "l") ksel = (ksel - 1 + tubes.length) % tubes.length; if (a === "r") ksel = (ksel + 1) % tubes.length; if (a === "go") tap(ksel); if (a === "undo") undo(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (pour) { pour.t += dt * 1.4; if (pour.t >= 1) finishPour(); } if (winT) { winT -= dt; if (winT <= 0) { winT = 0; load(level + 1); } } draw(); if (tubes && state === "play") { const q = layout()[ksel]; if (q) { ctx.strokeStyle = "#ffc94d88"; ctx.lineWidth = 2; ctx.strokeRect(q.x - 8, q.y + q.h + 12, q.w + 16, 4); } } }).start();
+        if (window.__test) window.__test.ws = { get s() { return { state, level, moves, n: tubes && tubes.length }; }, start, load };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Water Sort</h2><p>A calm colour-sorting puzzle. Each tube holds four layers of coloured water, all mixed up. Tap a tube to pick it up and tap another to pour: the top colour flows over, as much as fits, but only onto the same colour or into an empty tube. Keep pouring until every tube holds just one colour. Levels add more colours as you go, every level is checked by the game to make sure it can be solved, and your progress is saved.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap a tube, then another</td><td>Pour</td></tr><tr><td>⬅ ➡ then Space</td><td>Choose and pour with keys</td></tr><tr><td>Z</td><td>Undo</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Empty tubes are your most valuable space.</li><li>Pour the same colour together to free up tubes.</li><li>Undo as much as you like, there's no penalty.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Water Sort</h3><p>Water Sort is a puzzle about space. The empty tubes are your parking spots: use them to hold a colour while you dig down to what's underneath. But a parked colour blocks that tube, so try to only park when it helps you finish another tube.</p><p>Look for colours that are already at the top of several tubes. Pouring them together into one tube both sorts that colour and empties the tops of the others.</p><p>If you get stuck, undo a few moves and try a different order. There's also an Extra tube button once per level for really tricky moments.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve 5 levels.</li><li><b>Getting good:</b> Solve level 15.</li><li><b>Expert:</b> Solve level 30.</li></ul><h3>Did you know?</h3><p>Puzzles like this are a kind of sorting problem, the same kind computers solve millions of times a second when they put lists in order.</p><h3>Questions players ask</h3><h4>Can a level be impossible?</h4><p>No. The game tests every level with a solver before giving it to you.</p><h4>Is my progress saved?</h4><p>Yes, you'll continue from your highest level on this device.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
