@@ -132,6 +132,8 @@ export const GAMES = {
     sumopush: { name: "Sumo Push", path: "/SumoPush/sumo", img: "/thumbs/sumopush.png", tags: ["sports", "arcade", "2p"], desc: "Shove your rival out of the ring. Best of five wins!", isNew: true },
     colorlines: { name: "Color Lines", path: "/ColorLines/colorlines", img: "/thumbs/colorlines.png", tags: ["puzzle", "brain"], desc: "Move balls to make lines of five. Three new balls arrive every turn!", isNew: true },
     dropmerge: { name: "Drop Merge", path: "/DropMerge/dropmerge", img: "/thumbs/dropmerge.png", tags: ["puzzle"], desc: "Drop number blocks. Matching numbers merge and double. Chain them!", isNew: true },
+    echobat: { name: "Echo Bat", path: "/EchoBat/echobat", img: "/thumbs/echobat.png", tags: ["arcade"], desc: "Fly a blind bat through a pitch-black cave. Use sonar to see the walls!", isNew: true },
+    timeloop: { name: "Time Loop", path: "/TimeLoop/timeloop", img: "/thumbs/timeloop.png", tags: ["arcade", "brain"], desc: "Every 8 seconds time rewinds, and your past selves replay as ghosts!", isNew: true },
 };
 
 // Games that only count plays (no score)

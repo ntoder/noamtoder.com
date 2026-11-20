@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A brain-bending game about getting in your own way. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Time Loop · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Time <span>Loop</span></h1>
+        <div class="stats"><div class="stat"><b id="loop">1</b><small>Loop</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="760" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Time Loop</h2>
+                <p id="startText">Move with the arrow keys / WASD or by dragging. Grab every 💎 gem before the 8-second clock runs out.<br>Then time rewinds! You start again from the middle, and a ghost replays exactly what you did last time. Every loop adds another ghost. Touch any of your past selves and the loop collapses!</p>
+                <button class="btn" id="startBtn">⟲ Start the loop</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">⟲ Loop again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="up">⬆</button><button data-k="down">⬇</button><button data-k="right">➡</button></div>
+    <p class="hint">Your past selves always repeat the same path, so make each run's path simple and easy to avoid later.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Time Loop — every 8 seconds time rewinds and your past runs replay as ghosts. Grab the gems, never touch a past self
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "timeloopBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const LOOP = 8, DT = 1 / 60, SP = 230, START = [W / 2, H / 2];
+        let me, rec, ghosts, gems, t, loop, score, state = "ready", fx = Kit.particles(), acc = 0, target = null, flash = 0;
+        Kit.stat("best", Kit.best(BEST));
+        function spawnGems() { gems = []; const n = 3 + Math.min(4, loop); for (let i = 0; i < n; i++) { let x, y; do { x = Kit.rand(40, W - 40); y = Kit.rand(60, H - 40); } while (Math.hypot(x - START[0], y - START[1]) < 90); gems.push({ x, y, got: false }); } }
+        function newLoop() { if (rec && rec.length) ghosts.push(rec); rec = []; me = { x: START[0], y: START[1] }; t = 0; loop++; spawnGems(); flash = 0.5; Kit.stat("loop", loop); if (loop > 1) tune([880, 660, 440], 0.06, "triangle", 0.04); }
+        function start() { ghosts = []; rec = null; loop = 0; score = 0; state = "play"; newLoop(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function step() {
+            const k = Kit.keys; let mx = (k.has("right") ? 1 : 0) - (k.has("left") ? 1 : 0), my = (k.has("down") ? 1 : 0) - (k.has("up") ? 1 : 0);
+            if (!mx && !my && target) { mx = target.x - me.x; my = target.y - me.y; if (Math.hypot(mx, my) < 4) mx = my = 0; }
+            const l = Math.hypot(mx, my); if (l) { me.x += (mx / l) * SP * DT; me.y += (my / l) * SP * DT; }
+            me.x = Math.max(12, Math.min(W - 12, me.x)); me.y = Math.max(12, Math.min(H - 12, me.y));
+            rec.push([me.x, me.y]); const f = rec.length - 1;
+            for (const g of ghosts) { const p = g[Math.min(f, g.length - 1)]; if (t > 0.6 && Math.hypot(p[0] - me.x, p[1] - me.y) < 18) return die(); }
+            for (const gm of gems) if (!gm.got && Math.hypot(gm.x - me.x, gm.y - me.y) < 20) { gm.got = true; score += 10 * loop; Kit.stat("score", score); beep(900 + loop * 40, 0.05, "square", 0.03); fx.burst(gm.x, gm.y, "#5cc8ff", 10, 2); }
+            t += DT; if (t >= LOOP) { if (gems.some((g) => !g.got)) return die(true); score += 25 * loop; Kit.stat("score", score); newLoop(); }
+        }
+        function die(missed) { state = "over"; fx.burst(me.x, me.y, "#ffc94d", 40, 5); beep(90, 0.5, "sawtooth", 0.07); Kit.save(score); const b = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${missed ? T("Time ran out before you got every gem!", "הזמן נגמר לפני שאספתם את כל היהלומים!") : T("You bumped into your past self! 👻", "התנגשתם בעצמכם מהעבר! 👻")}<br>${T("Loop", "לולאה")} ${loop} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${b}`; Kit.show("over"); }, 700); }
+        function draw() {
+            ctx.fillStyle = "#0d0b1f"; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = "#ffffff08"; for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            if (!rec) return;
+            ctx.strokeStyle = "#ffffff22"; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.arc(START[0], START[1], 22, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+            const f = rec.length;
+            ghosts.forEach((g, i) => { const hue = (i * 47) % 360; ctx.strokeStyle = `hsla(${hue},80%,65%,0.12)`; ctx.lineWidth = 3; ctx.beginPath(); g.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+                const p = g[Math.min(f, g.length - 1)]; ctx.fillStyle = `hsla(${hue},80%,65%,0.75)`; ctx.beginPath(); ctx.arc(p[0], p[1], 11, Math.PI, 0); ctx.lineTo(p[0] + 11, p[1] + 10); for (let w = 0; w < 4; w++) ctx.lineTo(p[0] + 11 - (w + 0.5) * 5.5, p[1] + (w % 2 ? 10 : 6)); ctx.lineTo(p[0] - 11, p[1] + 10); ctx.fill(); ctx.fillStyle = "#0d0b1f"; ctx.fillRect(p[0] - 5, p[1] - 3, 3, 4); ctx.fillRect(p[0] + 2, p[1] - 3, 3, 4); });
+            for (const gm of gems) if (!gm.got) { const s = 1 + Math.sin(performance.now() / 200 + gm.x) * 0.1; ctx.fillStyle = "#5cc8ff"; ctx.beginPath(); ctx.moveTo(gm.x, gm.y - 12 * s); ctx.lineTo(gm.x + 9 * s, gm.y); ctx.lineTo(gm.x, gm.y + 12 * s); ctx.lineTo(gm.x - 9 * s, gm.y); ctx.fill(); }
+            if (state === "play") { ctx.fillStyle = "#ffc94d"; ctx.shadowColor = "#ffc94d"; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(me.x, me.y, 10, 0, 7); ctx.fill(); ctx.shadowBlur = 0; }
+            fx.draw(ctx);
+            // clock
+            const a = (t / LOOP) * Math.PI * 2; ctx.strokeStyle = "#ffffff33"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(W - 40, 40, 20, 0, 7); ctx.stroke(); ctx.strokeStyle = t > LOOP - 2 ? "#ff4d6d" : "#ffc94d"; ctx.beginPath(); ctx.arc(W - 40, 40, 20, -Math.PI / 2, -Math.PI / 2 + a); ctx.stroke();
+            Kit.text(ctx, `${T("Loop", "לולאה")} ${loop} · 👻 ${ghosts.length}`, 20, 34, 18, "#fff", "left");
+            if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.5})`; ctx.fillRect(0, 0, W, H); Kit.text(ctx, loop === 1 ? T("Grab every gem before the loop ends!", "אספו את כל היהלומים לפני שהלולאה נגמרת!") : T("⟲ Time rewinds…", "⟲ הזמן חוזר אחורה…"), W / 2, H / 2 - 40, 24, "#fff", "center"); }
+        }
+        cv.addEventListener("pointerdown", (e) => { target = Kit.point(cv, e); cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (target) target = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => (target = null));
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") { acc += dt; while (acc > DT) { acc -= DT; step(); if (state !== "play") break; } } if (flash > 0) flash -= dt; fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.tl = { get s() { return { state, loop, score }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Time Loop</h2><p>A brain-bending game about getting in your own way. You have eight seconds to collect all the gems. Then time rewinds and you start over with new gems, but a ghost of your previous run appears and does exactly what you did, at exactly the same time. Each loop adds another ghost, so the arena fills with copies of yourself. Plan your paths so future you can still get through. How many loops can you survive?</p></section>
+        <section><h3>How to play</h3><table><tr><td>Arrows / WASD or drag</td><td>Move</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Every ghost repeats your old run exactly, at the same time.</li><li>Faint trails show where each ghost will go.</li><li>Leave the starting circle quickly in a new direction.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Time Loop</h3><p>Time Loop is about thinking of your future self. Every move you make now becomes an obstacle later. Short, simple paths that stay in one part of the arena are easier to dodge than long zig-zags across the whole screen.</p><p>All ghosts start in the middle at the same moment you do, then spread out. Leave the start in a different direction from the earlier runs. The faint coloured trails show each ghost's path, so you can see where they're going to be.</p><p>Timing matters as much as place. A ghost is only dangerous where it is at that exact second. You can cross an old path safely if the ghost passed there earlier or will get there later.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Survive 3 loops.</li><li><b>Getting good:</b> Survive with 6 ghosts.</li><li><b>Expert:</b> Reach loop 12.</li></ul><h3>Did you know?</h3><p>Stories about time loops, where a day repeats over and over, have been popular for decades. In this game, you're the one creating the loop's obstacles.</p><h3>Questions players ask</h3><h4>What happens at the end of a loop?</h4><p>Time rewinds, you go back to the middle, and a ghost replays your last run.</p><h4>Can I touch a ghost at the very start?</h4><p>For the first half-second everyone overlaps in the middle, so that's allowed.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/UltimateTicTacToe/ultimatettt">Ultimate Tic-Tac-Toe</a><a href="/ZombieSurvival/zombies">Zombie Survival</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
