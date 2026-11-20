@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A drawing physics puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Ink Bridge · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>.ibbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:12px auto 0}.ibbar .btn{padding:8px 16px}.ibbar .ghost{background:#262a4d}</style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Ink <span>Bridge</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1/8</b><small>Level</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="800" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Ink Bridge</h2>
+                <p id="startText">Draw lines with your mouse or finger to make ramps, bridges and walls. Then press ▶ Go and the red ball drops!<br>Guide it into the golden cup 🏆. You only have so much ink, and the less you use, the more stars you get. If it misses, reset the ball and change your drawing.</p>
+                <button class="btn" id="startBtn">✏️ Start drawing</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>All done!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Start again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">A gentle slope is better than a steep one. A ball that's too fast bounces right out of the cup.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Ink Bridge — draw lines with limited ink, then release the ball and guide it into the cup
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "inkbridgeBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const BR = 12, G = 900;
+        // level: ball start, cup (x,y), walls [x1,y1,x2,y2], ink
+        const LV = [
+            { s: [120, 120], c: [640, 470], w: [], ink: 700 },
+            { s: [100, 100], c: [700, 300], w: [[350, 200, 350, 560]], ink: 800 },
+            { s: [700, 90], c: [110, 480], w: [[200, 330, 600, 330]], ink: 800 },
+            { s: [90, 120], c: [720, 140], w: [[420, 0, 420, 330]], ink: 900 },
+            { s: [400, 80], c: [400, 480], w: [[300, 260, 500, 260], [250, 380, 350, 380], [450, 380, 550, 380]], ink: 700 },
+            { s: [80, 480], c: [720, 470], w: [[380, 300, 380, 560], [500, 0, 500, 260]], ink: 900, bounce: 1 },
+            { s: [120, 90], c: [660, 160], w: [[0, 300, 560, 300], [560, 300, 560, 220]], ink: 1000 },
+            { s: [700, 80], c: [700, 480], w: [[560, 160, 800, 160], [560, 300, 760, 300], [600, 420, 800, 420]], ink: 1000 },
+        ];
+        let lv, lines, cur, ink, ball, running, state = "ready", winT = 0, stars = 0, total;
+        Kit.stat("best", Kit.best(BEST));
+        function load(i) { lv = i; const L = LV[i]; lines = []; cur = null; ink = L.ink; ball = { x: L.s[0], y: L.s[1], vx: 0, vy: 0 }; running = false; winT = 0; Kit.stat("level", `${i + 1}/${LV.length}`); state = "play"; }
+        function start() { total = 0; load(Math.min(LV.length - 1, +(localStorage.getItem("inkbridgeLevel") || 0))); Kit.hide("start"); Kit.hide("over"); }
+        function segs() { const L = LV[lv], out = L.w.map((w) => w.slice()); for (const l of lines) for (let i = 1; i < l.length; i++) out.push([l[i - 1][0], l[i - 1][1], l[i][0], l[i][1], 1]); const [cx, cy] = L.c; out.push([cx - 34, cy - 40, cx - 26, cy + 20], [cx + 34, cy - 40, cx + 26, cy + 20], [cx - 26, cy + 20, cx + 26, cy + 20]); return out; }
+        function go() { if (state !== "play" || running) return; running = true; beep(500, 0.06, "sine", 0.03); }
+        function reset() { const L = LV[lv]; ball = { x: L.s[0], y: L.s[1], vx: 0, vy: 0 }; running = false; }
+        function update(dt) {
+            if (!running) return; const S = segs(), n = 8, h = dt / n;
+            for (let k = 0; k < n; k++) {
+                ball.vy += G * h; ball.x += ball.vx * h; ball.y += ball.vy * h;
+                for (const [x1, y1, x2, y2] of S) { const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy || 1; let t = ((ball.x - x1) * dx + (ball.y - y1) * dy) / L2; t = Math.max(0, Math.min(1, t)); const px = x1 + t * dx, py = y1 + t * dy, ox = ball.x - px, oy = ball.y - py, d = Math.hypot(ox, oy);
+                    if (d < BR && d > 0) { const nx = ox / d, ny = oy / d; ball.x = px + nx * BR; ball.y = py + ny * BR; const vn = ball.vx * nx + ball.vy * ny; if (vn < 0) { const e = LV[lv].bounce ? 0.75 : 0.25; ball.vx -= (1 + e) * vn * nx; ball.vy -= (1 + e) * vn * ny; ball.vx *= 0.995; ball.vy *= 0.995; } } }
+            }
+            const [cx, cy] = LV[lv].c; if (Math.abs(ball.x - cx) < 24 && ball.y > cy - 20 && ball.y < cy + 20 && Math.hypot(ball.vx, ball.vy) < 260 && !winT) win();
+            if (ball.y > H + 60 || ball.x < -60 || ball.x > W + 60) { beep(150, 0.2, "sawtooth", 0.04); reset(); }
+        }
+        function win() { const L = LV[lv]; const used = 1 - ink / L.ink; stars = used < 0.35 ? 3 : used < 0.7 ? 2 : 1; total += stars; winT = 1.6; tune([523, 659, 784, 1047], 0.08, "square", 0.05); Kit.save(stars * 15); Kit.setBest(BEST, lv + 1); localStorage.setItem("inkbridgeLevel", lv + 1); }
+        function draw() {
+            ctx.fillStyle = "#fdfaf2"; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = "#e4ecf7"; ctx.lineWidth = 1; for (let y = 30; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); } ctx.strokeStyle = "#f5c6c6"; ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(60, H); ctx.stroke();
+            if (lv === undefined) return; const L = LV[lv];
+            ctx.lineCap = "round"; ctx.strokeStyle = "#5a5f70"; ctx.lineWidth = 10; for (const [x1, y1, x2, y2] of L.w) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+            ctx.strokeStyle = "#2a3fd0"; ctx.lineWidth = 5; ctx.lineJoin = "round"; for (const l of [...lines, ...(cur ? [cur] : [])]) { ctx.beginPath(); l.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+            const [cx, cy] = L.c; ctx.fillStyle = "#ffc94d"; ctx.beginPath(); ctx.moveTo(cx - 34, cy - 40); ctx.lineTo(cx + 34, cy - 40); ctx.lineTo(cx + 26, cy + 20); ctx.lineTo(cx - 26, cy + 20); ctx.fill(); ctx.strokeStyle = "#d9963a"; ctx.lineWidth = 4; ctx.stroke(); Kit.text(ctx, "🏆", cx, cy + 8, 22, "#000", "center");
+            ctx.setLineDash([4, 4]); ctx.strokeStyle = "#ff4d6d88"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(L.s[0], L.s[1], BR + 6, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = "#ff4d6d"; ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, 7); ctx.fill(); ctx.fillStyle = "#fff8"; ctx.beginPath(); ctx.arc(ball.x - 4, ball.y - 4, 4, 0, 7); ctx.fill();
+            // ink bar
+            ctx.fillStyle = "#e4ecf7"; Kit.rr(ctx, 80, 16, 220, 16, 8); ctx.fill(); ctx.fillStyle = "#2a3fd0"; Kit.rr(ctx, 80, 16, 220 * (ink / L.ink), 16, 8); ctx.fill(); Kit.text(ctx, T("ink", "דיו"), 310, 29, 13, "#2a3fd0", "left");
+            Kit.text(ctx, `${T("Level", "שלב")} ${lv + 1}`, W - 20, 30, 18, "#1a2a4a", "right");
+            if (!running && !winT) Kit.text(ctx, T("Draw lines, then press ▶ Go (or Space)", "ציירו קווים ואז לחצו ▶ (או רווח)"), W / 2, H - 16, 15, "#5a5f70", "center");
+            if (winT) Kit.text(ctx, "⭐".repeat(stars) + "☆".repeat(3 - stars), W / 2, H / 2, 54, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || running || winT || ink <= 0) return; const p = Kit.point(cv, e); cur = [[p.x, p.y]]; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (!cur) return; const p = Kit.point(cv, e), l = cur[cur.length - 1], d = Math.hypot(p.x - l[0], p.y - l[1]); if (d < 6) return; if (d > ink) return; if (Math.hypot(p.x - ball.x, p.y - ball.y) < BR + 4) return; ink -= d; cur.push([p.x, p.y]); });
+        cv.addEventListener("pointerup", () => { if (cur && cur.length > 1) { lines.push(cur); beep(700, 0.03, "sine", 0.02); } cur = null; });
+        cv.style.touchAction = "none";
+        const bar = document.createElement("div"); bar.className = "ibbar"; bar.innerHTML = `<button id="goBtn" class="btn">${T("▶ Go", "▶ שחרור")}</button><button id="undoBtn" class="btn ghost">${T("↶ Undo line", "↶ ביטול קו")}</button><button id="clearBtn" class="btn ghost">${T("🗑 Clear", "🗑 ניקוי")}</button><button id="skipBtn" class="btn ghost">${T("⏭ Level list", "⏭ שלבים")}</button>`; cv.parentElement.after(bar);
+        $("goBtn").onclick = () => (running ? reset() : go());
+        $("undoBtn").onclick = () => { if (running) reset(); const l = lines.pop(); if (l) for (let i = 1; i < l.length; i++) ink += Math.hypot(l[i][0] - l[i - 1][0], l[i][1] - l[i - 1][1]); };
+        $("clearBtn").onclick = () => { if (lv !== undefined) load(lv); };
+        $("skipBtn").onclick = () => { if (lv === undefined) return; const max = +(localStorage.getItem("inkbridgeLevel") || 0); load((lv + 1) % (Math.min(LV.length - 1, max) + 1)); };
+        Kit.onKeys({ Space: "go", KeyZ: "undo", KeyR: "reset", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "go") running ? reset() : go(); if (a === "undo") $("undoBtn").click(); if (a === "reset") $("clearBtn").click(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = () => { localStorage.setItem("inkbridgeLevel", 0); start(); };
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); $("goBtn").textContent = running ? T("⟲ Reset ball", "⟲ איפוס כדור") : T("▶ Go", "▶ שחרור"); if (winT) { winT -= dt; if (winT <= 0) { winT = 0; if (lv + 1 >= LV.length) { state = "over"; $("overText").innerHTML = `${T("You finished every level!", "סיימתם את כל השלבים!")} ⭐ ${total}`; Kit.show("over"); } else load(lv + 1); } } draw(); }).start();
+        if (window.__test) window.__test.ink = { get s() { return { state, lv, running, ball: ball && [Math.round(ball.x), Math.round(ball.y)] }; }, start, load, line: (pts) => { lines.push(pts); }, go };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Ink Bridge</h2><p>A drawing physics puzzle. Each page of the notebook has a red ball, a golden cup and some grey walls. Draw your own lines with the pen: they become solid ramps, slides, bridges and bumpers. Press Go and gravity takes over. If the ball rolls into the cup, you win the page. Ink is limited, so short clever lines earn three stars. Eight levels to solve, and your progress is saved.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Draw with mouse / finger</td><td>Make a line</td></tr><tr><td>Space / ▶ Go</td><td>Drop the ball (or reset it)</td></tr><tr><td>Z</td><td>Undo last line</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The ball must arrive slowly enough to stay in the cup.</li><li>You can draw while the ball is waiting, not while it's rolling.</li><li>Undo gives back the ink of that line.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Ink Bridge</h3><p>Ink Bridge is about slopes. A ramp tilted gently guides the ball where you want it. A steep ramp makes it fast, which is good for jumping gaps but bad for landing in the cup, because a fast ball bounces out.</p><p>Think about where the ball needs to end, then work backwards. The last line should drop the ball softly into the cup, the line before that should carry it there, and so on.</p><p>Fewer, shorter lines earn more stars. Once you've solved a level, try again with less ink. Sometimes one well-placed line is all you need.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Solve 3 levels.</li><li><b>Getting good:</b> Get 3 stars on a level.</li><li><b>Expert:</b> Solve all 8 levels.</li></ul><h3>Did you know?</h3><p>Engineers who design roller coasters think about the same thing as this game: how slopes turn height into speed.</p><h3>Questions players ask</h3><h4>The ball bounced out of the cup!</h4><p>It was going too fast. Make the last slope gentler.</p><h4>Can I change my lines?</h4><p>Yes: press Undo line, or Clear to start the level over.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/AlienInvaders/invaders">Alien Invaders</a><a href="/Jigsaw/jigsaw">Jigsaw</a><a href="/LightsOut/lightsout">Lights Out</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

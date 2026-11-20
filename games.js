@@ -136,6 +136,8 @@ export const GAMES = {
     timeloop: { name: "Time Loop", path: "/TimeLoop/timeloop", img: "/thumbs/timeloop.png", tags: ["arcade", "brain"], desc: "Every 8 seconds time rewinds, and your past selves replay as ghosts!", isNew: true },
     orbitbuilder: { name: "Orbit Builder", path: "/OrbitBuilder/orbit", img: "/thumbs/orbitbuilder.png", tags: ["physics", "creative"], desc: "Throw moons into orbit around a planet and build your own solar system.", isNew: true },
     mirrortwins: { name: "Mirror Twins", path: "/MirrorTwins/mirrortwins", img: "/thumbs/mirrortwins.png", tags: ["puzzle", "brain"], desc: "Move two twins at once: one copies you, the other moves in a mirror!", isNew: true },
+    inkbridge: { name: "Ink Bridge", path: "/InkBridge/inkbridge", img: "/thumbs/inkbridge.png", tags: ["puzzle", "physics", "creative"], desc: "Draw ramps and bridges with your pen to roll the ball into the cup.", isNew: true },
+    weatherwizard: { name: "Weather Wizard", path: "/WeatherWizard/weatherwizard", img: "/thumbs/weatherwizard.png", tags: ["strategy", "creative"], desc: "Control the weather! Rain, sunshine and wind to grow a garden and stop the storms.", isNew: true },
 };
 
 // Games that only count plays (no score)
