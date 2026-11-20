@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A physics demolition game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Castle Smash · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Castle <span>Smash</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="shots">3</b><small>Stones</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="880" height="520"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Castle Smash</h2>
+                <p id="startText">Press anywhere and drag backwards, like pulling a slingshot. Let go to fling a stone!<br>Knock out every green goblin. Hit them directly, drop blocks on them, or make them fall. Glass breaks easily, wood takes a couple of hits, and stone is tough. Unused stones give bonus points.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Aim for the supports at the bottom. When they break, everything on top comes crashing down.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Castle Smash — sling stones at block castles to knock out the goblins. Blocks fall when their support breaks
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "castlesmashBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const GROUND = H - 50, SX = 140, SY = GROUND - 110, G = 700;
+        let blocks, gobs, shots, stone, drag = null, level, score, state = "ready", fx = Kit.particles(), endT = 0, trail = [];
+        Kit.stat("best", Kit.best(BEST));
+        const MAT = { wood: ["#b07a45", 2], stone: ["#8a8fa3", 4], glass: ["#9fe3ff", 1] };
+        function B(x, y, w, h, m) { return { x, y: GROUND - y - h, w, h, m, hp: MAT[m][1], vy: 0, vx: 0 }; }
+        const LV = [
+            () => [[B(600, 0, 20, 80, "wood"), B(680, 0, 20, 80, "wood"), B(590, 80, 120, 20, "wood")], [[650, 0], [650, 100]]],
+            () => [[B(560, 0, 20, 90, "wood"), B(640, 0, 20, 90, "wood"), B(550, 90, 120, 18, "wood"), B(720, 0, 20, 90, "glass"), B(800, 0, 20, 90, "glass"), B(710, 90, 120, 18, "glass")], [[600, 0], [760, 0], [760, 108]]],
+            () => [[B(580, 0, 24, 70, "stone"), B(700, 0, 24, 70, "stone"), B(570, 70, 160, 20, "wood"), B(600, 90, 20, 70, "wood"), B(680, 90, 20, 70, "wood"), B(590, 160, 120, 20, "glass")], [[650, 0], [650, 90], [650, 180]]],
+            () => { const b = []; for (let i = 0; i < 4; i++) { b.push(B(540 + i * 80, 0, 20, 60, i % 2 ? "glass" : "wood")); } b.push(B(530, 60, 280, 18, "stone")); b.push(B(600, 78, 20, 60, "wood"), B(720, 78, 20, 60, "wood"), B(590, 138, 160, 18, "wood")); return [b, [[580, 0], [660, 0], [740, 0], [660, 156]]]; },
+            () => { const b = []; for (let k = 0; k < 3; k++) { const y = k * 80; b.push(B(560 + k * 30, y, 20, 62, "stone"), B(760 - k * 30, y, 20, 62, "stone"), B(550 + k * 30, y + 62, 240 - k * 60, 18, k === 2 ? "glass" : "wood")); } return [b, [[670, 0], [670, 80], [670, 160], [670, 240]]]; },
+        ];
+        function load() { const [b, g] = LV[(level - 1) % LV.length](); blocks = b; gobs = g.map(([x, y]) => ({ x, y: GROUND - y - 14, vy: 0, r: 14, alive: true })); shots = 3 + Math.floor(level / 2); stone = null; endT = 0; trail = []; Kit.stat("level", level); Kit.stat("shots", shots); }
+        function start() { level = 1; score = 0; state = "play"; load(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function launch(dx, dy) { if (stone || shots <= 0 || state !== "play") return; const p = Math.min(130, Math.hypot(dx, dy)); if (p < 15) return; const a = Math.atan2(-dy, -dx); stone = { x: SX, y: SY, vx: Math.cos(a) * p * 7.2, vy: Math.sin(a) * p * 7.2, r: 11, life: 6 }; shots--; Kit.stat("shots", shots); trail = []; beep(250, 0.15, "triangle", 0.05, 300); }
+        function hitBlock(b, force) { const dmg = force > 700 ? 3 : force > 400 ? 2 : force > 160 ? 1 : 0; if (!dmg) return; b.hp -= dmg; if (b.hp <= 0) { b.dead = true; score += 50; fx.burst(b.x + b.w / 2, b.y + b.h / 2, MAT[b.m][0], 16, 3); beep(b.m === "glass" ? 1400 : b.m === "stone" ? 120 : 260, 0.1, b.m === "glass" ? "square" : "sawtooth", 0.04); } else beep(200, 0.04, "square", 0.02); Kit.stat("score", score); }
+        function update(dt) {
+            if (stone) {
+                const s = stone, n = 4, h = dt / n;
+                for (let i = 0; i < n; i++) {
+                    s.vy += G * h; s.x += s.vx * h; s.y += s.vy * h;
+                    for (const b of blocks) {
+                        if (b.dead) continue; const cx = Math.max(b.x, Math.min(s.x, b.x + b.w)), cy = Math.max(b.y, Math.min(s.y, b.y + b.h)), dx = s.x - cx, dy = s.y - cy;
+                        if (dx * dx + dy * dy < s.r * s.r) { const sp = Math.hypot(s.vx, s.vy); hitBlock(b, sp); if (b.dead) { s.vx *= 0.7; s.vy *= 0.7; } else { if (Math.abs(dx) > Math.abs(dy)) { s.vx *= -0.3; s.x = cx + Math.sign(dx || -1) * s.r; b.vx += Math.sign(s.vx || 1) * -sp * 0.02; } else { s.vy *= -0.3; s.y = cy + Math.sign(dy || -1) * s.r; } s.vx *= 0.8; } }
+                    }
+                    for (const g of gobs) if (g.alive && Math.hypot(g.x - s.x, g.y - s.y) < g.r + s.r) kill(g);
+                    if (s.y > GROUND - s.r) { s.y = GROUND - s.r; s.vy *= -0.3; s.vx *= 0.7; }
+                }
+                trail.push([s.x, s.y]); s.life -= dt; if (s.life <= 0 || s.x > W + 50 || s.x < -50 || Math.hypot(s.vx, s.vy) < 15) stone = null;
+            }
+            // gravity for blocks and goblins (simple stacking)
+            blocks = blocks.filter((b) => !b.dead);
+            for (const b of blocks.sort((a, b) => b.y - a.y)) {
+                b.vy += G * dt; let ny = b.y + b.vy * dt, floor = GROUND;
+                for (const o of blocks) if (o !== b && o.x < b.x + b.w - 2 && o.x + o.w > b.x + 2 && o.y >= b.y + b.h - 1) floor = Math.min(floor, o.y);
+                if (ny + b.h >= floor) { if (b.vy > 260) hitBlock(b, b.vy * 0.8); ny = floor - b.h; b.vy = 0; }
+                b.y = ny; b.x += b.vx * dt; b.vx *= 0.9;
+            }
+            for (const g of gobs) {
+                if (!g.alive) continue; g.vy += G * dt; let ny = g.y + g.vy * dt, floor = GROUND;
+                for (const o of blocks) if (o.x < g.x + g.r && o.x + o.w > g.x - g.r && o.y >= g.y + g.r - 2) floor = Math.min(floor, o.y);
+                if (ny + g.r >= floor) { if (g.vy > 330) kill(g); ny = floor - g.r; g.vy = 0; } g.y = ny;
+                for (const o of blocks) if (o.vy > 200 && o.x < g.x + g.r && o.x + o.w > g.x - g.r && o.y + o.h > g.y - g.r && o.y < g.y) kill(g);
+            }
+            if (!gobs.some((g) => g.alive) && !endT) { endT = 1.5; const bonus = shots * 200; score += 500 + bonus; Kit.stat("score", score); tune([523, 659, 784, 1047], 0.08, "square", 0.05); }
+            if (endT) { endT -= dt; if (endT <= 0) { if (level >= LV.length) return finish(true); level++; load(); } }
+            else if (!stone && shots <= 0 && gobs.some((g) => g.alive)) { if (!update.wait) update.wait = 1.5; update.wait -= dt; if (update.wait <= 0) { update.wait = 0; finish(false); } }
+        }
+        function kill(g) { if (!g.alive) return; g.alive = false; score += 300; Kit.stat("score", score); fx.burst(g.x, g.y, "#7ad94a", 24, 4); beep(500, 0.15, "square", 0.05, -300); }
+        function finish(won) { state = "over"; Kit.save(Math.floor(score / 10)); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${won ? T("Every castle smashed! 🏰💥", "כל הטירות נופצו! 🏰💥") : T("Out of stones!", "נגמרו האבנים!")}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#9fd8ff"); g.addColorStop(1, "#e6f6ff"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#b8d98a"; ctx.beginPath(); ctx.ellipse(250, GROUND + 20, 420, 120, 0, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = "#6fae4a"; ctx.fillRect(0, GROUND, W, H - GROUND);
+            if (!blocks) return;
+            for (const b of blocks) { ctx.fillStyle = MAT[b.m][0]; ctx.globalAlpha = b.m === "glass" ? 0.75 : 1; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.globalAlpha = 1; ctx.strokeStyle = "#0004"; ctx.lineWidth = 2; ctx.strokeRect(b.x, b.y, b.w, b.h); if (b.hp < MAT[b.m][1]) { ctx.strokeStyle = "#0008"; ctx.beginPath(); ctx.moveTo(b.x + 3, b.y + 3); ctx.lineTo(b.x + b.w * 0.6, b.y + b.h * 0.5); ctx.lineTo(b.x + b.w - 3, b.y + b.h - 4); ctx.stroke(); } }
+            for (const g2 of gobs) if (g2.alive) { ctx.fillStyle = "#7ad94a"; ctx.beginPath(); ctx.arc(g2.x, g2.y, g2.r, 0, 7); ctx.fill(); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(g2.x - 5, g2.y - 3, 4, 0, 7); ctx.arc(g2.x + 5, g2.y - 3, 4, 0, 7); ctx.fill(); ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(g2.x - 6, g2.y - 3, 2, 0, 7); ctx.arc(g2.x + 4, g2.y - 3, 2, 0, 7); ctx.fill(); ctx.fillStyle = "#4a8a2a"; ctx.beginPath(); ctx.moveTo(g2.x - 12, g2.y - 8); ctx.lineTo(g2.x - 18, g2.y - 18); ctx.lineTo(g2.x - 6, g2.y - 12); ctx.moveTo(g2.x + 12, g2.y - 8); ctx.lineTo(g2.x + 18, g2.y - 18); ctx.lineTo(g2.x + 6, g2.y - 12); ctx.fill(); }
+            ctx.fillStyle = "#ffffff99"; trail.forEach(([x, y], i) => i % 3 === 0 && (ctx.beginPath(), ctx.arc(x, y, 2.5, 0, 7), ctx.fill()));
+            // slingshot
+            ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(SX, GROUND); ctx.lineTo(SX, SY + 30); ctx.lineTo(SX - 16, SY); ctx.moveTo(SX, SY + 30); ctx.lineTo(SX + 16, SY); ctx.stroke();
+            let lx = SX, ly = SY; if (drag && drag.cur) { const dx = drag.cur.x - drag.x, dy = drag.cur.y - drag.y, p = Math.min(130, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); lx = SX + Math.cos(a) * p * 0.6; ly = SY + Math.sin(a) * p * 0.6;
+                const v = p * 7.2, aa = Math.atan2(-dy, -dx); let x = SX, y = SY, vx = Math.cos(aa) * v, vy = Math.sin(aa) * v; ctx.fillStyle = "#0004"; for (let i = 0; i < 18; i++) { for (let k = 0; k < 3; k++) { vy += G * 0.012; x += vx * 0.012; y += vy * 0.012; } ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill(); } }
+            ctx.strokeStyle = "#3a2a1a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(SX - 16, SY); ctx.lineTo(lx, ly); ctx.lineTo(SX + 16, SY); ctx.stroke();
+            if (!stone && shots > 0 && state === "play") { ctx.fillStyle = "#6a6f80"; ctx.beginPath(); ctx.arc(lx, ly, 11, 0, 7); ctx.fill(); }
+            if (stone) { ctx.fillStyle = "#6a6f80"; ctx.beginPath(); ctx.arc(stone.x, stone.y, stone.r, 0, 7); ctx.fill(); }
+            for (let i = 0; i < shots - (stone || !state ? 0 : 1); i++) { ctx.fillStyle = "#6a6f80"; ctx.beginPath(); ctx.arc(40 + i * 26, GROUND + 25, 9, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}/${LV.length}`, 20, 34, 20, "#1a2a4a", "left");
+            Kit.text(ctx, String(score), W - 20, 34, 22, "#1a2a4a", "right", "'Press Start 2P', monospace", 400);
+            if (endT) Kit.text(ctx, T("Castle cleared! 🎉", "הטירה נוקתה! 🎉"), W / 2, 120, 30, "#1a2a4a", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play" || stone) return; const p = Kit.point(cv, e); drag = { x: p.x, y: p.y, cur: p }; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (drag) drag.cur = Kit.point(cv, e); });
+        cv.addEventListener("pointerup", () => { if (drag && drag.cur) launch(drag.cur.x - drag.x, drag.cur.y - drag.y); drag = null; });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.cs = { get s() { return { state, level, score, gobs: gobs && gobs.filter((g) => g.alive).length, shots }; }, start, launch };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Castle Smash</h2><p>A physics demolition game. Goblins have built little castles out of glass, wood and stone, and you have a slingshot and a few stones. Drag back to aim, and the dotted line shows the start of the stone's path. Smash the blocks so the castle collapses, and knock out every goblin to win the level. Goblins are knocked out by a direct hit, by a falling block, or by falling from a height. Five castles to conquer.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag back and let go</td><td>Fling a stone</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Glass breaks in one hit, wood in two, stone in four.</li><li>Knocking out supports brings the whole tower down.</li><li>Each stone you don't use is worth 200 bonus points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Castle Smash</h3><p>Castle Smash is about finding the weak point. Instead of aiming straight at a goblin, look at what's holding it up. Breaking a supporting pillar makes everything above it fall, and falling blocks knock out goblins below and around them.</p><p>Stronger shots break more. A stone flying fast does much more damage than a slow one, so pull back far for heavy materials like stone. A gentle lob is enough to shatter glass.</p><p>You have a limited number of stones, and each one you save is worth 200 points. Take your time to line up every shot using the dotted path.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear the first castle.</li><li><b>Getting good:</b> Clear a castle with one stone.</li><li><b>Expert:</b> Smash all 5 castles.</li></ul><h3>Did you know?</h3><p>Real catapults and trebuchets were used for hundreds of years to attack castles. The biggest trebuchets could throw stones heavier than a car.</p><h3>Questions players ask</h3><h4>How do I aim?</h4><p>Press anywhere, drag away from the castle, and let go. Further = stronger.</p><h4>How do I knock out a goblin?</h4><p>Hit it with a stone, drop a block on it, or make it fall from high up.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/CellEater/celleater">Cell Eater</a><a href="/ColorHop/colorhop">Color Hop</a><a href="/Darts/darts">Darts</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

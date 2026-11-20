@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A relaxing jigsaw puzzle. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Jigsaw · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Jig<span>saw</span></h1>
+        <div class="stats"><div class="stat"><b id="left">16</b><small>Pieces left</small></div><div class="stat"><b id="best">-</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="900" height="480"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Jigsaw</h2>
+                <p id="startText"><span class="seg" id="size"><button data-n="3">9 pieces</button><button data-n="4" class="on">16 pieces</button><button data-n="5">25 pieces</button><button data-n="6">36 pieces</button></span>Drag the pieces from the right into the frame. When a piece is close to its spot, it snaps into place.<br>The faint picture in the frame shows where things go. Every puzzle is a new picture!</p>
+                <button class="btn" id="startBtn">🧩 Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Puzzle complete!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🧩 Next puzzle</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Start with the edge pieces (the ones with a flat side), then fill in the middle.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Jigsaw — drag real jigsaw-shaped pieces into place. Pictures are painted by the game, so every puzzle is new
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "jigsawBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const PW = 480, PH = 360, BX = 40, BY = 60;
+        let n = 4, pic, pieces, drag = null, state = "ready", time = 0, done = 0, theme = 0, sizeBtn;
+        Kit.stat("best", Kit.best(BEST) ? Kit.best(BEST) + "s" : "-");
+        document.querySelectorAll("#size button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#size button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); n = +b.dataset.n; }));
+        function paint(th) {
+            const c = document.createElement("canvas"); c.width = PW; c.height = PH; const g = c.getContext("2d"), R = Math.random;
+            if (th === 0) { // sunset mountains & lake
+                const s = g.createLinearGradient(0, 0, 0, PH); s.addColorStop(0, "#ff7e5f"); s.addColorStop(0.55, "#feb47b"); s.addColorStop(0.56, "#3a6ea5"); s.addColorStop(1, "#1d3b5a"); g.fillStyle = s; g.fillRect(0, 0, PW, PH);
+                g.fillStyle = "#fff3b0"; g.beginPath(); g.arc(PW * (0.3 + R() * 0.4), PH * 0.42, 40, 0, 7); g.fill();
+                for (const [col, h] of [["#6b4c7a", 0.25], ["#4a3560", 0.35], ["#2e2245", 0.45]]) { g.fillStyle = col; g.beginPath(); g.moveTo(0, PH * 0.56); let x = 0; while (x < PW) { x += 40 + R() * 60; g.lineTo(x, PH * (0.56 - h * (0.5 + R() * 0.5))); x += 40 + R() * 40; g.lineTo(x, PH * 0.56 - R() * 20); } g.lineTo(PW, PH * 0.56); g.fill(); }
+                g.fillStyle = "#ffffff44"; for (let i = 0; i < 20; i++) g.fillRect(R() * PW, PH * 0.6 + R() * PH * 0.35, 30 + R() * 50, 2);
+            } else if (th === 1) { // underwater
+                const s = g.createLinearGradient(0, 0, 0, PH); s.addColorStop(0, "#2ec4f1"); s.addColorStop(1, "#06305a"); g.fillStyle = s; g.fillRect(0, 0, PW, PH);
+                g.fillStyle = "#e8d29a"; g.beginPath(); g.moveTo(0, PH); for (let x = 0; x <= PW; x += 20) g.lineTo(x, PH - 40 - Math.sin(x / 50) * 12); g.lineTo(PW, PH); g.fill();
+                for (let i = 0; i < 7; i++) { const x = R() * PW; g.strokeStyle = ["#2ea84a", "#5cd65c", "#a64dff"][i % 3]; g.lineWidth = 8; g.beginPath(); g.moveTo(x, PH - 40); for (let y = PH - 40; y > PH - 140 - R() * 80; y -= 10) g.lineTo(x + Math.sin(y / 15) * 10, y); g.stroke(); }
+                for (let i = 0; i < 9; i++) { const x = R() * PW, y = 40 + R() * (PH - 140), s2 = 14 + R() * 18, col = ["#ff9a3c", "#ffc94d", "#ff4d6d", "#ff4dd2"][i % 4]; g.fillStyle = col; g.beginPath(); g.ellipse(x, y, s2, s2 * 0.6, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(x - s2, y); g.lineTo(x - s2 * 1.6, y - s2 * 0.6); g.lineTo(x - s2 * 1.6, y + s2 * 0.6); g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.arc(x + s2 * 0.5, y - 3, 3, 0, 7); g.fill(); }
+                g.fillStyle = "#ffffff55"; for (let i = 0; i < 30; i++) { g.beginPath(); g.arc(R() * PW, R() * PH, 2 + R() * 5, 0, 7); g.fill(); }
+            } else if (th === 2) { // city at night
+                g.fillStyle = "#0b1030"; g.fillRect(0, 0, PW, PH); for (let i = 0; i < 80; i++) { g.fillStyle = "#fff"; g.fillRect(R() * PW, R() * PH * 0.5, 1.5, 1.5); }
+                g.fillStyle = "#f6f1d5"; g.beginPath(); g.arc(PW * 0.8, 60, 30, 0, 7); g.fill();
+                let x = 0; while (x < PW) { const w = 30 + R() * 50, h = 80 + R() * 200; g.fillStyle = ["#1d2450", "#262e63", "#2f3876"][Math.floor(R() * 3)]; g.fillRect(x, PH - h, w, h); for (let wy = PH - h + 8; wy < PH - 8; wy += 14) for (let wx = x + 5; wx < x + w - 8; wx += 10) if (R() < 0.45) { g.fillStyle = ["#ffd95a", "#ffb84d", "#9fe3ff"][Math.floor(R() * 3)]; g.fillRect(wx, wy, 5, 7); } x += w + 2; }
+            } else { // flower meadow
+                const s = g.createLinearGradient(0, 0, 0, PH); s.addColorStop(0, "#8fd3ff"); s.addColorStop(0.5, "#d4f0ff"); s.addColorStop(0.51, "#7cc46a"); s.addColorStop(1, "#3f8a3a"); g.fillStyle = s; g.fillRect(0, 0, PW, PH);
+                g.fillStyle = "#ffe14d"; g.beginPath(); g.arc(70, 60, 34, 0, 7); g.fill();
+                for (let i = 0; i < 4; i++) { const cx = R() * PW, cy = 40 + R() * 80; g.fillStyle = "#fff"; g.beginPath(); g.arc(cx, cy, 18, 0, 7); g.arc(cx + 20, cy - 8, 22, 0, 7); g.arc(cx + 42, cy, 18, 0, 7); g.fill(); }
+                for (let i = 0; i < 70; i++) { const x = R() * PW, y = PH * 0.55 + R() * PH * 0.45, s2 = 4 + (y / PH) * 8, col = ["#ff4d6d", "#ffc94d", "#ff4dd2", "#fff", "#a64dff"][i % 5]; g.strokeStyle = "#2a6a2a"; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + s2 * 2); g.stroke(); g.fillStyle = col; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x + Math.cos(k * 1.26) * s2, y + Math.sin(k * 1.26) * s2, s2 * 0.7, 0, 7); g.fill(); } g.fillStyle = "#ffe14d"; g.beginPath(); g.arc(x, y, s2 * 0.6, 0, 7); g.fill(); }
+            }
+            return c;
+        }
+        function start() {
+            theme = (theme + 1) % 4; pic = paint(theme); const pw = PW / n, ph = PH / n;
+            const hor = Array.from({ length: n + 1 }, (_, r) => Array.from({ length: n }, () => (r === 0 || r === n ? 0 : Math.random() < 0.5 ? 1 : -1)));
+            const ver = Array.from({ length: n }, () => Array.from({ length: n + 1 }, (_, c) => (c === 0 || c === n ? 0 : Math.random() < 0.5 ? 1 : -1)));
+            pieces = [];
+            for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+                const p = { r, c, top: -hor[r][c], bottom: hor[r + 1][c], left: -ver[r][c], right: ver[r][c + 1], placed: false, w: pw, h: ph };
+                p.tx = BX + c * pw; p.ty = BY + r * ph;
+                // scatter on the right tray (and some below)
+                p.x = PW + BX + 30 + Math.random() * (W - PW - BX - 30 - pw - 20); p.y = 50 + Math.random() * (H - ph - 70);
+                p.img = cut(p); pieces.push(p);
+            }
+            pieces.sort(() => Math.random() - 0.5); time = 0; done = 0; state = "play"; Kit.stat("left", pieces.length); Kit.hide("start"); Kit.hide("over");
+        }
+        function shape(g, p, ox, oy) {
+            const { w, h } = p, t = Math.min(w, h) * 0.22;
+            const edge = (x1, y1, x2, y2, s) => { if (!s) { g.lineTo(x2, y2); return; } const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len, nx = uy * s, ny = -ux * s; const P = (a, b) => [x1 + ux * a + nx * b, y1 + uy * a + ny * b]; const L = len;
+                g.lineTo(...P(L * 0.35, 0)); g.bezierCurveTo(...P(L * 0.4, 0), ...P(L * 0.32, t), ...P(L * 0.5, t)); g.bezierCurveTo(...P(L * 0.68, t), ...P(L * 0.6, 0), ...P(L * 0.65, 0)); g.lineTo(x2, y2); };
+            g.beginPath(); g.moveTo(ox, oy); edge(ox, oy, ox + w, oy, p.top); edge(ox + w, oy, ox + w, oy + h, p.right); edge(ox + w, oy + h, ox, oy + h, p.bottom); edge(ox, oy + h, ox, oy, p.left); g.closePath();
+        }
+        function cut(p) {
+            const pad = Math.min(p.w, p.h) * 0.3, c = document.createElement("canvas"); c.width = p.w + pad * 2; c.height = p.h + pad * 2; const g = c.getContext("2d");
+            shape(g, p, pad, pad); g.save(); g.clip(); g.drawImage(pic, -(p.c * p.w) + pad, -(p.r * p.h) + pad); g.restore(); g.strokeStyle = "#0005"; g.lineWidth = 1.5; shape(g, p, pad, pad); g.stroke(); p.pad = pad; return c;
+        }
+        function hit(px, py) { for (let i = pieces.length - 1; i >= 0; i--) { const p = pieces[i]; if (p.placed) continue; if (px > p.x && px < p.x + p.w && py > p.y && py < p.y + p.h) return i; } return -1; }
+        function draw() {
+            ctx.fillStyle = "#1e2240"; ctx.fillRect(0, 0, W, H);
+            if (!pieces) return;
+            ctx.fillStyle = "#2a2f57"; ctx.fillRect(BX, BY, PW, PH); ctx.globalAlpha = 0.12; ctx.drawImage(pic, BX, BY); ctx.globalAlpha = 1; ctx.strokeStyle = "#ffffff33"; ctx.strokeRect(BX, BY, PW, PH);
+            for (const p of pieces) if (p.placed) ctx.drawImage(p.img, p.tx - p.pad, p.ty - p.pad);
+            for (const p of pieces) if (!p.placed) { if (p === (drag && drag.p)) { ctx.shadowColor = "#000"; ctx.shadowBlur = 16; } ctx.drawImage(p.img, p.x - p.pad, p.y - p.pad); ctx.shadowBlur = 0; }
+            Kit.text(ctx, `${Math.floor(time)}s`, BX, 40, 20, "#fff", "left");
+            Kit.text(ctx, `${done}/${pieces.length}`, BX + PW, 40, 20, "#ffc94d", "right");
+        }
+        cv.addEventListener("pointerdown", (e) => { if (state !== "play") return; const pt = Kit.point(cv, e), i = hit(pt.x, pt.y); if (i < 0) return; const p = pieces.splice(i, 1)[0]; pieces.push(p); drag = { p, dx: pt.x - p.x, dy: pt.y - p.y }; cv.setPointerCapture(e.pointerId); beep(500, 0.02, "sine", 0.02); });
+        cv.addEventListener("pointermove", (e) => { if (!drag) return; const pt = Kit.point(cv, e); drag.p.x = pt.x - drag.dx; drag.p.y = pt.y - drag.dy; });
+        cv.addEventListener("pointerup", () => {
+            if (!drag) return; const p = drag.p; drag = null;
+            if (Math.hypot(p.x - p.tx, p.y - p.ty) < Math.min(p.w, p.h) * 0.3) { p.x = p.tx; p.y = p.ty; p.placed = true; done++; Kit.stat("left", pieces.length - done); beep(700, 0.06, "triangle", 0.04); if (done === pieces.length) win(); }
+        });
+        cv.style.touchAction = "none";
+        function win() { state = "over"; tune([523, 659, 784, 1047, 1319], 0.09, "square", 0.05); const t = Math.round(time); Kit.save(n * n * 5); const key = BEST + n; const prev = +localStorage.getItem(key) || 0; const best = !prev || t < prev ? t : prev; localStorage.setItem(key, best); Kit.stat("best", best + "s"); setTimeout(() => { $("overText").innerHTML = `${T("Puzzle complete!", "הפאזל הושלם!")} 🧩<br>${n * n} ${T("pieces in", "חלקים ב-")} ${t}s · ${T("best", "שיא")} ${best}s`; Kit.show("over"); }, 900); }
+        Kit.onKeys({ Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") time += dt; draw(); }).start();
+        if (window.__test) window.__test.jig = { get s() { return { state, done, total: pieces && pieces.length }; }, start, solveAll: () => { pieces.forEach((p) => { p.x = p.tx; p.y = p.ty; p.placed = true; }); done = pieces.length; win(); } };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Jigsaw</h2><p>A relaxing jigsaw puzzle. The game paints a picture (a sunset over a lake, an underwater reef, a city at night, or a flower meadow), then cuts it into real jigsaw-shaped pieces with tabs and slots. Drag each piece into the frame. A faint copy of the picture shows where things belong, and pieces snap into place when they're close. Pick 9, 16, 25 or 36 pieces.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag</td><td>Move a piece</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Flat-sided pieces go on the edges.</li><li>Corner pieces have two flat sides.</li><li>Group pieces by colour first.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Jigsaw</h3><p>Jigsaw puzzlers almost always start with the edges. Pieces with one flat side belong on the border, and pieces with two flat sides are the corners. Building the frame first gives you a shape to fill in.</p><p>Next, sort by colour. Sky pieces are usually lighter, ground or water pieces darker. The faint picture in the frame is a guide, so match the colours of a piece to the area where it looks the same.</p><p>Take your time. There's a timer if you want a challenge, but jigsaws are also great for relaxing. Try 9 pieces for a quick puzzle or 36 for a long one.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Finish a 9-piece puzzle.</li><li><b>Getting good:</b> Finish a 25-piece puzzle.</li><li><b>Expert:</b> Finish a 36-piece puzzle.</li></ul><h3>Did you know?</h3><p>The first jigsaw puzzles were made around 1760 by a London mapmaker. He glued maps onto wood and cut them along country borders to help children learn geography.</p><h3>Questions players ask</h3><h4>How do pieces snap?</h4><p>Drop a piece near its correct spot and it clicks into place.</p><h4>Is the picture always the same?</h4><p>No, the game paints a new version each time and rotates through four scenes.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/KnifeThrow/knifethrow">Knife Throw</a><a href="/LightsOut/lightsout">Lights Out</a><a href="/MemoryGrid/memorygrid">Memory Grid</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
