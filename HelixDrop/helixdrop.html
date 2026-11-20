@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A bouncy falling game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Helix Drop · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Helix <span>Drop</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Helix Drop</h2>
+                <p id="startText">Drag left and right (or use the arrow keys) to spin the tower. Line up the gaps so the bouncing ball falls through!<br>Don't land on the red pieces. Fall through 3 rings in a row and you smash straight through the next one!</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Spin early. Line the next gap up while the ball is still bouncing on the ring above it.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Helix Drop — spin the tower and let the ball fall through the gaps
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "helixdropBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const SEG = 12, GAPY = 120, R = 150, CX = W / 2;
+        let rings, ang, ball, camY, score, level, state = "ready", combo, fx = Kit.particles(), drag = null, splats = [], passed, hue;
+        Kit.stat("best", Kit.best(BEST));
+        function makeRing(i) {
+            if (i === 0) return { y: 0, seg: new Array(SEG).fill(1).map((v, k) => (k === 6 || k === 7 ? 0 : 1)) };
+            const seg = new Array(SEG).fill(1), gap = Kit.randi(0, SEG - 1), gw = Kit.randi(2, 3);
+            for (let k = 0; k < gw; k++) seg[(gap + k) % SEG] = 0;
+            const reds = Math.min(4, Math.floor(level / 2) + (i > 2 ? Kit.randi(0, 2) : 0));
+            for (let k = 0; k < reds; k++) { const p = Kit.randi(0, SEG - 1); if (seg[p] === 1) seg[p] = 2; }
+            return { y: i * GAPY, seg };
+        }
+        function newLevel() { const n = 12 + level * 3; rings = []; for (let i = 0; i < n; i++) rings.push(makeRing(i)); rings.push({ y: n * GAPY, seg: new Array(SEG).fill(3), goal: true }); ball = { y: -60, vy: 0 }; camY = -200; ang = 0; combo = 0; passed = 0; hue = Kit.randi(0, 360); Kit.stat("level", level); }
+        function start() { level = 1; score = 0; state = "play"; splats = []; newLevel(); Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        const segAt = (ring) => { const a = ((-ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), k = Math.floor((a + Math.PI / 2) / (Math.PI * 2 / SEG)) % SEG; return ring.seg[k]; };
+        function update(dt) {
+            if (Kit.keys.has("left")) ang -= dt * 3.2; if (Kit.keys.has("right")) ang += dt * 3.2;
+            ball.vy += 1500 * dt; const prev = ball.y; ball.y += ball.vy * dt;
+            for (const r of rings) {
+                if (r.broken || prev > r.y - 12 || ball.y < r.y - 12) continue;
+                const s = r.goal ? 3 : segAt(r);
+                if (s === 0) { r.broken = true; passed++; combo++; score += combo; Kit.stat("score", score); beep(300 + combo * 60, 0.04, "triangle", 0.04); fx.burst(CX, r.y - camY + 160, `hsl(${hue + r.y / 4},80%,60%)`, 8, 2); continue; }
+                if (s === 3) { score += 20 * level; Kit.stat("score", score); tune([523, 659, 784, 1047], 0.08, "square", 0.05); level++; Kit.save(score); Kit.setBest(BEST, score); newLevel(); return; }
+                if (combo >= 3 && s !== 3) { r.broken = true; passed++; combo = 0; score += 5; Kit.stat("score", score); fx.burst(CX, r.y - camY + 160, "#ffffff", 30, 5); beep(120, 0.2, "square", 0.05); ball.y = r.y - 12; ball.vy = -500; continue; }
+                if (s === 2) return gameOver();
+                ball.y = r.y - 12; ball.vy = -560; combo = 0; splats.push({ y: r.y, a: -ang, c: `hsl(${hue + 180},90%,60%)`, t: 1 }); beep(220, 0.03, "sine", 0.03);
+            }
+            camY += (Math.max(camY, ball.y - 120) - camY) * Math.min(1, dt * 10);
+        }
+        function gameOver() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); beep(100, 0.4, "sawtooth", 0.06, -60); fx.burst(CX, ball.y - camY + 160, "#ff4d6d", 30, 4); setTimeout(() => { $("overText").innerHTML = `${T("You hit a red piece!", "פגעתם בחלק אדום!")}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 700); }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, `hsl(${hue || 250},45%,22%)`); g.addColorStop(1, "#0b0d1a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!rings) return;
+            ctx.fillStyle = "#ffffff22"; ctx.fillRect(CX - 16, 0, 32, H);
+            const off = 160 - camY;
+            for (const r of rings) {
+                const y = r.y + off; if (y < -40 || y > H + 40 || r.broken) continue;
+                // draw back half then front half of the ring as an ellipse split into segments
+                for (const front of [false, true]) for (let k = 0; k < SEG; k++) {
+                    const a0 = (k / SEG) * Math.PI * 2 + ang - Math.PI / 2, a1 = a0 + Math.PI * 2 / SEG, mid = (a0 + a1) / 2;
+                    if ((Math.sin(mid) > 0) !== front) continue;
+                    const s = r.seg[k]; if (!s) continue;
+                    ctx.fillStyle = s === 2 ? "#ff3b4d" : s === 3 ? "#ffc94d" : `hsl(${hue + r.y / 6},70%,${front ? 62 : 45}%)`;
+                    ctx.beginPath(); ctx.ellipse(CX, y, R, R * 0.32, 0, a0, a1); ctx.ellipse(CX, y + 14, R, R * 0.32, 0, a1, a0, true); ctx.closePath(); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(CX, y, R, R * 0.32, 0, a0, a1); ctx.lineTo(CX + Math.cos(a1) * 40, y + Math.sin(a1) * 13); ctx.lineTo(CX + Math.cos(a0) * 40, y + Math.sin(a0) * 13); ctx.closePath(); ctx.fill();
+                }
+            }
+            for (const s of splats) { const y = s.y + off, a = s.a + ang; if (Math.sin(a + Math.PI / 2) > 0.3) { ctx.fillStyle = s.c; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.ellipse(CX + Math.cos(a + Math.PI / 2) * R * 0.8, y + Math.sin(a + Math.PI / 2) * R * 0.25, 12, 5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; } }
+            if (state !== "over") { const by = ball.y + off, sq = ball.vy < -400 ? 0.85 : 1; ctx.fillStyle = `hsl(${hue + 180},90%,62%)`; ctx.beginPath(); ctx.ellipse(CX, by + R * 0.32 - 2, 13 / sq, 13 * sq, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#ffffff99"; ctx.beginPath(); ctx.arc(CX - 4, by + R * 0.32 - 7, 4, 0, 7); ctx.fill(); }
+            fx.draw(ctx);
+            Kit.text(ctx, String(score), W / 2, 50, 36, "#fff", "center", "'Press Start 2P', monospace", 400);
+            const total = rings.length - 1; ctx.fillStyle = "#ffffff22"; Kit.rr(ctx, 60, 80, W - 120, 10, 5); ctx.fill(); ctx.fillStyle = "#ffc94d"; Kit.rr(ctx, 60, 80, (W - 120) * Math.min(1, passed / total), 10, 5); ctx.fill();
+            Kit.text(ctx, String(level), 44, 85, 14, "#fff", "center"); Kit.text(ctx, String(level + 1), W - 44, 85, 14, "#fff", "center");
+            if (combo >= 2 && state === "play") Kit.text(ctx, `🔥 x${combo}`, W / 2, H - 40, 22, "#ffc94d", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { drag = { x: Kit.point(cv, e).x, a: ang }; cv.setPointerCapture(e.pointerId); });
+        cv.addEventListener("pointermove", (e) => { if (drag) ang = drag.a + (Kit.point(cv, e).x - drag.x) * 0.012; });
+        cv.addEventListener("pointerup", () => (drag = null));
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "left", ArrowRight: "right", KeyA: "left", KeyD: "right", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); fx.update(dt); splats.forEach((s) => (s.t -= dt * 0.1)); splats = splats.filter((s) => s.t > 0).slice(-40); draw(); }).start();
+        if (window.__test) window.__test.helix = { get s() { return { state, score, level }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Helix Drop</h2><p>A bouncy falling game. A ball bounces on a tall spiral tower made of rings, and every ring has a gap. Spin the tower so the gap lines up under the ball and it drops to the next ring. Red pieces end your run, but if you fall through three rings in a row, the ball becomes powerful enough to smash through anything. Reach the golden ring at the bottom to finish the level.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Drag left or right</td><td>Spin the tower</td></tr><tr><td>⬅ ➡ or A D</td><td>Spin the tower</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Watch for red pieces right next to the gap.</li><li>Falling through 3 rings in a row smashes the next one, even red!</li><li>Small, careful spins are safer than big ones.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Helix Drop</h3><p>Helix Drop is about timing your spins. The ball only checks the ring under it at the moment it lands, so you have the whole bounce to line up the next gap. Start turning as soon as the ball leaves a ring.</p><p>Red pieces are the danger. Before you spin a gap under the ball, check which pieces will pass under it on the way. Turning the long way around can be safer than going past a red piece.</p><p>Combos are your secret weapon. If you fall through three rings in a row without bouncing, the ball smashes the next ring whatever it's made of, red pieces included. Chaining falls is also worth more points.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Finish level 1.</li><li><b>Getting good:</b> Reach level 4, where red pieces get more common.</li><li><b>Expert:</b> Smash through a red ring with a combo.</li></ul><h3>Did you know?</h3><p>A helix is a shape like a spring or a spiral staircase. DNA, the code inside living cells, is shaped like a double helix.</p><h3>Questions players ask</h3><h4>What ends the game?</h4><p>Landing on a red piece, unless you're on a combo of three falls.</p><h4>How do I finish a level?</h4><p>Fall all the way to the golden ring at the bottom.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/KnifeThrow/knifethrow">Knife Throw</a><a href="/Mancala/mancala">Mancala</a><a href="/Reversi/reversi">Reversi</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

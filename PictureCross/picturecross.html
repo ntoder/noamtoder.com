@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A picture logic puzzle, also called a nonogram. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Picture Cross · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Picture <span>Cross</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Picture</small></div><div class="stat"><b id="mistakes">0</b><small>Mistakes</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="620" height="660"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Picture Cross</h2>
+                <p id="startText">The numbers next to each row and above each column tell you how many squares in a row to paint, in order. For example, “3 1” means a group of 3, a gap, then 1.<br>Paint the right squares to reveal the hidden picture! Switch to ✖ to mark squares you know are empty.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Start with the biggest numbers. A row of 8 with the clue 8 is completely full, and a clue of 6 always fills the middle 4 squares.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Picture Cross — paint the grid using the number clues to reveal a picture
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "picturecrossBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const PICS = [
+            ["Heart", "#ff4d6d", ["01100110", "11111111", "11111111", "11111111", "01111110", "00111100", "00011000", "00000000"]],
+            ["Smile", "#ffc94d", ["00111100", "01000010", "10100101", "10000001", "10100101", "10011001", "01000010", "00111100"]],
+            ["Arrow", "#4da3ff", ["00010000", "00011000", "11111100", "11111110", "11111100", "00011000", "00010000", "00000000"]],
+            ["House", "#ff8a3d", ["00011000", "00111100", "01111110", "11111111", "01100110", "01100110", "01111110", "00000000"]],
+            ["Cat", "#b07cff", ["10000001", "11000011", "11111111", "10111101", "11111111", "11011011", "01100110", "00111100"]],
+            ["Tree", "#2ee6a0", ["00011000", "00111100", "01111110", "00111100", "01111110", "11111111", "00011000", "00011000"]],
+            ["Rocket", "#ff4d6d", ["0000110000", "0001111000", "0011111100", "0011011100", "0011111100", "0011111100", "0111111110", "1101111011", "1000110001", "0000110000"]],
+            ["Star", "#ffc94d", ["0000110000", "0000110000", "0001111000", "1111111111", "0111111110", "0011111100", "0011111100", "0111001110", "0110000110", "1100000011"]],
+            ["Duck", "#ffc94d", ["0001110000", "0011111000", "0011101110", "0011111111", "0001110000", "1001111110", "1111111111", "0111111110", "0011111100", "0000000000"]],
+            ["Fish", "#4de8ff", ["0000000000", "0001111000", "1011111100", "1111110110", "1111111111", "1111111111", "1011111100", "0001111000", "0000000000", "0000000000"]],
+            ["Mushroom", "#ff4d6d", ["0001111000", "0111111110", "1110110111", "1111111111", "1101111011", "0111111110", "0001111000", "0001111000", "0011111100", "0000000000"]],
+            ["Robot", "#9aa0b5", ["0000110000", "0001111000", "0111111110", "0110110110", "0111111110", "0110000110", "0111111110", "0010000100", "0110000110", "0000000000"]]
+        ];
+        const HE = { Heart: "לב", Smile: "חיוך", Arrow: "חץ", House: "בית", Cat: "חתול", Tree: "עץ", Rocket: "טיל", Star: "כוכב", Duck: "ברווז", Fish: "דג", Mushroom: "פטרייה", Robot: "רובוט" };
+        let lvl = 0, sol, n, g, mode = 1, state = "ready", mistakes = 0, score = 0, won = 0, painting = null;
+        Kit.stat("best", Kit.best(BEST));
+        const clue = (arr) => { const out = []; let k = 0; for (const v of arr) { if (v) k++; else if (k) { out.push(k); k = 0; } } if (k) out.push(k); return out.length ? out : [0]; };
+        function load() {
+            const p = PICS[lvl % PICS.length]; sol = p[2].map((r) => [...r].map(Number)); n = sol.length;
+            g = Array.from({ length: n }, () => new Array(n).fill(0)); mistakes = 0; won = 0;
+            Kit.stat("level", lvl + 1); Kit.stat("mistakes", 0);
+        }
+        const rowsC = () => sol.map(clue), colsC = () => sol[0].map((_, c) => clue(sol.map((r) => r[c])));
+        const layout = () => { const cs = Math.min(46, 420 / n), ox = W - 40 - cs * n, oy = H - 90 - cs * n; return { cs, ox, oy }; };
+        function mark(r, c, how) {
+            if (g[r][c] || won) return;
+            if (how === 1) { if (sol[r][c]) { g[r][c] = 1; beep(600, 0.03, "triangle", 0.03); } else { g[r][c] = 2; mistakes++; Kit.stat("mistakes", mistakes); beep(160, 0.1, "sawtooth", 0.04); } }
+            else { if (!sol[r][c]) g[r][c] = 2; else { g[r][c] = 1; mistakes++; Kit.stat("mistakes", mistakes); beep(160, 0.1, "sawtooth", 0.04); } }
+            // auto-cross finished lines
+            for (let i = 0; i < n; i++) { if (sol[i].every((v, j) => !v || g[i][j] === 1)) for (let j = 0; j < n; j++) if (!g[i][j]) g[i][j] = 2; if (sol.every((row, j) => !row[i] || g[j][i] === 1)) for (let j = 0; j < n; j++) if (!g[j][i]) g[j][i] = 2; }
+            if (sol.every((row, i) => row.every((v, j) => !v || g[i][j] === 1))) {
+                won = 1; const pts = n * n * 3 + Math.max(0, 5 - mistakes) * 40; score += pts; Kit.stat("score", score); Kit.save(score); Kit.setBest(BEST, score);
+                tune([523, 659, 784, 1047], 0.08, "square", 0.05); setTimeout(() => { lvl++; load(); }, 2200);
+            }
+        }
+        function start() { lvl = 0; score = 0; state = "play"; Kit.stat("score", 0); load(); Kit.hide("start"); Kit.hide("over"); }
+        function draw() {
+            ctx.fillStyle = "#0b0d1a"; ctx.fillRect(0, 0, W, H);
+            if (!g) return;
+            const { cs, ox, oy } = layout(), col = PICS[lvl % PICS.length][1];
+            const rc = rowsC(), cc = colsC();
+            rc.forEach((cl, r) => Kit.text(ctx, cl.join("  "), ox - 10, oy + r * cs + cs / 2, Math.min(16, cs * 0.42), "#cfd2f5", "right"));
+            cc.forEach((cl, c) => cl.slice().reverse().forEach((v, k) => Kit.text(ctx, String(v), ox + c * cs + cs / 2, oy - 14 - k * 20, Math.min(16, cs * 0.42), "#cfd2f5", "center")));
+            for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+                const x = ox + c * cs, y = oy + r * cs, v = g[r][c];
+                ctx.fillStyle = v === 1 ? col : "#1a1f45"; ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+                if (v === 2) { ctx.strokeStyle = "#ff4d6d88"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + cs * 0.3, y + cs * 0.3); ctx.lineTo(x + cs * 0.7, y + cs * 0.7); ctx.moveTo(x + cs * 0.7, y + cs * 0.3); ctx.lineTo(x + cs * 0.3, y + cs * 0.7); ctx.stroke(); }
+            }
+            ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 2; for (let i = 0; i <= n; i += n === 10 ? 5 : 4) { ctx.beginPath(); ctx.moveTo(ox + i * cs, oy); ctx.lineTo(ox + i * cs, oy + n * cs); ctx.moveTo(ox, oy + i * cs); ctx.lineTo(ox + n * cs, oy + i * cs); ctx.stroke(); }
+            // mode switch
+            const by = H - 64;
+            [[1, "⬛ " + T("Paint", "צביעה")], [2, "✖ " + T("Cross", "סימון")]].forEach(([m, l], i) => { ctx.fillStyle = mode === m ? "#7c5cff" : "#2a2f6a"; Kit.rr(ctx, W / 2 - 160 + i * 170, by, 150, 46, 12); ctx.fill(); Kit.text(ctx, l, W / 2 - 85 + i * 170, by + 23, 16, "#fff", "center"); });
+            Kit.text(ctx, `${T("Picture", "תמונה")} ${lvl + 1}`, 30, 34, 22, "#fff", "left", "'Press Start 2P', monospace", 400);
+            if (won) { const nm = PICS[lvl % PICS.length][0]; Kit.text(ctx, `${T("It's a", "זה")} ${T(nm, HE[nm])}! 🎉`, 30, 74, 22, "#2ee6a0", "left"); }
+        }
+        function cellAt(p) { const { cs, ox, oy } = layout(), c = Math.floor((p.x - ox) / cs), r = Math.floor((p.y - oy) / cs); return r >= 0 && r < n && c >= 0 && c < n ? [r, c] : null; }
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play") return; const p = Kit.point(cv, e);
+            if (p.y > H - 70) { mode = p.x < W / 2 ? 1 : 2; return; }
+            const cl = cellAt(p); if (!cl) return; painting = e.button === 2 ? 2 : mode; mark(cl[0], cl[1], painting); cv.setPointerCapture(e.pointerId);
+        });
+        cv.addEventListener("pointermove", (e) => { if (!painting) return; const cl = cellAt(Kit.point(cv, e)); if (cl) mark(cl[0], cl[1], painting); });
+        cv.addEventListener("pointerup", () => (painting = null));
+        cv.addEventListener("contextmenu", (e) => e.preventDefault());
+        Kit.onKeys({ KeyX: "x", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "x") mode = mode === 1 ? 2 : 1; });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.pcross = { get s() { return { g, sol }; }, mark, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Picture Cross</h2><p>A picture logic puzzle, also called a nonogram. Every row and column has number clues saying how many squares are painted and in what groups. Use logic to work out which squares to fill, and a little pixel picture appears: a heart, a cat, a rocket and more. Mistakes are shown straight away, so it's friendly for beginners.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap (drag for many)</td><td>Paint or cross out squares</td></tr><tr><td>Right-click or X</td><td>Cross out / switch mode</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Rows with a 0 clue are completely empty.</li><li>Big clues overlap in the middle: those squares must be painted.</li><li>Cross out squares you know are empty to keep track.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Picture Cross</h3><p>Start with the easy lines. A clue of 0 means the whole line is empty, and a clue equal to the line's length means it's completely full. Mark those first.</p><p>Next, use overlap. If a line is 8 long and the clue is 6, the group of 6 must cover the middle 4 squares, no matter where it starts. The same trick works with several groups: add them up with one gap between each, and see how much room is left over.</p><p>Crossing out empty squares is just as important as painting. Every square you cross out makes the other clues easier to solve, and finished lines are crossed out for you automatically.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Finish the 8 by 8 pictures without mistakes.</li><li><b>Getting good:</b> Solve the first 10 by 10 picture.</li><li><b>Expert:</b> Complete all twelve pictures.</li></ul><h3>Did you know?</h3><p>Picture logic puzzles were invented in Japan in the late 1980s and became popular around the world in newspapers, just like crosswords and sudoku.</p><h3>Questions players ask</h3><h4>What happens if I make a mistake?</h4><p>The square shows as a cross and counts as a mistake. Fewer mistakes give a bigger bonus.</p><h4>Can I drag to paint?</h4><p>Yes, hold and drag across squares to paint or cross out several at once.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/PipeConnect/pipeconnect">Pipe Connect</a><a href="/SlidePuzzle/slidepuzzle">Slide Puzzle</a><a href="/WordScramble/wordscramble">Word Scramble</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

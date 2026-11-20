@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A cute stacking puzzle with fruit, flowers, cars and more. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Tile Match · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Tile <span>Match</span></h1>
+        <div class="stats"><div class="stat"><b id="level">1</b><small>Level</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="520" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Tile Match</h2>
+                <p id="startText">Tap a tile to move it into the tray at the bottom. When three of the same tile are in the tray, they disappear!<br>Only tiles that aren't covered can be picked. Clear the whole board, but don't let the tray fill up with 7 tiles.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Before you tap, look for pairs you can complete. Never put a third different kind into an almost-full tray.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Tile Match — tap tiles into the tray; three of a kind disappear
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "tilematchBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const ICONS = ["🍎", "🍋", "🍇", "🍉", "🍓", "🥕", "🌽", "🍄", "🌸", "⭐", "🐟", "🦋", "🍩", "🧁", "⚽", "🎈", "🚗", "🔔"];
+        const TS = 62, TRAY = 7;
+        let tiles, tray, level = 1, score = 0, state = "ready", fly = [], undoLeft, shuffleLeft;
+        Kit.stat("best", Kit.best(BEST));
+        function newLevel() {
+            const kinds = Math.min(ICONS.length, 5 + level), sets = 6 + level * 2;
+            const pool = []; for (let s = 0; s < sets; s++) { const ic = ICONS[s % kinds]; pool.push(ic, ic, ic); }
+            pool.sort(() => Math.random() - 0.5);
+            tiles = []; let z = 0;
+            const layers = Math.min(5, 2 + Math.floor(level / 2));
+            while (pool.length) {
+                for (let L = 0; L < layers && pool.length; L++) {
+                    const cols = 7 - (L % 2), rows = 6 - (L % 2), off = (L % 2) * TS / 2;
+                    const cells = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([r, c]);
+                    cells.sort(() => Math.random() - 0.5);
+                    for (const [r, c] of cells.slice(0, Math.ceil(pool.length / (layers - L)))) { if (!pool.length) break; tiles.push({ ic: pool.pop(), x: 40 + off + c * TS, y: 110 + off + r * TS, z: z++, L }); }
+                }
+            }
+            tray = []; undoLeft = 2; shuffleLeft = 1; Kit.stat("level", level);
+        }
+        const overlap = (a, b) => Math.abs(a.x - b.x) < TS - 4 && Math.abs(a.y - b.y) < TS - 4;
+        const free = (t) => !tiles.some((o) => o !== t && o.z > t.z && overlap(o, t));
+        function pick(t) {
+            if (tray.length >= TRAY || !free(t)) return;
+            tiles = tiles.filter((o) => o !== t);
+            // keep same icons together in the tray
+            const i = tray.map((x) => x.ic).lastIndexOf(t.ic); const pos = i >= 0 ? i + 1 : tray.length;
+            tray.splice(pos, 0, { ic: t.ic, from: { x: t.x, y: t.y }, t: 0, src: t });
+            beep(560, 0.04, "triangle", 0.03);
+            const same = tray.filter((x) => x.ic === t.ic);
+            if (same.length === 3) setTimeout(() => { tray = tray.filter((x) => x.ic !== t.ic); score += 30; Kit.stat("score", score); tune([660, 880], 0.05, "square", 0.04); checkEnd(); }, 220);
+            else if (tray.length >= TRAY) setTimeout(checkEnd, 260);
+        }
+        function checkEnd() {
+            if (!tiles.length && !tray.length) { score += 200 + level * 50; Kit.stat("score", score); Kit.save(score); Kit.setBest(BEST, score); tune([523, 659, 784, 1047], 0.08, "square", 0.05); level++; newLevel(); return; }
+            if (tray.length >= TRAY) { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); $("overText").innerHTML = `${T("The tray is full!", "המגש מלא!")}<br>${T("Level", "שלב")} ${level} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; tune([392, 330, 262], 0.14, "triangle", 0.05); Kit.show("over"); }
+        }
+        function undo() { if (!undoLeft || !tray.length || state !== "play") return; const t = tray.pop(); tiles.push(t.src); undoLeft--; }
+        function shuffle() { if (!shuffleLeft || state !== "play") return; const ics = tiles.map((t) => t.ic).sort(() => Math.random() - 0.5); tiles.forEach((t, i) => (t.ic = ics[i])); shuffleLeft--; }
+        function start() { level = 1; score = 0; state = "play"; Kit.stat("score", 0); newLevel(); Kit.hide("start"); Kit.hide("over"); }
+        const BTN = { undo: { x: 40, y: H - 56, w: 160, h: 42 }, shuf: { x: W - 200, y: H - 56, w: 160, h: 42 } };
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#2a1f5a"); g.addColorStop(1, "#0b0d1a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            if (!tiles) return;
+            Kit.text(ctx, `${T("Level", "שלב")} ${level}`, W / 2, 40, 24, "#fff", "center", "'Press Start 2P', monospace", 400);
+            Kit.text(ctx, `${tiles.length} ${T("tiles left", "אריחים נשארו")}`, W / 2, 76, 14, "#9aa0c8", "center");
+            for (const t of tiles.slice().sort((a, b) => a.z - b.z)) {
+                const f = free(t);
+                ctx.fillStyle = "#00000055"; Kit.rr(ctx, t.x + 3, t.y + 5, TS - 4, TS - 4, 10); ctx.fill();
+                ctx.fillStyle = f ? "#fff7e6" : "#a9a3b8"; Kit.rr(ctx, t.x, t.y, TS - 4, TS - 4, 10); ctx.fill();
+                ctx.fillStyle = f ? "#e8d9b8" : "#8a849a"; ctx.fillRect(t.x + 2, t.y + TS - 12, TS - 8, 6);
+                ctx.globalAlpha = f ? 1 : 0.55; Kit.text(ctx, t.ic, t.x + (TS - 4) / 2, t.y + (TS - 4) / 2 - 2, 32, "#000", "center"); ctx.globalAlpha = 1;
+            }
+            // tray
+            const tx = (W - TRAY * (TS + 4)) / 2, ty = H - 150;
+            ctx.fillStyle = "#6b4425"; Kit.rr(ctx, tx - 10, ty - 10, TRAY * (TS + 4) + 16, TS + 20, 14); ctx.fill();
+            for (let i = 0; i < TRAY; i++) { ctx.fillStyle = "#4a2f18"; Kit.rr(ctx, tx + i * (TS + 4), ty, TS, TS, 8); ctx.fill(); }
+            tray.forEach((t, i) => { t.t = Math.min(1, t.t + 0.12); const x = t.from.x + (tx + i * (TS + 4) - t.from.x) * t.t, y = t.from.y + (ty - t.from.y) * t.t; ctx.fillStyle = "#fff7e6"; Kit.rr(ctx, x + 2, y + 2, TS - 4, TS - 4, 10); ctx.fill(); Kit.text(ctx, t.ic, x + TS / 2, y + TS / 2, 32, "#000", "center"); });
+            [[BTN.undo, `↶ ${T("Undo", "ביטול")} (${undoLeft})`], [BTN.shuf, `🔀 ${T("Shuffle", "ערבוב")} (${shuffleLeft})`]].forEach(([b, l]) => { ctx.fillStyle = "#2a2f6a"; Kit.rr(ctx, b.x, b.y, b.w, b.h, 12); ctx.fill(); Kit.text(ctx, l, b.x + b.w / 2, b.y + b.h / 2, 15, "#fff", "center"); });
+        }
+        const inB = (p, b) => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
+        cv.addEventListener("pointerdown", (e) => {
+            if (state !== "play") return; const p = Kit.point(cv, e);
+            if (inB(p, BTN.undo)) return undo(); if (inB(p, BTN.shuf)) return shuffle();
+            const hit = tiles.filter((t) => p.x > t.x && p.x < t.x + TS - 4 && p.y > t.y && p.y < t.y + TS - 4).sort((a, b) => b.z - a.z)[0];
+            if (hit) { if (free(hit)) pick(hit); else beep(150, 0.05, "square", 0.02); }
+        });
+        Kit.onKeys({ Enter: "enter" }, () => { if (state !== "play") start(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.tiles = { get s() { return { tiles, tray }; }, pick, free, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Tile Match</h2><p>A cute stacking puzzle with fruit, flowers, cars and more. The tiles are piled up in layers, and you can only take the ones on top. Tap a tile to send it to the tray, and whenever three matching tiles meet in the tray, they vanish. Clear every tile to win the level, but if the tray fills up with seven tiles, the game is over.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Click or tap a tile</td><td>Move it to the tray</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Grab tiles that finish a pair in the tray first.</li><li>Uncover tiles under the stack before the tray gets crowded.</li><li>Save the Shuffle for when you're stuck.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Tile Match</h3><p>The tray is your most important resource. Every different kind of tile you put in it takes up space until you find its two partners. Try to keep no more than two or three kinds in the tray at the same time.</p><p>Before tapping, look at what's already in the tray and search the board for matching tiles that are free. Completing a set clears three spaces at once. If no match is free, pick a tile that uncovers lots of tiles underneath.</p><p>Use Undo when a move goes wrong, and keep the Shuffle for emergencies, when none of the free tiles match anything.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear level 1 without using Undo.</li><li><b>Getting good:</b> Reach level 4 with more layers.</li><li><b>Expert:</b> Beat level 8 with a full stack of icons.</li></ul><h3>Did you know?</h3><p>Tile-matching games go back to the old Chinese game of mahjong, which uses 144 tiles. Mahjong solitaire, where you match pairs of tiles from a pile, became a computer game in 1981.</p><h3>Questions players ask</h3><h4>Why can't I pick some tiles?</h4><p>Greyed-out tiles are covered by tiles above them. Clear the ones on top first.</p><h4>What does Shuffle do?</h4><p>It swaps the pictures on the tiles left on the board. You get one per level.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/Noametry/noametry">Noametry</a><a href="/Breakout/breakout">Brick Smash</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

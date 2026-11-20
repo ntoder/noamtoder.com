@@ -75,6 +75,10 @@ export const GAMES = {
     wordscramble: { name: "Word Scramble", path: "/WordScramble/wordscramble", img: "/thumbs/wordscramble.png", tags: ["word", "brain"], desc: "Unscramble as many words as you can in 90 seconds.", isNew: true },
     pipeconnect: { name: "Pipe Connect", path: "/PipeConnect/pipeconnect", img: "/thumbs/pipeconnect.png", tags: ["puzzle", "brain"], desc: "Turn the pipes so water reaches every tile.", isNew: true },
     trafficjam: { name: "Traffic Jam", path: "/TrafficJam/trafficjam", img: "/thumbs/trafficjam.png", tags: ["puzzle", "brain"], desc: "Slide the cars out of the way to free the red car.", isNew: true },
+    picturecross: { name: "Picture Cross", path: "/PictureCross/picturecross", img: "/thumbs/picturecross.png", tags: ["puzzle", "brain"], desc: "Use the number clues to paint a hidden picture.", isNew: true },
+    tilematch: { name: "Tile Match", path: "/TileMatch/tilematch", img: "/thumbs/tilematch.png", tags: ["puzzle"], desc: "Tap tiles into the tray. Three of a kind disappear!", isNew: true },
+    helixdrop: { name: "Helix Drop", path: "/HelixDrop/helixdrop", img: "/thumbs/helixdrop.png", tags: ["arcade"], desc: "Spin the tower and drop the ball through the gaps.", isNew: true },
+    knifethrow: { name: "Knife Throw", path: "/KnifeThrow/knifethrow", img: "/thumbs/knifethrow.png", tags: ["arcade"], desc: "Stick every knife in the spinning log.", isNew: true },
 };
 
 // Games that only count plays (no score)

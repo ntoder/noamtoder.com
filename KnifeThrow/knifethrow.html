@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A one-tap timing game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Knife Throw · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Knife <span>Throw</span></h1>
+        <div class="stats"><div class="stat"><b id="stage">1</b><small>Stage</small></div><div class="stat"><b id="score">0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="760"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Knife Throw</h2>
+                <p id="startText">Tap (or press Space) to throw a knife at the spinning log. Throw all your knives to break the log and move on!<br>But don't hit a knife that's already stuck. Hit the red apples for bonus points. Every fifth log is a tricky boss.</p>
+                <button class="btn" id="startBtn">▶ Play</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">↻ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Wait for a big empty space to spin toward the bottom, then throw. On speed-changing logs, throw when it slows down.</p>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Knife Throw — stick every knife in the spinning log without hitting another
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "knifethrowBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const LX = W / 2, LY = 270, LR = 105, KL = 90;
+        let stuck, apples, left, ang, spin, t, flying, stage, score, state = "ready", fx = Kit.particles(), shake = 0, bounce = null, broken = null, boss;
+        Kit.stat("best", Kit.best(BEST));
+        function newStage() {
+            boss = stage % 5 === 0;
+            left = Math.min(12, 5 + Math.floor(stage / 2) + (boss ? 2 : 0));
+            stuck = []; const pre = Math.min(4, Math.floor((stage - 1) / 2));
+            for (let i = 0; i < pre; i++) stuck.push({ a: (i / pre) * Math.PI * 2 + Math.random(), pre: true });
+            apples = []; if (Math.random() < 0.7) apples.push({ a: Math.random() * Math.PI * 2 });
+            ang = 0; t = 0; spin = (boss ? 2.4 : 1.5 + stage * 0.08) * (Math.random() < 0.5 ? 1 : -1); flying = null; broken = null;
+            Kit.stat("stage", stage);
+        }
+        function start() { stage = 1; score = 0; state = "play"; Kit.stat("score", 0); newStage(); Kit.hide("start"); Kit.hide("over"); }
+        function speed() { return boss ? spin * (1 + Math.sin(t * 1.3) * 0.9) : stage > 3 ? spin * (1 + Math.sin(t * 0.8) * 0.5) : spin; }
+        function throwKnife() { if (state !== "play" || flying || bounce || broken || left <= 0) return; flying = { y: H - 120 }; left--; beep(700, 0.04, "sine", 0.03, 200); }
+        function hit() {
+            const a = (Math.PI / 2 - ang + Math.PI * 4) % (Math.PI * 2);
+            for (const k of stuck) { const d = Math.abs(Math.atan2(Math.sin(k.a - a), Math.cos(k.a - a))); if (d < 0.17) { bounce = { y: LY + LR, vy: 600, r: 0 }; flying = null; beep(1200, 0.08, "square", 0.05); shake = 0.3; return fail(); } }
+            for (const ap of apples) { const d = Math.abs(Math.atan2(Math.sin(ap.a - a), Math.cos(ap.a - a))); if (d < 0.25 && !ap.got) { ap.got = true; score += 25; tune([880, 1320], 0.05, "square", 0.04); const [x, y] = [LX + Math.cos(ap.a + ang) * (LR + 14), LY + Math.sin(ap.a + ang) * (LR + 14)]; fx.burst(x, y, "#ff4d6d", 14, 3); } }
+            stuck.push({ a }); flying = null; score += 1; Kit.stat("score", score); shake = 0.12; beep(240, 0.05, "triangle", 0.05);
+            fx.burst(LX, LY + LR, "#c8925a", 6, 2);
+            if (!left) { broken = { t: 0 }; score += stage * 10; Kit.stat("score", score); tune([523, 659, 784, 1047], 0.07, "square", 0.05); setTimeout(() => { stage++; newStage(); }, 1300); }
+        }
+        function fail() { state = "over"; Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${T("Clang! You hit another knife.", "קלאנג! פגעתם בסכין אחרת.")}<br>${T("Stage", "שלב")} ${stage} · ${score} ${T("points", "נקודות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 900); }
+        function knife(x, y, a, alpha = 1) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#e8ecf5"; ctx.beginPath(); ctx.moveTo(0, -KL * 0.55); ctx.lineTo(9, -KL * 0.05); ctx.lineTo(-9, -KL * 0.05); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#9aa0b5"; ctx.fillRect(-9, -KL * 0.05, 18, 8);
+            ctx.fillStyle = "#5a3b22"; Kit.rr(ctx, -6, KL * 0.04, 12, KL * 0.42, 4); ctx.fill();
+            ctx.restore(); ctx.globalAlpha = 1;
+        }
+        function draw() {
+            ctx.fillStyle = "#14112b"; ctx.fillRect(0, 0, W, H);
+            if (!stuck) return;
+            ctx.save(); if (shake > 0) ctx.translate(Kit.rand(-4, 4), Kit.rand(-4, 4));
+            // knives stuck in the log
+            for (const k of stuck) { const a = k.a + ang; knife(LX + Math.cos(a) * (LR + KL * 0.32), LY + Math.sin(a) * (LR + KL * 0.32), a + Math.PI / 2 + Math.PI); }
+            for (const ap of apples) if (!ap.got) { const a = ap.a + ang, x = LX + Math.cos(a) * (LR + 14), y = LY + Math.sin(a) * (LR + 14); ctx.fillStyle = "#ff3b4d"; ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fill(); ctx.fillStyle = "#2ee6a0"; ctx.beginPath(); ctx.ellipse(x + 3, y - 13, 5, 3, -0.5, 0, 7); ctx.fill(); }
+            if (broken) { broken.t += 0.016; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.6, d = broken.t * 300; ctx.fillStyle = "#b07a45"; ctx.beginPath(); ctx.moveTo(LX + Math.cos(a) * d, LY + Math.sin(a) * d + broken.t * broken.t * 400); ctx.arc(LX + Math.cos(a) * d, LY + Math.sin(a) * d + broken.t * broken.t * 400, LR, a - 0.7, a + 0.7); ctx.fill(); } }
+            else {
+                ctx.save(); ctx.translate(LX, LY); ctx.rotate(ang);
+                ctx.fillStyle = boss ? "#6b3a8a" : "#b07a45"; ctx.beginPath(); ctx.arc(0, 0, LR, 0, 7); ctx.fill();
+                ctx.strokeStyle = boss ? "#4a2366" : "#8a5a2b"; ctx.lineWidth = 3; for (let r = 25; r < LR; r += 22) { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); }
+                ctx.fillStyle = boss ? "#4a2366" : "#8a5a2b"; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill();
+                ctx.restore();
+            }
+            if (flying) knife(LX, flying.y, 0);
+            if (bounce) knife(LX + bounce.r * 40, bounce.y, bounce.r);
+            if (!flying && !bounce && left > 0 && state === "play" && !broken) knife(LX, H - 120, 0);
+            ctx.restore();
+            fx.draw(ctx);
+            for (let i = 0; i < left; i++) { ctx.fillStyle = "#e8ecf5"; ctx.fillRect(30, H - 60 - i * 26, 8, 18); ctx.fillStyle = "#5a3b22"; ctx.fillRect(30, H - 42 - i * 26, 8, 4); }
+            Kit.text(ctx, boss ? T("⚔️ BOSS LOG", "⚔️ בול בוס") : `${T("Stage", "שלב")} ${stage}`, W / 2, 50, 22, boss ? "#ff8fa3" : "#fff", "center", "'Press Start 2P', monospace", 400);
+        }
+        cv.addEventListener("pointerdown", throwKnife);
+        Kit.onKeys({ Space: "t", ArrowUp: "t", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); else if (a === "t") throwKnife(); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => {
+            if (stuck) {
+                t += dt; if (!broken) ang += speed() * dt;
+                if (flying) { flying.y -= 2600 * dt; if (flying.y <= LY + LR + KL * 0.32) hit(); }
+                if (bounce) { bounce.vy += 2000 * dt; bounce.y += bounce.vy * dt; bounce.r += dt * 8; if (bounce.y > H + 100) bounce = null; }
+            }
+            if (shake > 0) shake -= dt; fx.update(dt); draw();
+        }).start();
+        if (window.__test) window.__test.knife = { get s() { return { state, stage, left }; }, throwKnife, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Knife Throw</h2><p>A one-tap timing game. A wooden log spins at the top of the screen, and you throw knives at it from below. Each knife sticks where it lands and spins around with the log, so the space fills up fast. Hit an old knife and it's game over. Later logs speed up, slow down and change direction, and every fifth stage is a boss log.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap, click or Space</td><td>Throw a knife</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Throw into the biggest gap.</li><li>Count the beat: logs that change speed follow a rhythm.</li><li>Apples are worth 25 points.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Knife Throw</h3><p>Knife Throw is all about timing. The knife flies straight up and hits the bottom of the log, so watch the bottom edge. When a big empty space is about to arrive there, throw. With practice you'll learn how early to tap for the speed of the log.</p><p>As more knives stick, the gaps shrink. Spread your knives out evenly instead of bunching them up, so there's always room for the last few. Knives that start in the log (on later stages) need extra care.</p><p>Boss logs and later stages change speed and even direction. Instead of chasing the log, find the moment it slows down and throw then.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Clear the first boss log on stage 5.</li><li><b>Getting good:</b> Reach stage 10.</li><li><b>Expert:</b> Hit every apple on a stage.</li></ul><h3>Did you know?</h3><p>Real knife throwing is a sport with world championships. Throwers stand at set distances and count how many times the knife spins in the air before it hits.</p><h3>Questions players ask</h3><h4>What ends the game?</h4><p>A thrown knife hitting a knife that's already in the log.</p><h4>What are the boss logs?</h4><p>Every fifth stage the log is purple, faster and changes speed a lot.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/LightsOut/lightsout">Lights Out</a><a href="/PictureCross/picturecross">Picture Cross</a><a href="/SlidePuzzle/slidepuzzle">Slide Puzzle</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
