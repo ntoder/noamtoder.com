@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A logic puzzle based on a famous board game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Code Breaker · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Code <span>Breaker</span></h1>
+        <div class="stats"><div class="stat"><b id="tries">0/10</b><small>Tries</small></div><div class="stat"><b id="best">-</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="600" height="680"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Code Breaker</h2>
+                <p id="startText"><span class="seg" id="diff"><button data-d="4,5,10">Easy</button><button data-d="4,6,10" class="on">Normal</button><button data-d="5,8,12">Hard</button></span>The computer picks a secret code of coloured pegs (colours can repeat). Tap colours to make a guess, then press ✓ Check.<br>⚫ means a peg is the right colour in the right place. ⚪ means right colour, wrong place. Use the clues to crack the code in as few tries as you can!</p>
+                <button class="btn" id="startBtn">🔐 Start</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🔐 New code</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    
+    <p class="hint">Start with guesses that test several colours at once, like two reds and two blues.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Code Breaker — Mastermind: guess the secret colour code using black/white peg clues
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "codebreakerBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const COLS = ["#ff4d6d", "#ffc94d", "#2ee6a0", "#2a74ff", "#a64dff", "#ff9a3c", "#ffffff", "#ff4dd2"];
+        let n = 4, nc = 6, tries = 10, secret, rows, cur, state = "ready", reveal = false, wins = 0, dup = true;
+        document.querySelectorAll("#diff button").forEach((b) => b.addEventListener("click", () => { document.querySelectorAll("#diff button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); [n, nc, tries] = b.dataset.d.split(",").map(Number); }));
+        Kit.stat("best", Kit.best(BEST) || "-");
+        function start() { secret = Array.from({ length: n }, () => Kit.randi(0, nc - 1)); rows = []; cur = []; reveal = false; state = "play"; Kit.stat("tries", `0/${tries}`); Kit.hide("start"); Kit.hide("over"); }
+        function score(g) { let b = 0, w = 0; const s = secret.slice(), gg = g.slice(); for (let i = 0; i < n; i++) if (gg[i] === s[i]) { b++; s[i] = gg[i] = -1; } for (let i = 0; i < n; i++) if (gg[i] >= 0) { const j = s.indexOf(gg[i]); if (j >= 0) { w++; s[j] = -1; } } return [b, w]; }
+        function pick(c) { if (state !== "play" || cur.length >= n) return; cur.push(c); beep(400 + c * 60, 0.05, "triangle", 0.03); }
+        function back() { cur.pop(); }
+        function submit() {
+            if (state !== "play" || cur.length < n) return; const [b, w] = score(cur); rows.push({ g: cur, b, w }); cur = []; Kit.stat("tries", `${rows.length}/${tries}`);
+            if (b === n) { state = "over"; reveal = true; tune([523, 659, 784, 1047], 0.08, "square", 0.05); const sc = (tries - rows.length + 1) * 20 * (n - 2); Kit.save(sc); const prev = +Kit.best(BEST) || 0, best = !prev || rows.length < prev ? rows.length : prev; localStorage.setItem(BEST, best); Kit.stat("best", best); setTimeout(() => { $("overText").innerHTML = `${T("🔓 Code cracked in", "🔓 הקוד פוצח ב-")} ${rows.length} ${T("tries!", "ניסיונות!")}`; Kit.show("over"); }, 900); }
+            else if (rows.length >= tries) { state = "over"; reveal = true; beep(150, 0.4, "sawtooth", 0.05); setTimeout(() => { $("overText").innerHTML = T("🔒 Out of tries! The code is shown at the top.", "🔒 נגמרו הניסיונות! הקוד מוצג למעלה."); Kit.show("over"); }, 900); }
+            else { beep(b ? 600 : 300, 0.08, "square", 0.03); }
+        }
+        const RH = 46, TOP = 90, PX = 120;
+        function peg(x, y, r, c) { ctx.fillStyle = c === undefined ? "#ffffff14" : COLS[c]; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); if (c !== undefined) { ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, 7); ctx.fill(); } }
+        function draw() {
+            ctx.fillStyle = "#2a1d14"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#4a3324"; Kit.rr(ctx, 40, 20, W - 80, H - 40, 18); ctx.fill();
+            if (!secret) return;
+            // secret
+            ctx.fillStyle = "#1a120c"; Kit.rr(ctx, PX - 30, 32, n * 52 + 20, 44, 10); ctx.fill();
+            for (let i = 0; i < n; i++) { if (reveal) peg(PX + i * 52, 54, 16, secret[i]); else Kit.text(ctx, "?", PX + i * 52, 62, 22, "#ffc94d", "center"); }
+            const shown = Math.min(tries, 11);
+            for (let r = 0; r < tries; r++) {
+                const y = TOP + 26 + r * RH * (10 / Math.max(10, tries)); const row = rows[r], active = r === rows.length && state === "play";
+                if (active) { ctx.fillStyle = "#ffffff12"; Kit.rr(ctx, PX - 30, y - 20, W - PX - 40, 40, 10); ctx.fill(); }
+                Kit.text(ctx, String(r + 1), PX - 50, y + 5, 13, "#ffffff55", "center");
+                for (let i = 0; i < n; i++) peg(PX + i * 52, y, 14, row ? row.g[i] : active ? cur[i] : undefined);
+                if (row) { const fx0 = PX + n * 52 + 20; const pins = [...Array(row.b).fill("#111"), ...Array(row.w).fill("#fff")]; for (let k = 0; k < n; k++) { const xx = fx0 + (k % 3) * 14, yy = y - 7 + Math.floor(k / 3) * 14; ctx.fillStyle = pins[k] || "#ffffff18"; ctx.beginPath(); ctx.arc(xx, yy, 5, 0, 7); ctx.fill(); if (pins[k] === "#111") { ctx.strokeStyle = "#666"; ctx.lineWidth = 1; ctx.stroke(); } } }
+            }
+            // palette
+            const py = H - 70; for (let c = 0; c < nc; c++) { const x = W / 2 - (nc * 54) / 2 + c * 54 + 27; peg(x, py, 20, c); }
+            ctx.fillStyle = "#ff4d6d"; Kit.rr(ctx, W - 150, 30, 90, 40, 10); ctx.fill(); Kit.text(ctx, T("⌫ Back", "⌫ מחיקה"), W - 105, 56, 15, "#fff", "center");
+            ctx.fillStyle = cur.length === n ? "#2ee6a0" : "#ffffff22"; Kit.rr(ctx, W - 150, 80, 90, 40, 10); ctx.fill(); Kit.text(ctx, T("✓ Check", "✓ בדיקה"), W - 105, 106, 15, "#1a1a2a", "center");
+            Kit.text(ctx, T("⚫ right colour, right place   ⚪ right colour, wrong place", "⚫ צבע נכון במקום נכון   ⚪ צבע נכון במקום לא נכון"), W / 2, H - 28, 12, "#ffffffaa", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => {
+            const p = Kit.point(cv, e); if (state !== "play") return;
+            const py = H - 70; for (let c = 0; c < nc; c++) { const x = W / 2 - (nc * 54) / 2 + c * 54 + 27; if (Math.hypot(p.x - x, p.y - py) < 24) return pick(c); }
+            if (p.x > W - 150 && p.x < W - 60 && p.y > 30 && p.y < 70) return back();
+            if (p.x > W - 150 && p.x < W - 60 && p.y > 80 && p.y < 120) return submit();
+        });
+        Kit.onKeys({ Digit1: "0", Digit2: "1", Digit3: "2", Digit4: "3", Digit5: "4", Digit6: "5", Digit7: "6", Digit8: "7", Backspace: "back", Enter: "enter", Space: "enter" }, (a) => { if (a === "enter") { if (state !== "play") start(); else submit(); } else if (a === "back") back(); else if (+a < nc) pick(+a); });
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop(() => draw()).start();
+        if (window.__test) window.__test.cb = { get s() { return { state, rows: rows && rows.length }; }, start, pick, submit };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Code Breaker</h2><p>A logic puzzle based on a famous board game. The computer hides a secret code of four coloured pegs. You make a guess, and it tells you how close you are with little clue pins: a black pin for each peg that's the right colour in the right spot, and a white pin for each peg that's a right colour but in the wrong spot. It doesn't say which pegs they are, so you have to reason it out. Crack the code before you run out of rows. Hard mode has five pegs and eight colours.</p></section>
+        <section><h3>How to play</h3><table><tr><td>Tap colours or 1–8</td><td>Add a peg</td></tr><tr><td>Backspace</td><td>Remove a peg</td></tr><tr><td>Enter / ✓</td><td>Check the guess</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>The clue pins don't tell you WHICH peg is right, only how many.</li><li>Colours can repeat in the code.</li><li>Change one thing at a time to learn exactly what matters.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Code Breaker</h3><p>Code Breaker is about getting the most information from every guess. A good first guess uses two colours, like red-red-blue-blue. The clues tell you how many reds and blues are in the code, and roughly where.</p><p>Then change things carefully. If you move one peg and the black count goes up, you learned where that colour belongs. If it goes down, you learned where it doesn't. Changing too much at once makes the clues hard to read.</p><p>Remember that the total of black and white pins equals how many of your colours are in the code. Once that total equals the number of pegs, you have all the right colours, and you just need the order.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Crack a code on Easy.</li><li><b>Getting good:</b> Crack a Normal code in 6 tries or fewer.</li><li><b>Expert:</b> Crack a Hard code.</li></ul><h3>Did you know?</h3><p>Mathematicians proved that any 4-peg, 6-colour code can always be cracked in five guesses or fewer, if you play perfectly.</p><h3>Questions players ask</h3><h4>Can colours repeat?</h4><p>Yes, the code can use the same colour more than once.</p><h4>What do the pins mean?</h4><p>⚫ = right colour, right place. ⚪ = right colour, wrong place.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/ColorHop/colorhop">Color Hop</a><a href="/CrazyEights/crazyeights">Crazy Eights</a><a href="/Dodge/dodge">Dodge!</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

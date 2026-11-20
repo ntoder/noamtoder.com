@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A fast one-button-per-side reflex game. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Timber Chop · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Timber <span>Chop</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0</b><small>Chops</small></div><div class="stat"><b id="best">0</b><small>Best</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="480" height="720"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Timber Chop</h2>
+                <p id="startText">Tap the left or right side of the screen (or ⬅ ➡) to chop from that side. The tree slides down after every chop.<br>If a branch is coming down on your side, switch sides! The green bar drains all the time, and every chop fills it back up. Chop fast!</p>
+                <button class="btn" id="startBtn">🪓 Chop</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Game Over</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">🪓 Chop again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="left">⬅</button><button data-k="right">➡</button></div>
+    <p class="hint">Look at the branch just above the bottom piece. That's the one that comes down next.</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Timber Chop — chop the tree from left or right; dodge the branches; the timer drains, every chop refills it
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "timberchopBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const CX = W / 2, TW = 90, SEG = 80, BASE = H - 120;
+        let segs, side, score, energy, state = "ready", flying = [], fx = Kit.particles(), hitT = 0, started;
+        Kit.stat("best", Kit.best(BEST));
+        function nextSeg(prev) { if (prev && prev !== 0) return Math.random() < 0.5 ? 0 : prev; const r = Math.random(); return r < 0.35 ? -1 : r < 0.7 ? 1 : 0; }
+        function start() { segs = [0, 0]; while (segs.length < 9) segs.push(nextSeg(segs[segs.length - 1])); side = -1; score = 0; energy = 1; started = false; flying = []; state = "play"; Kit.stat("score", 0); Kit.hide("start"); Kit.hide("over"); }
+        function chop(s) {
+            if (state !== "play") return; started = true; side = s; hitT = 0.12;
+            if (segs[0] === side) return die();
+            const cut = segs.shift(); flying.push({ y: BASE - SEG / 2, b: cut, vx: -side * 600, vy: -200, r: 0, t: 0 }); segs.push(nextSeg(segs[segs.length - 1]));
+            if (segs[0] === side) return die();
+            score++; Kit.stat("score", score); energy = Math.min(1, energy + 0.08 - Math.min(0.05, score / 3000)); beep(180 + (score % 5) * 20, 0.05, "square", 0.04); fx.burst(CX + side * TW / 2, BASE - 20, "#c08a4a", 6, 2);
+            if (score % 50 === 0) tune([659, 880, 1100], 0.06, "triangle", 0.04);
+        }
+        function die() { state = "over"; beep(90, 0.5, "sawtooth", 0.07); Kit.save(score); const best = Kit.setBest(BEST, score); setTimeout(() => { $("overText").innerHTML = `${energy <= 0 ? T("Too slow! The timer ran out.", "איטי מדי! הזמן נגמר.") : T("Bonk! A branch got you.", "בום! ענף פגע בכם.")}<br>${score} ${T("chops", "חטיבות")} · ${T("best", "שיא")} ${best}`; Kit.show("over"); }, 600); }
+        function update(dt) { if (started) { energy -= dt * (0.22 + Math.min(0.5, score / 400)); if (energy <= 0) { energy = 0; die(); } } }
+        function trunk(y, b) {
+            ctx.fillStyle = "#8a5a2b"; ctx.fillRect(CX - TW / 2, y - SEG, TW, SEG); ctx.fillStyle = "#6b4a2a"; ctx.fillRect(CX - TW / 2 + 12, y - SEG + 10, 6, SEG - 20); ctx.fillRect(CX + 14, y - SEG + 20, 5, SEG - 30); ctx.strokeStyle = "#5a3b22"; ctx.lineWidth = 2; ctx.strokeRect(CX - TW / 2, y - SEG, TW, SEG);
+            if (b) { const x0 = CX + b * TW / 2; ctx.fillStyle = "#6b4a2a"; ctx.fillRect(b > 0 ? x0 : x0 - 120, y - SEG / 2 - 9, 120, 18); ctx.fillStyle = "#3f8a3a"; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x0 + b * (60 + k * 30), y - SEG / 2 - 16 - (k % 2) * 6, 20, 0, 7); ctx.fill(); } }
+        }
+        function draw() {
+            const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ffcf8a"); g.addColorStop(1, "#ffe9cf"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = "#c9a36a55"; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(i * 140 - 40, BASE); ctx.lineTo(i * 140 + 40, BASE - 220); ctx.lineTo(i * 140 + 120, BASE); ctx.fill(); }
+            ctx.fillStyle = "#7cc46a"; ctx.fillRect(0, BASE, W, H - BASE); ctx.fillStyle = "#5a3b22"; ctx.fillRect(CX - TW / 2 - 10, BASE - 6, TW + 20, 14);
+            if (!segs) return;
+            segs.forEach((b, i) => trunk(BASE - i * SEG, b));
+            for (const f of flying) { ctx.save(); ctx.translate(CX + f.vx * f.t, f.y + f.vy * f.t + 600 * f.t * f.t); ctx.rotate(f.t * 6 * Math.sign(f.vx)); ctx.globalAlpha = Math.max(0, 1 - f.t * 1.5); trunk(SEG / 2, 0); ctx.restore(); }
+            ctx.globalAlpha = 1;
+            // lumberjack
+            const px = CX + side * (TW / 2 + 50), py = BASE; ctx.save(); ctx.translate(px, py); ctx.scale(-side, 1);
+            ctx.fillStyle = "#2a3a8a"; ctx.fillRect(-14, -36, 10, 36); ctx.fillRect(4, -36, 10, 36); ctx.fillStyle = "#d62b3a"; Kit.rr(ctx, -18, -80, 36, 46, 8); ctx.fill(); ctx.fillStyle = "#1a1a2a"; for (let k = 0; k < 3; k++) ctx.fillRect(-18, -76 + k * 14, 36, 4);
+            ctx.fillStyle = "#ffd9b3"; ctx.beginPath(); ctx.arc(0, -94, 14, 0, 7); ctx.fill(); ctx.fillStyle = "#8a5a2b"; ctx.beginPath(); ctx.arc(0, -86, 12, 0, Math.PI); ctx.fill(); ctx.fillStyle = "#d62b3a"; ctx.fillRect(-15, -110, 30, 8);
+            ctx.rotate(hitT > 0 ? 0.9 : -0.3); ctx.fillStyle = "#6b4a2a"; ctx.fillRect(10, -76, 46, 6); ctx.fillStyle = "#9aa0b5"; ctx.fillRect(48, -86, 14, 22); ctx.restore();
+            fx.draw(ctx);
+            ctx.fillStyle = "#0003"; Kit.rr(ctx, W / 2 - 120, 24, 240, 22, 11); ctx.fill(); ctx.fillStyle = energy > 0.3 ? "#2ee6a0" : "#ff4d6d"; Kit.rr(ctx, W / 2 - 118, 26, 236 * energy, 18, 9); ctx.fill();
+            Kit.text(ctx, String(score), W / 2, 110, 48, "#fff", "center", "'Press Start 2P', monospace", 400);
+            if (!started && state === "play") Kit.text(ctx, T("⬅ Tap left or right to chop ➡", "⬅ הקישו שמאלה או ימינה כדי לחטוב ➡"), W / 2, BASE + 60, 18, "#1a2a1a", "center");
+        }
+        cv.addEventListener("pointerdown", (e) => { e.preventDefault(); const p = Kit.point(cv, e); chop(p.x < W / 2 ? -1 : 1); });
+        cv.style.touchAction = "none";
+        Kit.onKeys({ ArrowLeft: "l", KeyA: "l", ArrowRight: "r", KeyD: "r", Enter: "enter" }, (a) => { if (a === "enter" && state !== "play") start(); if (a === "l") chop(-1); if (a === "r") chop(1); });
+        Kit.touchButtons((k) => chop(k === "left" ? -1 : 1));
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(dt); if (hitT > 0) hitT -= dt; for (const f of flying) f.t += dt; flying = flying.filter((f) => f.t < 1); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.tc = { get s() { return { state, score, segs }; }, start, chop };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Timber Chop</h2><p>A fast one-button-per-side reflex game. You're a lumberjack chopping a never-ending tree. Each chop knocks out the bottom piece and the whole tree drops down. Branches stick out on the left and right, so if one is about to land on your side, jump to the other side before you chop. A timer bar drains constantly and each chop tops it up, so you have to keep chopping faster and faster.</p></section>
+        <section><h3>How to play</h3><table><tr><td>⬅ / A or tap left</td><td>Chop from the left</td></tr><tr><td>➡ / D or tap right</td><td>Chop from the right</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Watch the second piece up, not the bottom one.</li><li>The timer drains faster as your score grows.</li><li>Find a rhythm: left-left-right…</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Timber Chop</h3><p>Timber Chop is all about reading one piece ahead. The bottom piece is what you're chopping now, but the piece above it is what will drop onto your level next. If that piece has a branch on your side, switch sides with this chop.</p><p>The timer forces you to speed up. Early on there's lots of time, so practise reading ahead. Later the bar drains quickly and you'll need to chop several times a second.</p><p>Branches never appear on both sides of the same piece, so there's always a safe side. Trust your eyes and keep a steady rhythm.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Chop 50 pieces.</li><li><b>Getting good:</b> Chop 150 pieces.</li><li><b>Expert:</b> Chop 300 pieces.</li></ul><h3>Did you know?</h3><p>The tallest tree in the world is a coast redwood in California called Hyperion. It's about 116 metres tall, taller than a 30-storey building.</p><h3>Questions players ask</h3><h4>What ends the game?</h4><p>A branch landing on you, or the timer bar running out.</p><h4>Why does the timer drain faster?</h4><p>It speeds up as your score grows, to keep you on your toes.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/TrafficJam/trafficjam">Traffic Jam</a><a href="/UltimateTicTacToe/ultimatettt">Ultimate Tic-Tac-Toe</a><a href="/ZombieSurvival/zombies">Zombie Survival</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -127,6 +127,8 @@ export const GAMES = {
     ultimatetictactoe: { name: "Ultimate Tic-Tac-Toe", path: "/UltimateTicTacToe/ultimatettt", img: "/thumbs/ultimatetictactoe.png", tags: ["board", "strategy", "2p"], desc: "Tic-tac-toe made of nine tic-tac-toes. Every move sends your rival somewhere!", isNew: true },
     carsoccer: { name: "Car Soccer", path: "/CarSoccer/carsoccer", img: "/thumbs/carsoccer.png", tags: ["sports", "2p"], desc: "Drive, boost and bump a giant ball into the goal. 2-minute matches!", isNew: true },
     fruitcatcher: { name: "Fruit Catcher", path: "/FruitCatcher/fruitcatch", img: "/thumbs/fruitcatcher.png", tags: ["arcade"], desc: "Catch the falling fruit in your basket. Dodge the bombs and old boots!", isNew: true },
+    codebreaker: { name: "Code Breaker", path: "/CodeBreaker/codebreaker", img: "/thumbs/codebreaker.png", tags: ["brain", "puzzle"], desc: "Crack the secret colour code using clever clues. A classic logic puzzle.", isNew: true },
+    timberchop: { name: "Timber Chop", path: "/TimberChop/timberchop", img: "/thumbs/timberchop.png", tags: ["arcade"], desc: "Chop the tree as fast as you can, but dodge the falling branches!", isNew: true },
 };
 
 // Games that only count plays (no score)
