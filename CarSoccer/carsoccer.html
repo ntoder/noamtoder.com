@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Football, but with cars. Free to play in your browser on Noam&#x27;s Game Hub.">
+    <title>Car Soccer · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style></style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Car <span>Soccer</span></h1>
+        <div class="stats"><div class="stat"><b id="score">0 – 0</b><small>Score</small></div><div class="stat"><b id="best">0</b><small>Wins</small></div></div>
+    </div>
+    <div class="stage">
+        <div class="playwrap">
+            
+            <div class="frame">
+            <canvas id="c" width="900" height="560"></canvas>
+            <div class="overlay" id="start"><div>
+                <h2>Car Soccer</h2>
+                <p id="startText"><span class="seg" id="mode2"><button data-m="cpu" class="on">🤖 vs Computer</button><button data-m="2p">👥 2 Players</button></span>You're the blue car. W / ⬆ to drive, S / ⬇ to reverse, A D / ⬅ ➡ to steer, Space or Shift to boost.<br>Push the ball into the orange goal on the right! Most goals in 2 minutes wins. In 2-player mode: Blue uses W A S D + Left Shift, Orange uses the arrows + Right Shift.</p>
+                <button class="btn" id="startBtn">⚽ Kick off</button>
+            </div></div>
+            <div class="overlay hidden" id="over"><div>
+                <h2>Full time!</h2>
+                <p id="overText"></p>
+                <button class="btn" id="againBtn">⚽ Play again</button>
+            </div></div>
+            
+            </div>
+            
+        </div>
+    </div>
+    <div class="touch"><button data-k="a.left">⬅</button><button data-k="a.down">⬇</button><button data-k="a.up">⬆</button><button data-k="a.boost">🔥</button><button data-k="a.right">➡</button></div>
+    <p class="hint">Get behind the ball before you hit it, lined up with the goal. Then boost straight through it!</p>
+    <script src="/gamepad.js" defer></script>
+    <script src="/game-kit.js"></script>
+    <script>
+    (() => {
+        // Car Soccer — drive a car, boost, and bump the giant ball into the goal. vs computer or 2 players
+        const { $, beep, tune } = Kit;
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height, BEST = "carsoccerBest";
+        const T = (en, hb) => (document.documentElement.lang === "he" ? hb : en);
+        const M = 40, GOAL = 150, BR = 22, CL = 46, CWD = 26, TIME = 120;
+        let cpuWait = 0, cars, ball, score, time, state = "ready", two = false, kick = 0, fx = Kit.particles(), msg = "";
+        document.querySelectorAll("#mode2 button").forEach((x) => x.addEventListener("click", () => { document.querySelectorAll("#mode2 button").forEach((y) => y.classList.remove("on")); x.classList.add("on"); two = x.dataset.m === "2p"; }));
+        Kit.stat("best", Kit.best(BEST));
+        function reset() { ball = { x: W / 2, y: H / 2, vx: 0, vy: 0 }; cars[0] = { ...cars[0], x: W * 0.22, y: H / 2, a: 0, v: 0 }; cars[1] = { ...cars[1], x: W * 0.78, y: H / 2, a: Math.PI, v: 0 }; kick = 1.2; cpuWait = 0.9; }
+        function start() { cars = [{ c: "#2a74ff", boost: 100 }, { c: "#ff9a3c", boost: 100 }]; score = [0, 0]; time = TIME; state = "play"; msg = ""; reset(); Kit.stat("score", "0 – 0"); Kit.hide("start"); Kit.hide("over"); }
+        function drive(c, steer, gas, boost, dt) {
+            const b = boost && c.boost > 0 && gas >= 0; if (b) { c.boost -= 40 * dt; if (Math.random() < 0.6) fx.burst(c.x - Math.cos(c.a) * 24, c.y - Math.sin(c.a) * 24, Kit.pick(["#ffc94d", "#ff7a3c"]), 1, 1.5); } else c.boost = Math.min(100, c.boost + 8 * dt);
+            const maxV = b ? 520 : 330; c.v += (gas > 0 ? (b ? 700 : 420) : gas < 0 ? -380 : 0) * dt; c.v *= gas ? 0.995 : 0.97; c.v = Math.max(-200, Math.min(maxV, c.v));
+            c.a += steer * dt * 3.4 * Math.min(1, Math.abs(c.v) / 140) * Math.sign(c.v || 1);
+            c.x += Math.cos(c.a) * c.v * dt; c.y += Math.sin(c.a) * c.v * dt;
+            if (c.x < M + 14 || c.x > W - M - 14) { c.x = Math.max(M + 14, Math.min(W - M - 14, c.x)); c.v *= -0.4; } if (c.y < M + 14 || c.y > H - M - 14) { c.y = Math.max(M + 14, Math.min(H - M - 14, c.y)); c.v *= -0.4; }
+        }
+        function cpu(c, dt) {
+            if (cpuWait > 0) { cpuWait -= dt; drive(c, 0, 0, false, dt); return; }
+            const goalX = M, aimX = ball.x + 30, aimY = ball.y + (ball.y - H / 2) * 0.15; // get behind the ball relative to target goal (left)
+            const behind = c.x > ball.x + 10; let tx = behind ? ball.x : ball.x + 90, ty = behind ? ball.y : ball.y + (c.y < ball.y ? -60 : 60);
+            if (ball.x > W * 0.7 && !behind) { tx = W - M - 60; ty = H / 2; }
+            let da = Math.atan2(ty - c.y, tx - c.x) - c.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+            drive(c, Math.max(-1, Math.min(1, da * 3)), Math.abs(da) > 2.2 ? -1 : 1, behind && Math.abs(da) < 0.25 && c.boost > 60 && Math.hypot(ball.x - c.x, ball.y - c.y) < 200, dt * 0.72);
+        }
+        function update(dt) {
+            if (kick > 0) { kick -= dt; return; }
+            time -= dt; if (time <= 0) return end();
+            const k = Kit.keys;
+            if (two) { drive(cars[0], (k.has("a.right") ? 1 : 0) - (k.has("a.left") ? 1 : 0), k.has("a.up") ? 1 : k.has("a.down") ? -1 : 0, k.has("a.boost"), dt); drive(cars[1], (k.has("b.right") ? 1 : 0) - (k.has("b.left") ? 1 : 0), k.has("b.up") ? 1 : k.has("b.down") ? -1 : 0, k.has("b.boost"), dt); }
+            else { const r = k.has("a.right") || k.has("b.right"), l = k.has("a.left") || k.has("b.left"), u = k.has("a.up") || k.has("b.up"), d = k.has("a.down") || k.has("b.down"); drive(cars[0], (r ? 1 : 0) - (l ? 1 : 0), u ? 1 : d ? -1 : 0, k.has("a.boost") || k.has("b.boost"), dt); cpu(cars[1], dt); }
+            // ball
+            ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.vx *= 0.992; ball.vy *= 0.992;
+            const inGoalY = Math.abs(ball.y - H / 2) < GOAL / 2;
+            if (ball.y < M + BR) { ball.y = M + BR; ball.vy = Math.abs(ball.vy) * 0.85; } if (ball.y > H - M - BR) { ball.y = H - M - BR; ball.vy = -Math.abs(ball.vy) * 0.85; }
+            if (!inGoalY) { if (ball.x < M + BR) { ball.x = M + BR; ball.vx = Math.abs(ball.vx) * 0.85; } if (ball.x > W - M - BR) { ball.x = W - M - BR; ball.vx = -Math.abs(ball.vx) * 0.85; } }
+            if (ball.x < M - BR) return goal(1); if (ball.x > W - M + BR) return goal(0);
+            for (const c of cars) {
+                const dx = ball.x - c.x, dy = ball.y - c.y, d = Math.hypot(dx, dy);
+                if (d < BR + 18) { const nx = dx / d, ny = dy / d; ball.x = c.x + nx * (BR + 18); ball.y = c.y + ny * (BR + 18); const cvx = Math.cos(c.a) * c.v, cvy = Math.sin(c.a) * c.v, rel = (ball.vx - cvx) * nx + (ball.vy - cvy) * ny; if (rel < 0) { ball.vx -= 1.7 * rel * nx; ball.vy -= 1.7 * rel * ny; ball.vx += cvx * 0.25; ball.vy += cvy * 0.25; beep(180 + Math.min(400, Math.abs(rel)), 0.05, "square", 0.04); } c.v *= 0.85; }
+            }
+            const [a, b] = cars, dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy); if (d < 36 && d > 0) { const p = (36 - d) / 2; a.x -= (dx / d) * p; a.y -= (dy / d) * p; b.x += (dx / d) * p; b.y += (dy / d) * p; a.v *= 0.8; b.v *= 0.8; }
+            const sp = Math.hypot(ball.vx, ball.vy); if (sp > 1100) { ball.vx *= 1100 / sp; ball.vy *= 1100 / sp; }
+        }
+        function goal(side) {
+            score[side]++; Kit.stat("score", `${score[0]} – ${score[1]}`); fx.burst(side === 0 ? W - M : M, H / 2, cars[side].c, 60, 6); tune(side === 0 ? [523, 659, 784, 1047] : [392, 330], 0.08, "square", 0.05);
+            msg = side === 0 ? (two ? T("GOAL for Blue!", "גול לכחול!") : T("GOAL! ⚽", "גול! ⚽")) : two ? T("GOAL for Orange!", "גול לכתום!") : T("Computer scores", "המחשב הבקיע"); setTimeout(() => (msg = ""), 1400); reset(); kick = 1.6;
+        }
+        function end() { state = "over"; const [a, b] = score; if (!two && a > b) { Kit.save(100); Kit.setBest(BEST, (Kit.best(BEST) || 0) + 1); } $("overText").innerHTML = `${a === b ? T("🤝 Draw!", "🤝 תיקו!") : two ? (a > b ? T("🔵 Blue wins!", "🔵 הכחול ניצח!") : T("🟠 Orange wins!", "🟠 הכתום ניצח!")) : a > b ? T("🏆 You win!", "🏆 ניצחתם!") : T("😢 The computer wins", "😢 המחשב ניצח")}<br>${a} – ${b}`; Kit.show("over"); }
+        function draw() {
+            ctx.fillStyle = "#1f2a20"; ctx.fillRect(0, 0, W, H);
+            for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? "#3f8a3a" : "#468f40"; ctx.fillRect(M + (i * (W - 2 * M)) / 10, M, (W - 2 * M) / 10 + 1, H - 2 * M); }
+            ctx.strokeStyle = "#ffffffcc"; ctx.lineWidth = 3; ctx.strokeRect(M, M, W - 2 * M, H - 2 * M); ctx.beginPath(); ctx.moveTo(W / 2, M); ctx.lineTo(W / 2, H - M); ctx.stroke(); ctx.beginPath(); ctx.arc(W / 2, H / 2, 70, 0, 7); ctx.stroke();
+            ctx.strokeRect(M, H / 2 - 110, 90, 220); ctx.strokeRect(W - M - 90, H / 2 - 110, 90, 220);
+            ctx.fillStyle = "#2a74ff55"; ctx.fillRect(M - 30, H / 2 - GOAL / 2, 30, GOAL); ctx.fillStyle = "#ff9a3c55"; ctx.fillRect(W - M, H / 2 - GOAL / 2, 30, GOAL);
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(M - 30, H / 2 - GOAL / 2, 30, GOAL); ctx.strokeRect(W - M, H / 2 - GOAL / 2, 30, GOAL);
+            if (!cars) return;
+            fx.draw(ctx);
+            ctx.fillStyle = "#0004"; ctx.beginPath(); ctx.ellipse(ball.x + 4, ball.y + 6, BR, BR * 0.8, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, 7); ctx.fill(); ctx.fillStyle = "#1a1a2a"; for (let i = 0; i < 5; i++) { const a = i * 1.256 + ball.x / 30; ctx.beginPath(); ctx.arc(ball.x + Math.cos(a) * BR * 0.55, ball.y + Math.sin(a) * BR * 0.55, 4.5, 0, 7); ctx.fill(); }
+            for (const c of cars) { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a); ctx.fillStyle = "#0005"; Kit.rr(ctx, -CL / 2 + 3, -CWD / 2 + 4, CL, CWD, 7); ctx.fill(); ctx.fillStyle = "#1a1a2a"; for (const [x, y] of [[-14, -15], [8, -15], [-14, 11], [8, 11]]) ctx.fillRect(x, y, 10, 4); ctx.fillStyle = c.c; Kit.rr(ctx, -CL / 2, -CWD / 2, CL, CWD, 7); ctx.fill(); ctx.fillStyle = "#cfe8ff"; Kit.rr(ctx, 2, -CWD / 2 + 4, 10, CWD - 8, 3); ctx.fill(); ctx.restore(); }
+            cars.forEach((c, i) => { const x = i ? W - 160 : 20; ctx.fillStyle = "#0006"; ctx.fillRect(x, 12, 140, 12); ctx.fillStyle = c.c; ctx.fillRect(x, 12, 1.4 * c.boost, 12); });
+            Kit.text(ctx, `${score[0]}  –  ${score[1]}`, W / 2, 30, 24, "#fff", "center", "'Press Start 2P', monospace", 400);
+            const m = Math.max(0, Math.ceil(time)); Kit.text(ctx, `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`, W / 2, H - 12, 16, "#fff", "center");
+            if (msg) Kit.text(ctx, msg, W / 2, H / 2 - 100, 40, "#ffc94d", "center");
+        }
+        Kit.onKeys({ KeyW: "a.up", KeyS: "a.down", KeyA: "a.left", KeyD: "a.right", ShiftLeft: "a.boost", Space: "a.boost", ArrowUp: "b.up", ArrowDown: "b.down", ArrowLeft: "b.left", ArrowRight: "b.right", ShiftRight: "b.boost", Enter: "enter", KeyJ: "b.boost" }, (a) => { if (a === "enter" && state !== "play") start(); });
+        window.GAMEPAD_MAP = [{ up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", a: "KeyW", b: "KeyS", x: "Space", rb: "Space", rt: "Space", lt: "KeyS", start: "Enter" }, { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "ArrowUp", b: "ArrowDown", x: "ShiftRight", rb: "ShiftRight", rt: "ShiftRight", lt: "ArrowDown", start: "Enter" }];
+        Kit.touchButtons();
+        $("startBtn").onclick = start; $("againBtn").onclick = start;
+        Kit.loop((dt) => { if (state === "play") update(Math.min(dt, 0.03)); fx.update(dt); draw(); }).start();
+        if (window.__test) window.__test.cs2 = { get s() { return { state, score, time }; }, start };
+    })();
+    </script>
+
+    <!-- Game info -->
+    <style>
+body{flex-direction:column;flex-wrap:nowrap;overflow-y:auto!important;height:auto}
+.gh-info{max-width:860px;margin:32px auto 8px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#cfd3f5;line-height:1.65;text-align:left}
+.gh-info section{background:#171b36;border:1px solid #2a3060;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.gh-info h2{font-size:20px;font-weight:800;color:#eef0ff;margin:0 0 8px}
+.gh-info h3{font-size:16px;font-weight:800;color:#2ee6c9;margin:0 0 8px}
+.gh-info p{margin:0}
+.gh-info ul{margin:0;padding-left:20px}
+.gh-info li{margin:4px 0}
+.gh-info table{border-collapse:collapse;width:100%}
+.gh-info td{padding:6px 8px;border-top:1px solid #2a3060;vertical-align:top}
+.gh-info td:first-child{font-weight:700;color:#eef0ff;white-space:nowrap;width:1%}
+.gh-info .gh-more{display:flex;gap:10px;flex-wrap:wrap}
+.gh-info .gh-more a{color:#2ee6c9;text-decoration:none;font-weight:700;background:#12152b;border:1px solid #2a3060;border-radius:999px;padding:6px 14px}
+.gh-info .gh-more a:hover{border-color:#7c5cff}
+@media (max-width:520px){.gh-info td:first-child{white-space:normal;width:38%}}
+</style>
+    <div class="gh-info">
+        <section><h2>About Car Soccer</h2><p>Football, but with cars. Two cars and one giant ball share a walled pitch. Drive into the ball to knock it around: the faster you're going, the harder you hit it. Boost gives a burst of speed and slowly refills. Score in the opponent's goal as many times as you can in two minutes. Play against the computer or challenge a friend on the same keyboard.</p></section>
+        <section><h3>How to play</h3><table><tr><td>W / ⬆</td><td>Drive</td></tr><tr><td>S / ⬇</td><td>Reverse</td></tr><tr><td>A D / ⬅ ➡</td><td>Steer</td></tr><tr><td>Space / Shift</td><td>Boost</td></tr></table></section>
+        <section><h3>Tips</h3><ul><li>Hit the ball through its middle to send it straight.</li><li>Boost refills slowly, so save it for shots.</li><li>Use the walls: the ball bounces off them.</li></ul></section><!-- guide --><style>
+.gh-guide p{margin:0 0 12px}.gh-guide p:last-child{margin-bottom:0}
+.gh-guide h3{margin-top:22px!important}.gh-guide h3:first-child{margin-top:0!important}
+.gh-guide h4{font-size:15px;font-weight:800;color:#eef0ff;margin:14px 0 4px}
+.gh-guide ul{display:grid;gap:6px}
+.gh-guide .by{margin-top:18px;padding-top:12px;border-top:1px solid #2a3060;color:#9aa0c8;font-size:13px}
+.gh-guide a{color:#2ee6c9}
+</style><section class="gh-guide" lang="en" dir="ltr" data-noi18n><h3>How to get better at Car Soccer</h3><p>Car Soccer is about angles. The ball flies away from your car in the direction you hit it, so line up behind the ball with the goal straight ahead before you charge. A glancing hit sends it off to the side.</p><p>Boost is your power shot. It makes you much faster, and speed equals shot strength. But it only refills slowly, so don't waste it driving around: save it for when you're lined up.</p><p>Defending matters too. When the ball is on your half, get between it and your goal. You can always reverse if you overshoot.</p><h3>From beginner to expert</h3><ul><li><b>Beginner:</b> Score a goal.</li><li><b>Getting good:</b> Beat the computer.</li><li><b>Expert:</b> Win by 5 goals.</li></ul><h3>Did you know?</h3><p>Real-world 'car soccer' exists! Some motor shows and festivals hold matches with small cars pushing a huge inflatable ball.</p><h3>Questions players ask</h3><h4>How do I boost?</h4><p>Hold Space or Shift. The bar at the top shows how much boost you have.</p><h4>How long is a match?</h4><p>Two minutes. Most goals wins.</p><p class="by">Guide written by Noam, who makes the games on this site. Spotted a mistake or have a tip to add? <a href="mailto:noam@noamtoder.com">Email me</a> · <a href="/about">About the Game Hub</a></p></section><!-- /guide -->
+        <section><h3>More games</h3><div class="gh-more"><a href="/CastleSmash/castlesmash">Castle Smash</a><a href="/CityDefender/citydefender">City Defender</a><a href="/CrazyEights/crazyeights">Crazy Eights</a><a href="/">All games →</a></div></section>
+    </div>
+    <div data-ad="banner"></div>
+    <script>
+    // game keys shouldn't scroll the page now that it has text below the game
+    addEventListener("keydown", function (e) {
+        var t = e.target && e.target.tagName;
+        if (t === "INPUT" || t === "TEXTAREA") return;
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) !== -1) e.preventDefault();
+    }, { passive: false });
+    </script>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
