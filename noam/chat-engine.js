@@ -229,15 +229,16 @@
     save(); emit('change');
     return m;
   }
+  // only tell the screen to redraw when something really changed (otherwise opening a chat redraws it forever)
   function markRead(key) {
-    const c = chat(key); c.unread = 0;
+    const c = chat(key); let changed = !!c.unread; c.unread = 0;
     if (key.startsWith('f:')) {
       const f = D.friends[key.slice(2)]; const r = f && rooms.get(f.room);
       const ids = c.msgs.filter((m) => m.from !== myId && !m.readSent).map((m) => { m.readSent = true; return m.id; });
-      if (ids.length && r && r.peers.size) r.a.ack.send({ ids, st: 'read' });
+      if (ids.length && r && r.peers.size) { r.a.ack.send({ ids, st: 'read' }); changed = true; }
       else if (ids.length) c.msgs.forEach((m) => { if (ids.includes(m.id)) m.readSent = false; });
     }
-    save(); emit('change');
+    if (changed) { save(); emit('change'); }
   }
   async function addFriend(code, note) {
     const inv = parseInvite(code); if (!inv) throw new Error('That isn’t a NoamChat invite code. It starts with NC1.');
