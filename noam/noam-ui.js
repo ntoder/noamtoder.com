@@ -5,7 +5,7 @@
   const PAGES = [['chat', '💬 Chat', '/chat/'], ['music', '🎧 Music', '/music/'], ['focus', '🍅 Focus', '/focus/'], ['bookmarks', '⭐ Bookmarks', '/bookmarks/'], ['account', '👤 Account', '/account/']];
   function shell(active) {
     const top = document.createElement('header'); top.className = 'top';
-    top.innerHTML = `<a class="logo" href="/">Noam's <span>Game Hub</span></a><nav class="nav">${PAGES.map(([id, label, href]) => `<a href="${href}" class="${id === active ? 'on' : ''}">${label}</a>`).join('')}</nav><a class="who" id="who" href="/account/"></a>`;
+    top.innerHTML = `<a class="logo" href="/">Noam's <span>Game Hub</span></a><nav class="nav"><a href="/" class="home" title="Noam's Game Hub">🏠</a>${PAGES.map(([id, label, href]) => { const [ic, ...rest] = label.split(' '); return `<a href="${href}" class="${id === active ? 'on' : ''}" title="${rest.join(' ')}">${ic} <span>${rest.join(' ')}</span></a>`; }).join('')}</nav><a class="who" id="who" href="/account/"></a>`;
     document.body.prepend(top);
     const who = top.querySelector('#who');
     const paint = (st) => { who.innerHTML = st && st.user ? `@<b>${esc(st.user)}</b>${st.state === 'syncing' ? ' · syncing…' : ''}` : 'Sign in'; };

@@ -190,7 +190,7 @@
         <textarea id="nc-text" rows="1" placeholder="Message${isG ? ' the group' : ''}…" maxlength="8000"></textarea><button class="nc-send" id="nc-send" title="Send (Enter)">➤</button><input type="file" id="nc-file" accept="image/*" hidden></div>`;
     const list = main.querySelector('#nc-msgs'); list.scrollTop = list.scrollHeight;
     main.querySelector('#nc-back').onclick = () => go('list');
-    main.querySelector('#nc-more').onclick = (e) => convMenu(key, e.clientX, e.clientY);
+    main.querySelector('#nc-more').onclick = (e) => convMenu(key, e.clientX, e.clientY, e.currentTarget);
     const ta = main.querySelector('#nc-text'); ta.value = draft[key] || '';
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; ta.style.overflowY = ta.scrollHeight > 120 ? 'auto' : 'hidden'; }; grow();
     let lastType = 0;
@@ -204,8 +204,7 @@
     main.querySelector('#nc-imgb').onclick = () => main.querySelector('#nc-file').click();
     main.querySelector('#nc-file').onchange = (e) => { const file = e.target.files[0]; if (file) sendImage(key, file); };
     main.querySelector('#nc-playb').onclick = async (e) => {
-      const r = e.currentTarget.getBoundingClientRect();
-      const a = await popup(PLAY.map(([id, ic, n]) => ({ id, label: `${ic} ${n}` })), r.left, r.top - 8);
+      const a = await popup(PLAY.map(([id, ic, n]) => ({ id, label: `${ic} ${n}` })), 0, 0, e.currentTarget);
       const p = PLAY.find((x) => x[0] === a); if (!p) return;
       const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       const code = Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => ABC[b % ABC.length]).join('');
@@ -218,14 +217,15 @@
     list.querySelectorAll('[data-url]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); newTab({ url: a.dataset.url }); }));
     list.querySelectorAll('.nc-img').forEach((img) => (img.onclick = () => lightbox(img.src)));
     list.querySelectorAll('[data-join]').forEach((b) => (b.onclick = async () => { const o = JSON.parse(b.dataset.join); const g2 = await C.joinGroup(o); go('conv', 'g:' + g2.gid); }));
+    list.querySelectorAll('.nc-msg').forEach((m) => { let lp = null; m.addEventListener('touchstart', (e) => { const t = e.touches[0]; lp = setTimeout(() => { lp = null; m.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: t.clientX, clientY: t.clientY })); }, 500); }, { passive: true }); ['touchend', 'touchmove', 'touchcancel'].forEach((ev) => m.addEventListener(ev, () => { if (lp) { clearTimeout(lp); lp = null; } }, { passive: true })); });
     list.querySelectorAll('.nc-msg').forEach((m) => (m.oncontextmenu = async (e) => { e.preventDefault(); const msg = c.msgs.find((x) => x.id === m.dataset.id); if (!msg) return; const a = await popup([{ id: 'copy', label: 'Copy text', enabled: !!msg.text }, { id: 'del', label: '🗑️ Delete on this computer' }], e.clientX, e.clientY); if (a === 'copy') navigator.clipboard.writeText(msg.text); if (a === 'del') C.deleteMsg(key, msg.id); }));
     setTimeout(() => ta.focus(), 0);
   }
-  async function convMenu(key, x, y) {
+  async function convMenu(key, x, y, anchor) {
     const isG = key.startsWith('g:');
     const items = isG ? [{ id: 'inv', label: '➕ Invite friends' }, { id: 'code', label: '📋 Copy group code' }, { id: 'clear', label: 'Clear chat on this computer' }, { type: 'separator' }, { id: 'leave', label: '🚪 Leave group' }]
       : [{ id: 'clear', label: 'Clear chat on this computer' }, { type: 'separator' }, { id: 'remove', label: 'Remove friend' }, { id: 'block', label: '🚫 Block' }];
-    const a = await popup(items, x, y);
+    const a = await popup(items, x, y, anchor);
     if (a === 'inv') go('invite');
     if (a === 'code') navigator.clipboard.writeText(C.groupCode(C.data.groups[key.slice(2)])).then(() => toast('📋 Group code copied'));
     if (a === 'clear') C.clearChat(key);

@@ -17,19 +17,44 @@ function toast(msg, ms = 2600) {
   let t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
   t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms);
 }
-function popup(items, x, y) {
+// popup menu. Pass x, y for a click point, or an element as `anchor` to open next to it
+// (below it, or above it when there's no room). Closes on Escape, outside click, scroll or resize.
+let closeMenu = null, menuAnchor = null;
+function popup(items, x, y, anchor) {
+  if (closeMenu) { const same = anchor && anchor === menuAnchor; closeMenu(null); if (same) return Promise.resolve(null); }
+  menuAnchor = anchor || null;
   return new Promise((resolve) => {
-    document.querySelectorAll('.menu').forEach((m) => m.remove());
-    const m = document.createElement('div'); m.className = 'menu';
+    const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu');
+    const btns = [];
     for (const it of items) {
       if (it.type === 'separator') { m.appendChild(document.createElement('hr')); continue; }
-      const b = document.createElement('button'); b.textContent = it.label; b.disabled = it.enabled === false;
-      b.onclick = (e) => { e.stopPropagation(); m.remove(); resolve(it.id); }; m.appendChild(b);
+      const b = document.createElement('button'); b.textContent = it.label; b.disabled = it.enabled === false; b.setAttribute('role', 'menuitem');
+      b.onclick = (e) => { e.stopPropagation(); done(it.id); }; m.appendChild(b); if (!b.disabled) btns.push(b);
     }
     document.body.appendChild(m);
-    const r = m.getBoundingClientRect();
-    m.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px'; m.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
-    setTimeout(() => addEventListener('pointerdown', function off(e) { if (!m.contains(e.target)) { m.remove(); removeEventListener('pointerdown', off, true); resolve(null); } }, true), 0);
+    const r = m.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+    let left = x, top = y;
+    if (anchor) {
+      const a = anchor.getBoundingClientRect();
+      left = a.right - r.width > 8 && a.left + r.width > W - 8 ? a.right - r.width : a.left;   // line up with the button
+      top = a.bottom + 6 + r.height <= H - 8 ? a.bottom + 6 : a.top - 6 - r.height;           // below, or above if no room
+    }
+    m.style.left = Math.max(8, Math.min(left, W - r.width - 8)) + 'px';
+    m.style.top = Math.max(8, Math.min(top, H - r.height - 8)) + 'px';
+    const onDown = (e) => { if (!m.contains(e.target) && !(anchor && anchor.contains(e.target))) done(null); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); done(null); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const i = btns.indexOf(document.activeElement); const n = e.key === 'ArrowDown' ? (i + 1) % btns.length : (i - 1 + btns.length) % btns.length; btns[n] && btns[n].focus(); }
+    };
+    const onAway = () => done(null);
+    function done(v) {
+      if (!m.isConnected) return; m.remove(); closeMenu = null; menuAnchor = null;
+      removeEventListener('pointerdown', onDown, true); removeEventListener('keydown', onKey, true); removeEventListener('resize', onAway); removeEventListener('scroll', onAway, true);
+      resolve(v);
+    }
+    closeMenu = done;
+    setTimeout(() => { addEventListener('pointerdown', onDown, true); addEventListener('resize', onAway); addEventListener('scroll', onAway, true); }, 0);
+    addEventListener('keydown', onKey, true);
   });
 }
 function $(q) { return document.querySelector(q) || document.createElement('div'); }
