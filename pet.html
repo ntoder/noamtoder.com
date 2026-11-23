@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Hub Pet · Noam's Game Hub</title>
-    <meta name="description" content="Hatch your own Hub pet. It grows every time you play a game, evolves into Sporty, Brainy, Zappy or Artsy depending on what you play, and wears hats you unlock. Free.">
+    <meta name="description" content="Hatch your own Hub pet. It grows every time you play a game, evolves into Sporty, Brainy, Zappy or Artsy, and has a wardrobe of 140+ hats, colours, patterns, effects and rooms to unlock. Free.">
     <link rel="canonical" href="https://noamtoder.com/pet">
     <meta property="og:title" content="Hatch your own Hub pet">
     <meta property="og:description" content="It grows every time you play a game on Noam's Game Hub.">
@@ -14,40 +14,73 @@
     <link rel="stylesheet" href="/game-shell.css">
     <style>
         body { -webkit-user-select: auto; user-select: auto; }
-        main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; width: 100%; }
+        main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; width: 100%; }
         .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-        .home { background: radial-gradient(ellipse at 50% 85%, #2a2160 0%, #171b36 60%); border: 1px solid var(--line); border-radius: 24px; position: relative; overflow: hidden; }
+        .home { background: #171b36; border: 1px solid var(--line); border-radius: 24px; position: relative; overflow: hidden; margin-bottom: 16px; }
         #pc { width: 100%; height: auto; display: block; cursor: pointer; touch-action: manipulation; }
-        .acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 16px 16px; justify-content: center; }
-        .acts button, .acts a { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 10px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; text-decoration: none; }
-        .acts button:hover, .acts a:hover { border-color: var(--accent); }
-        .acts .main { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .acts button:disabled { opacity: .5; cursor: default; }
+        #pc.playing { touch-action: none; }
+        .acts { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px 16px; justify-content: center; }
+        .acts button, .acts a, .btn { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 10px 14px; font: 700 14px Inter, Rubik, sans-serif; cursor: pointer; text-decoration: none; }
+        .acts button:hover, .acts a:hover, .btn:hover { border-color: var(--accent); }
+        .acts .main, .btn.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .acts button:disabled, .btn:disabled { opacity: .5; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px; margin-bottom: 16px; }
         .name { display: flex; gap: 10px; align-items: center; }
         .name h2 { font-size: 30px; font-weight: 800; }
         .name button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
-        .sub { color: var(--accent-2); font-weight: 800; margin: 2px 0 14px; }
+        .sub { color: var(--accent-2); font-weight: 800; margin: 2px 0 10px; }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+        .chip { background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-weight: 800; font-size: 14px; }
+        .chip.coin { color: #ffc93d; border-color: #ffc93d66; }
         .bar { margin: 10px 0; }
         .bar label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
         .bar .t { height: 12px; background: var(--bg-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
         .bar .f { height: 100%; border-radius: 999px; transition: width .5s; }
-        .hats { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
-        .hats button { border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 8px 6px; cursor: pointer; font: 700 12px Inter, Rubik, sans-serif; display: grid; gap: 4px; justify-items: center; }
-        .hats button.on { border-color: var(--accent-2); background: #2ee6c922; }
-        .hats button:disabled { opacity: .45; cursor: default; }
-        .hats canvas { width: 64px; height: 64px; }
-        .hats small { color: var(--muted); font-weight: 600; font-size: 10px; line-height: 1.2; text-align: center; }
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .tabs button { position: relative; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 10px; padding: 7px 10px; font: 700 13px Inter, Rubik, sans-serif; cursor: pointer; }
+        .tabs button.on { border-color: var(--accent-2); background: #2ee6c922; }
+        .tabs button i { position: absolute; top: -4px; inset-inline-end: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ff4d8d; }
+        .tabs small { color: var(--muted); font-weight: 600; }
+        .tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; font-size: 13px; }
+        .tools .btn { padding: 6px 10px; font-size: 13px; }
+        .tools .sp { flex: 1; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 560px; overflow: auto; padding: 2px; }
+        .it { position: relative; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); border-radius: 12px; padding: 6px 5px 8px; cursor: pointer; font: 700 12px Inter, Rubik, sans-serif; display: grid; gap: 3px; justify-items: center; text-align: center; }
+        .it:hover { border-color: var(--accent); }
+        .it.on { border-color: var(--accent-2); background: #2ee6c922; }
+        .it.lock canvas { filter: grayscale(.85) brightness(.7); }
+        .it canvas { width: 72px; height: 72px; border-radius: 8px; }
+        .it small { color: var(--muted); font-weight: 600; font-size: 10px; line-height: 1.25; }
+        .it .new { position: absolute; top: 4px; inset-inline-start: 4px; background: #ff4d8d; color: #fff; font-size: 9px; font-weight: 900; border-radius: 6px; padding: 1px 5px; }
+        .it .lk { position: absolute; top: 4px; inset-inline-end: 6px; font-size: 13px; }
+        .it .buy { background: #ffc93d; color: #1a1205; border: 0; border-radius: 8px; padding: 3px 8px; font: 800 11px Inter, Rubik, sans-serif; cursor: pointer; }
+        .it .buy:disabled { background: #ffc93d55; cursor: default; }
+        .daily { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .box { background: var(--bg-2); border: 1px solid var(--line); border-radius: 16px; padding: 14px; text-align: center; display: grid; gap: 8px; justify-items: center; align-content: start; }
+        .box h4 { font-size: 15px; }
+        .box p { color: var(--muted); font-size: 12px; line-height: 1.4; }
+        #wheel { width: 150px; height: 150px; }
+        #giftCv { width: 120px; height: 120px; }
+        .code { display: flex; gap: 6px; width: 100%; }
+        .code input { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 8px 10px; font: 700 14px Inter, Rubik, sans-serif; text-transform: uppercase; }
+        .slots { display: flex; gap: 6px; }
+        .slots .btn { padding: 6px 9px; font-size: 12px; }
         .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
         .kinds div { background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 8px 4px; font-size: 12px; color: var(--muted); }
         .kinds b { display: block; color: var(--text); font-size: 13px; }
         .kinds canvas { width: 72px; height: 72px; }
-        .how p, .how li { color: #cfd3f5; line-height: 1.6; font-size: 15px; }
+        .how li { color: #cfd3f5; line-height: 1.6; font-size: 15px; }
         .how ul { padding-inline-start: 20px; display: grid; gap: 4px; margin-top: 6px; }
         h3 { font-size: 18px; margin-bottom: 10px; }
-        .bubble { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #fff; color: #0b0d1a; border-radius: 14px; padding: 8px 14px; font: 700 14px Inter, Rubik, sans-serif; max-width: 80%; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
+        .bubble { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #fff; color: #0b0d1a; border-radius: 14px; padding: 8px 14px; font: 700 14px Inter, Rubik, sans-serif; max-width: 80%; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 2; }
         .bubble.show { opacity: 1; }
-        @media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } .kinds { grid-template-columns: repeat(2, 1fr); } }
+        .pop { position: fixed; inset: 0; background: #0008; display: none; place-items: center; z-index: 9500; }
+        .pop.show { display: grid; }
+        .pop > div { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 22px; text-align: center; max-width: 320px; width: 90%; display: grid; gap: 10px; justify-items: center; animation: popin .35s ease; }
+        .pop canvas { width: 160px; height: 160px; }
+        .pop h3 { margin: 0; }
+        @keyframes popin { from { transform: scale(.6); opacity: 0; } }
+        @media (max-width: 760px) { .wrap { display: flex; flex-direction: column; gap: 0; } .wrap > div { display: contents; } .home { order: 1; } #infoCard { order: 2; } #wardCard { order: 3; } #dailyCard { order: 4; } .kinds { grid-template-columns: repeat(2, 1fr); } .daily { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -65,22 +98,52 @@
                     <div class="acts">
                         <button id="patBtn">🤚 Pat</button>
                         <button id="treatBtn">🍪 Treat</button>
+                        <button id="miniBtn">🎯 Treat Catch</button>
                         <a class="main" id="playBtn" href="/">🎮 Play a game</a>
                         <button id="shareBtn">📤 Share</button>
                     </div>
                 </div>
+                <div class="card" id="dailyCard">
+                    <h3 id="dailyH">🎁 Daily fun</h3>
+                    <div class="daily">
+                        <div class="box">
+                            <h4 id="wheelH">🎡 Daily wheel</h4>
+                            <canvas id="wheel" width="300" height="300"></canvas>
+                            <button class="btn main" id="spinBtn">Spin!</button>
+                        </div>
+                        <div class="box">
+                            <h4 id="boxH">📦 Mystery box</h4>
+                            <canvas id="giftCv" width="240" height="240"></canvas>
+                            <p id="boxP"></p>
+                            <button class="btn main" id="boxBtn"></button>
+                        </div>
+                    </div>
+                    <div class="box" style="margin-top:12px">
+                        <h4 id="codeH">🔑 Secret code</h4>
+                        <p id="codeP"></p>
+                        <div class="code"><input id="codeIn" maxlength="16" autocomplete="off" spellcheck="false"><button class="btn main" id="codeBtn">OK</button></div>
+                    </div>
+                </div>
             </div>
             <div>
-                <div class="card">
+                <div class="card" id="infoCard">
                     <div class="name"><h2 id="pname" data-noi18n>Bloop</h2><button id="renameBtn" title="Rename" aria-label="Rename">✏️</button></div>
                     <div class="sub" id="psub">Egg</div>
+                    <div class="chips" data-noi18n><span class="chip coin" id="coinChip"></span><span class="chip" id="streakChip"></span><span class="chip" id="collChip"></span></div>
                     <div class="bar"><label><span>⭐ <span id="xpLbl">Growing</span></span><span id="xpNum" data-noi18n></span></label><div class="t"><div class="f" id="xpBar" style="background:linear-gradient(90deg,#7c5cff,#2ee6c9)"></div></div></div>
                     <div class="bar"><label><span>🍪 Food</span><span id="foodNum" data-noi18n></span></label><div class="t"><div class="f" id="foodBar" style="background:#ffc94d"></div></div></div>
                     <div class="bar"><label><span>❤️ Love</span><span id="loveNum" data-noi18n></span></label><div class="t"><div class="f" id="loveBar" style="background:#ff4d8d"></div></div></div>
                 </div>
-                <div class="card">
-                    <h3>🎩 Accessories</h3>
-                    <div class="hats" id="hats"></div>
+                <div class="card" id="wardCard" data-noi18n>
+                    <h3 id="wardH">👗 Wardrobe</h3>
+                    <div class="tabs" id="tabs"></div>
+                    <div class="tools">
+                        <button class="btn" id="fAll"></button><button class="btn" id="fMine"></button><button class="btn" id="fLocked"></button>
+                        <span class="sp"></span>
+                        <button class="btn" id="randBtn"></button><button class="btn" id="resetBtn"></button>
+                    </div>
+                    <div class="tools"><span id="savedLbl"></span><span class="slots" id="slots"></span></div>
+                    <div class="grid" id="grid"></div>
                 </div>
             </div>
         </div>
@@ -91,18 +154,12 @@
             <div class="kinds" id="kinds"></div>
         </div>
 
-        <div class="card how">
-            <h3>🐾 How it works</h3>
-            <ul>
-                <li><b>Every game you finish feeds your pet</b> and gives it 10 XP. Your first game hatches the egg.</li>
-                <li>It grows from Baby to Kid, Teen, Grown-up and finally Legend.</li>
-                <li>As a Teen it evolves: play sports for <b>Sporty</b>, puzzles and brain games for <b>Brainy</b>, arcade games for <b>Zappy</b>, or word and creative games for <b>Artsy</b>.</li>
-                <li>Pat it and give it a treat (once an hour) to keep it happy. It gets a bit hungry while you're away, but it never gets sick or goes away.</li>
-                <li>Unlock accessories by earning achievements or by growing your pet.</li>
-                <li>Log in and your pet is saved to your account, so it follows you to other devices.</li>
-            </ul>
+        <div class="card how" data-noi18n>
+            <h3 id="howH">🐾 How it works</h3>
+            <ul id="howList"></ul>
         </div>
     </main>
+    <div class="pop" id="pop" data-noi18n><div><canvas id="popCv" width="320" height="320"></canvas><h3 id="popH"></h3><p id="popP" style="color:var(--muted)"></p><div style="display:flex;gap:8px"><button class="btn main" id="popWear"></button><button class="btn" id="popOk">OK</button></div></div></div>
     <footer data-cookie-settings style="text-align:center;color:var(--muted);font-size:14px;padding:0 16px 40px">Made by Noam · <a href="/" style="color:inherit">Games</a> · <a href="/about" style="color:inherit">About</a> · </footer>
 
     <script type="module">
@@ -110,28 +167,78 @@
         import * as P from "/pet.js";
         import { achievementsFor } from "/progress.js";
         import { NAMES } from "/i18n.js";
+        const PI = P.PI;
         const he = LANG === "he", T = (e, h) => (he ? h : e);
         const $ = (id) => document.getElementById(id);
+        const nm = (it) => (he ? it.he : it.en);
         const cv = $("pc"), ctx = cv.getContext("2d");
-        // sharper canvas on high-DPI screens
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         cv.width = 560 * dpr; cv.height = 440 * dpr; ctx.scale(dpr, dpr);
         const hearts = [], crumbs = [];
-        let fx = {}, t0 = performance.now(), bubbleT = 0;
+        let fx = {}, t0 = performance.now(), bubbleT = 0, tryOn = null, tryT = 0;
+        let ach = new Set(), C = P.unlockCtx(ach);
+        let slot = "hat", filter = "all";
 
         function say(text, ms = 2600) { const b = $("bubble"); b.textContent = text; b.classList.add("show"); clearTimeout(bubbleT); bubbleT = setTimeout(() => b.classList.remove("show"), ms); }
+
+        // ---------- Treat Catch mini-game (played right on the pet canvas) ----------
+        let mini = null;
+        function startMini() {
+            if (P.stageOf().id === "egg") { say(T("Hatch me first! Play any game 🥚", "קודם תבקיעו אותי! שחקו משחק 🥚")); return; }
+            mini = { x: 280, tx: 280, items: [], score: 0, lives: 3, time: 30, last: performance.now(), spawn: 0 };
+            $("miniBtn").disabled = true; cv.classList.add("playing"); cv.scrollIntoView({ behavior: "smooth", block: "center" }); say(T("Catch the treats, dodge the broccoli! 🥦", "תפסו חטיפים, התחמקו מהברוקולי! 🥦"));
+        }
+        function endMini() {
+            const n = mini.score; mini = null; $("miniBtn").disabled = false; cv.classList.remove("playing");
+            const coins = P.miniScore(n);
+            say(T(`Score ${n}! +${coins} 🪙`, `${n} נקודות! +${coins} 🪙`), 3500);
+            render(); checkNew();
+        }
+        function miniFrame(now, t) {
+            const dt = Math.min(0.05, (now - mini.last) / 1000); mini.last = now;
+            mini.time -= dt; if (mini.time <= 0 || mini.lives <= 0) { endMini(); return; }
+            if (keys.ArrowLeft || keys.KeyA) mini.tx -= 420 * dt;
+            if (keys.ArrowRight || keys.KeyD) mini.tx += 420 * dt;
+            mini.tx = Math.max(50, Math.min(510, mini.tx)); mini.x += (mini.tx - mini.x) * Math.min(1, dt * 14);
+            mini.spawn -= dt;
+            const speed = 1 + (30 - mini.time) / 22;
+            if (mini.spawn <= 0) { mini.spawn = 0.55 / speed; const r = Math.random(); mini.items.push({ x: 30 + Math.random() * 500, y: -20, e: r < 0.2 ? "🥦" : r < 0.27 ? "⭐" : ["🍪", "🍩", "🍓", "🧁", "🍬"][Math.floor(Math.random() * 5)], v: (150 + Math.random() * 90) * speed }); }
+            for (let i = mini.items.length - 1; i >= 0; i--) {
+                const it = mini.items[i]; it.y += it.v * dt;
+                if (it.y > 300 && it.y < 360 && Math.abs(it.x - mini.x) < 52) {
+                    mini.items.splice(i, 1);
+                    if (it.e === "🥦") { mini.lives--; fx.jump = 8; setTimeout(() => (fx.jump = 0), 200); }
+                    else { const pts = it.e === "⭐" ? 5 : 1; mini.score += pts; hearts.push({ x: it.x, y: 300, a: 1, e: "+" + pts, s: 22 }); }
+                    continue;
+                }
+                if (it.y > 460) mini.items.splice(i, 1);
+            }
+            ctx.font = "34px serif"; ctx.textAlign = "center";
+            for (const it of mini.items) ctx.fillText(it.e, it.x, it.y);
+            P.draw(ctx, mini.x, 340, 0.95, t, P.getPet(), { ...fx, look: (mini.tx - mini.x) / 40 });
+            ctx.textAlign = "start"; ctx.fillStyle = "#fff"; ctx.font = "800 20px Inter, Rubik, sans-serif";
+            ctx.fillText(`⭐ ${mini.score}   ⏱ ${Math.ceil(mini.time)}   ${"❤️".repeat(mini.lives)}`, 16, 32);
+        }
+        const keys = {};
+        addEventListener("keydown", (e) => { if (mini && ["ArrowLeft", "ArrowRight", "KeyA", "KeyD"].includes(e.code)) { keys[e.code] = true; e.preventDefault(); } });
+        addEventListener("keyup", (e) => { keys[e.code] = false; });
+        cv.addEventListener("pointermove", (e) => { if (!mini) return; const r = cv.getBoundingClientRect(); mini.tx = (e.clientX - r.left) * 560 / r.width; });
+
         function frame(now) {
-            const t = (now - t0) / 1000;
+            const t = (now - t0) / 1000, p = P.getPet();
+            const show = tryOn && performance.now() < tryT ? { ...p, outfit: tryOn } : p;
+            if (tryOn && performance.now() >= tryT) tryOn = null;
             ctx.clearRect(0, 0, 560, 440);
-            // floor
-            ctx.fillStyle = "#ffffff08"; ctx.beginPath(); ctx.ellipse(280, 392, 250, 40, 0, 0, 7); ctx.fill();
-            P.draw(ctx, 280, 250, 1.9, t, P.getPet(), fx);
-            for (let i = hearts.length - 1; i >= 0; i--) { const h = hearts[i]; h.y -= 1.2; h.a -= 0.012; if (h.a <= 0) { hearts.splice(i, 1); continue; } ctx.globalAlpha = h.a; ctx.font = `${h.s}px serif`; ctx.fillText(h.e, h.x, h.y); ctx.globalAlpha = 1; }
+            PI.drawRoom(ctx, show.outfit.room, 560, 440, t);
+            if (mini) miniFrame(now, t); else P.draw(ctx, 280, 250, 1.9, t, show, fx);
+            for (let i = hearts.length - 1; i >= 0; i--) { const h = hearts[i]; h.y -= 1.2; h.a -= 0.012; if (h.a <= 0) { hearts.splice(i, 1); continue; } ctx.globalAlpha = h.a; ctx.fillStyle = "#ffc93d"; ctx.font = `800 ${h.s}px Inter, serif`; ctx.fillText(h.e, h.x, h.y); ctx.globalAlpha = 1; }
             for (let i = crumbs.length - 1; i >= 0; i--) { const c = crumbs[i]; c.vy += 0.4; c.x += c.vx; c.y += c.vy; if (c.y > 400) { crumbs.splice(i, 1); continue; } ctx.fillStyle = "#c8873a"; ctx.fillRect(c.x, c.y, 5, 5); }
+            if (tryOn) { ctx.fillStyle = "#000a"; ctx.fillRect(0, 404, 560, 36); ctx.fillStyle = "#fff"; ctx.font = "800 16px Inter, Rubik, sans-serif"; ctx.textAlign = "center"; ctx.fillText(T("👀 Just trying it on. Unlock it to keep it!", "👀 רק מודדים. פתחו כדי לשמור!"), 280, 428); ctx.textAlign = "start"; }
+            drawWheel(t);
             requestAnimationFrame(frame);
         }
-        requestAnimationFrame(frame);
 
+        // ---------- top card ----------
         function render() {
             const p = P.getPet(), st = P.stageOf(p), nx = P.nextStage(p), kind = P.kindOf(p), k = P.KINDS[kind];
             $("pname").textContent = p.name;
@@ -146,45 +253,228 @@
             const left = 3600000 - (Date.now() - (p.treatAt || 0));
             $("treatBtn").disabled = left > 0;
             $("treatBtn").textContent = left > 0 ? T(`🍪 Treat in ${Math.ceil(left / 60000)} min`, `🍪 חטיף בעוד ${Math.ceil(left / 60000)} דק׳`) : T("🍪 Treat", "🍪 חטיף");
-            renderHats();
+            $("miniBtn").textContent = T("🎯 Treat Catch", "🎯 תפיסת חטיפים") + (p.stats.mini ? ` · ${p.stats.mini}` : "");
+            $("coinChip").textContent = `🪙 ${p.coins}`;
+            $("streakChip").textContent = T(`🔥 ${p.streak || 1}-day streak`, `🔥 רצף ${p.streak || 1} ימים`);
+            const n = PI.ITEMS.filter((it) => P.has(it, C)).length;
+            $("collChip").textContent = T(`👗 ${n}/${PI.ITEMS.length} items`, `👗 ${n}/${PI.ITEMS.length} פריטים`);
+            $("spinBtn").disabled = !P.canSpin() || spinning;
+            $("spinBtn").textContent = P.canSpin() ? T("Spin!", "סובבו!") : T("Come back tomorrow", "חזרו מחר");
+            $("boxBtn").textContent = `🪙 ${PI.BOX_PRICE} · ${T("Open", "פתיחה")}`;
+            $("boxBtn").disabled = p.coins < PI.BOX_PRICE;
+            renderGrid();
         }
-        let ach = new Set();
-        function renderHats() {
+
+        // ---------- wardrobe ----------
+        function preview(c, it, base) {
+            const x = c.getContext("2d"), W = c.width, H = c.height; x.clearRect(0, 0, W, H);
+            const o = { ...base.outfit, [it.slot]: it.id };
+            if (it.slot === "room") { x.save(); x.scale(W / 560, H / 440); PI.drawRoom(x, it.id, 560, 440, 1); x.restore(); P.draw(x, W / 2, H * 0.6, W / 260, 1, { ...base, outfit: o }, {}); return; }
+            x.fillStyle = "#ffffff08"; x.fillRect(0, 0, W, H);
+            const zoom = { face: [1.25, 0.66], eyes: [1.2, 0.68], pattern: [0.9, 0.6], held: [0.66, 0.62], aura: [0.6, 0.58] }[it.slot] || [0.78, 0.6];
+            P.draw(x, W / 2 - (it.slot === "held" ? W * 0.12 : 0), H * zoom[1], zoom[0] * W / 144, 1, { ...base, outfit: o }, {});
+        }
+        function demoPet() { const p = P.getPet(); return { ...p, xp: Math.max(p.xp, 600), food: 90, love: 90, kind: P.kindOf(p) === "blob" ? "blob" : p.kind }; }
+        function renderTabs() {
             const p = P.getPet();
-            $("hats").innerHTML = P.HATS.map((h) => {
-                const ok = h.xp <= p.xp || (h.need && ach.has(h.need)) || h.id === "none";
-                return `<button data-h="${h.id}" class="${p.hat === h.id ? "on" : ""}" ${ok ? "" : "disabled"}><canvas width="128" height="128" data-hc="${h.id}"></canvas>${he ? h.he : h.en}${ok ? "" : `<small>${T(`${h.xp} XP or an achievement`, `${h.xp} XP או הישג`)}</small>`}</button>`;
+            $("tabs").innerHTML = PI.SLOTS.map((s) => {
+                const all = PI.ITEMS.filter((it) => it.slot === s.id), mine = all.filter((it) => P.has(it, C));
+                const nu = mine.some((it) => !p.seen.includes(PI.key(it)));
+                return `<button data-s="${s.id}" class="${slot === s.id ? "on" : ""}">${s.e} ${he ? s.he : s.en} <small>${mine.length}/${all.length}</small>${nu ? "<i></i>" : ""}</button>`;
             }).join("");
-            const demo = { ...p, xp: Math.max(p.xp, 1), food: 90, love: 90 };
-            $("hats").querySelectorAll("[data-hc]").forEach((c) => { const x = c.getContext("2d"); P.draw(x, 64, 74, 0.75, 1, { ...demo, hat: c.dataset.hc }, {}); });
         }
+        function renderGrid() {
+            const p = P.getPet(), base = demoPet();
+            renderTabs();
+            $("fAll").textContent = T("All", "הכל"); $("fMine").textContent = T("✅ Mine", "✅ שלי"); $("fLocked").textContent = T("🔒 Locked", "🔒 נעולים");
+            for (const [id, f] of [["fAll", "all"], ["fMine", "mine"], ["fLocked", "locked"]]) $(id).classList.toggle("main", filter === f);
+            $("randBtn").textContent = T("🎲 Random", "🎲 אקראי"); $("resetBtn").textContent = T("↺ Plain", "↺ בלי כלום");
+            $("savedLbl").textContent = T("Saved looks:", "לוקים שמורים:");
+            $("slots").innerHTML = [0, 1, 2].map((i) => `<button class="btn" data-load="${i}" ${p.outfits[i] ? "" : "disabled"}>👗 ${i + 1}</button><button class="btn" data-save="${i}" title="${T("Save current look", "שמירת הלוק")}">💾</button>`).join("");
+            let list = PI.ITEMS.filter((it) => it.slot === slot);
+            if (filter === "mine") list = list.filter((it) => P.has(it, C));
+            if (filter === "locked") list = list.filter((it) => !P.has(it, C));
+            $("grid").innerHTML = list.map((it) => {
+                const ok = P.has(it, C), k = PI.key(it), on = p.outfit[slot] === it.id, nu = ok && !p.seen.includes(k) && it.u.t !== "free";
+                const buy = !ok && it.u.t === "coins" ? `<button class="buy" data-buy="${it.id}" ${p.coins >= it.u.v ? "" : "disabled"}>🪙 ${it.u.v}</button>` : "";
+                return `<div class="it ${on ? "on" : ""} ${ok ? "" : "lock"}" data-i="${it.id}" role="button" tabindex="0">${nu ? `<span class="new">${T("NEW", "חדש")}</span>` : ""}${ok ? "" : '<span class="lk">🔒</span>'}<canvas width="144" height="144" data-c="${it.id}"></canvas>${nm(it)}${ok ? "" : buy || `<small>${PI.howTo(it, C, he)}</small>`}</div>`;
+            }).join("") || `<p style="color:var(--muted);grid-column:1/-1">${T("Nothing here yet!", "עוד אין כאן כלום!")}</p>`;
+            $("grid").querySelectorAll("[data-c]").forEach((c) => preview(c, PI.byId(slot, c.dataset.c), base));
+            // what's on screen counts as seen (after a moment, so the NEW badges are visible first)
+            clearTimeout(renderGrid.seen);
+            renderGrid.seen = setTimeout(() => { P.markSeen(list.filter((it) => P.has(it, C)).map(PI.key)); renderTabs(); }, 2500);
+        }
+        $("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-s]"); if (!b) return; slot = b.dataset.s; renderGrid(); });
+        for (const [id, f] of [["fAll", "all"], ["fMine", "mine"], ["fLocked", "locked"]]) $(id).onclick = () => { filter = f; renderGrid(); };
+        $("grid").addEventListener("click", (e) => {
+            const bb = e.target.closest("[data-buy]");
+            if (bb) {
+                const it = PI.byId(slot, bb.dataset.buy);
+                if (P.buy(it)) { P.wear(slot, it.id); say(T(`Yay, a new ${it.en}! 🛍️`, `יש! ${it.he} חדש! 🛍️`)); confetti(); render(); }
+                return;
+            }
+            const b = e.target.closest("[data-i]"); if (!b) return;
+            const it = PI.byId(slot, b.dataset.i);
+            if (P.has(it, C)) { P.wear(slot, it.id); tryOn = null; fx.jump = -14; setTimeout(() => (fx.jump = 0), 250); say([T("Do I look good? ✨", "אני נראה טוב? ✨"), T("I love it! 😍", "אני אוהב את זה! 😍"), T("So stylish! 😎", "כל כך מגניב! 😎")][Math.floor(Math.random() * 3)]); render(); }
+            else { tryOn = { ...P.getPet().outfit, [slot]: it.id }; tryT = performance.now() + 3500; say(PI.howTo(it, C, he), 3500); scrollPetIntoView(); }
+        });
+        $("grid").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { const b = e.target.closest("[data-i]"); if (b) { e.preventDefault(); b.click(); } } });
+        function scrollPetIntoView() { const r = cv.getBoundingClientRect(); if (r.bottom < 80 || r.top > innerHeight - 80) cv.scrollIntoView({ behavior: "smooth", block: "center" }); }
+        $("randBtn").onclick = () => {
+            const o = {};
+            for (const s of PI.SLOTS) { const mine = PI.ITEMS.filter((it) => it.slot === s.id && P.has(it, C)); o[s.id] = Math.random() < (s.id === "room" || s.id === "color" ? 0.8 : 0.6) ? mine[Math.floor(Math.random() * mine.length)].id : P.getPet().outfit[s.id]; }
+            P.setOutfit(o); fx.jump = -14; setTimeout(() => (fx.jump = 0), 250); say(T("Surprise look! 🎲", "לוק הפתעה! 🎲")); render();
+        };
+        $("resetBtn").onclick = () => { P.setOutfit({}); render(); };
+        $("slots").addEventListener("click", (e) => {
+            const s = e.target.closest("[data-save]"), l = e.target.closest("[data-load]");
+            if (s) { P.saveOutfit(+s.dataset.save); toast(T(`💾 Look ${+s.dataset.save + 1} saved`, `💾 לוק ${+s.dataset.save + 1} נשמר`)); render(); }
+            if (l && !l.disabled) { P.loadOutfit(+l.dataset.load); say(T("Changed! ✨", "החלפתי! ✨")); render(); }
+        });
+
+        // ---------- daily wheel ----------
+        const wcv = $("wheel"), wx = wcv.getContext("2d"), WCOL = ["#7c5cff", "#2ee6c9", "#ff4d8d", "#ffc93d", "#3d8bff", "#ff8a3d", "#57d164", "#a64dff"];
+        let wAng = 0, spinning = false, spinFrom = 0, spinTo = 0, spinStart = 0, spinRes = null;
+        function drawWheel(t) {
+            if (spinning) {
+                const k = Math.min(1, (performance.now() - spinStart) / 3500), e = 1 - Math.pow(1 - k, 3);
+                wAng = spinFrom + (spinTo - spinFrom) * e;
+                if (k >= 1) { spinning = false; spinDone(); }
+            }
+            const n = PI.WHEEL.length, R = 140; wx.clearRect(0, 0, 300, 300); wx.save(); wx.translate(150, 150);
+            for (let i = 0; i < n; i++) {
+                const a0 = wAng + (i * 2 * Math.PI) / n - Math.PI / 2 - Math.PI / n, a1 = a0 + (2 * Math.PI) / n;
+                wx.fillStyle = WCOL[i]; wx.beginPath(); wx.moveTo(0, 0); wx.arc(0, 0, R, a0, a1); wx.fill();
+                const w = PI.WHEEL[i], am = (a0 + a1) / 2;
+                wx.save(); wx.rotate(am); wx.fillStyle = "#fff"; wx.font = "900 20px Inter, sans-serif"; wx.textAlign = "right"; wx.textBaseline = "middle";
+                wx.fillText(w.kind === "coins" ? `${w.v}🪙` : w.kind === "xp" ? `${w.v}⭐` : "🎁", R - 10, 0); wx.restore();
+            }
+            wx.fillStyle = "#171b36"; wx.beginPath(); wx.arc(0, 0, 22, 0, 7); wx.fill(); wx.restore();
+            wx.fillStyle = "#fff"; wx.beginPath(); wx.moveTo(136, 0); wx.lineTo(164, 0); wx.lineTo(150, 26); wx.fill();
+        }
+        $("spinBtn").onclick = () => {
+            if (spinning) return;
+            const res = P.spin(C); if (!res) { render(); return; }
+            spinRes = res; spinning = true; spinStart = performance.now(); spinFrom = wAng % (2 * Math.PI);
+            const n = PI.WHEEL.length; spinTo = spinFrom + 2 * Math.PI * 5 + (2 * Math.PI - ((res.i * 2 * Math.PI) / n) - (spinFrom % (2 * Math.PI)));
+            $("spinBtn").disabled = true;
+        };
+        function spinDone() {
+            const r = spinRes;
+            if (r.item) showItem(r.item, T("🎡 You won an item!", "🎡 זכיתם בפריט!"));
+            else { say(r.kind === "coins" ? T(`+${r.v} coins! 🪙`, `+${r.v} מטבעות! 🪙`) : T(`+${r.v} XP! ⭐`, `+${r.v} XP! ⭐`)); confetti(); }
+            render();
+        }
+
+        // ---------- mystery box ----------
+        const gcv = $("giftCv"), gx = gcv.getContext("2d"); let shake = 0;
+        function drawGift(t) {
+            gx.clearRect(0, 0, 240, 240); gx.save(); gx.translate(120, 140); gx.rotate(Math.sin(t * 30) * shake * 0.15);
+            gx.fillStyle = "#7c5cff"; gx.fillRect(-70, -40, 140, 100); gx.fillStyle = "#9a7cff"; gx.fillRect(-80, -62, 160, 30);
+            gx.fillStyle = "#ffc93d"; gx.fillRect(-12, -62, 24, 122);
+            for (const sd of [-1, 1]) { gx.beginPath(); gx.ellipse(sd * 26, -74, 26, 14, sd * 0.5, 0, 7); gx.fill(); }
+            gx.fillStyle = "#fff"; gx.font = "900 40px Inter, sans-serif"; gx.textAlign = "center"; gx.fillText("?", 0, 28);
+            gx.restore(); requestAnimationFrame((n) => drawGift(n / 1000));
+        }
+        requestAnimationFrame((n) => drawGift(n / 1000));
+        $("boxBtn").onclick = () => {
+            shake = 1; $("boxBtn").disabled = true;
+            setTimeout(() => {
+                shake = 0; const it = P.openBox(C);
+                if (it) showItem(it, T("📦 Look what was inside!", "📦 תראו מה היה בפנים!")); else toast(T("You already have everything a box can give! 🎉", "כבר יש לכם כל מה שיש בקופסאות! 🎉"));
+                render();
+            }, 900);
+        };
+
+        // ---------- secret codes ----------
+        $("codeBtn").onclick = () => {
+            const v = $("codeIn").value; if (!v.trim()) return;
+            const r = P.redeem(v);
+            if (!r) { $("codeIn").animate([{ transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "none" }], { duration: 250 }); say(T("Hmm, that's not a code I know 🤔", "המממ, אני לא מכיר את הקוד הזה 🤔")); return; }
+            $("codeIn").value = "";
+            if (r.already) { say(T("You already have that one! 😄", "כבר יש לכם את זה! 😄")); return; }
+            showItem(r.it, T("🔑 Secret unlocked!", "🔑 סוד נפתח!")); render();
+        };
+        $("codeIn").onkeydown = (e) => { if (e.key === "Enter") $("codeBtn").click(); };
+
+        // ---------- "you got an item" popup ----------
+        let popItem = null;
+        function showItem(it, title) {
+            popItem = it; $("popH").textContent = title; $("popP").textContent = `${PI.SLOTS.find((s) => s.id === it.slot).e} ${nm(it)}`;
+            $("popWear").textContent = T("Wear it!", "ללבוש!");
+            const c = $("popCv"); preview(c, it, demoPet());
+            $("pop").classList.add("show"); confetti();
+        }
+        $("popOk").onclick = () => $("pop").classList.remove("show");
+        $("pop").onclick = (e) => { if (e.target.id === "pop") $("pop").classList.remove("show"); };
+        $("popWear").onclick = () => { P.wear(popItem.slot, popItem.id); slot = popItem.slot; $("pop").classList.remove("show"); render(); scrollPetIntoView(); say(T("Thank you!! 🥰", "תודה!! 🥰")); };
+        addEventListener("keydown", (e) => { if (e.key === "Escape") $("pop").classList.remove("show"); });
+
+        function confetti() { for (let i = 0; i < 18; i++) hearts.push({ x: 120 + Math.random() * 320, y: 200 + Math.random() * 120, a: 1, e: ["✨", "⭐", "🎉", "💖"][i % 4], s: 18 + Math.random() * 14 }); }
+
+        // new unlocks since the last visit
+        function checkNew() {
+            const p = P.getPet(), fresh = PI.ITEMS.filter((it) => it.u.t !== "free" && P.has(it, C) && !p.seen.includes(PI.key(it)) && !(p.notified || []).includes(PI.key(it)));
+            if (!fresh.length) return;
+            p.notified = [...(p.notified || []), ...fresh.map(PI.key)];
+            if (fresh.length === 1) showItem(fresh[0], T("🔓 New item unlocked!", "🔓 נפתח פריט חדש!"));
+            else toast(T(`🔓 ${fresh.length} new items unlocked! Look for the NEW badges.`, `🔓 נפתחו ${fresh.length} פריטים חדשים! חפשו את התגית "חדש".`), 4500);
+            renderTabs();
+        }
+
         function renderKinds() {
             const p = P.getPet(), mine = P.kindOf(p), grown = !["egg", "baby", "kid"].includes(P.stageOf(p).id);
             $("kinds").innerHTML = ["sporty", "brainy", "zappy", "artsy"].map((k) => `<div style="${grown && mine === k ? "border-color:" + P.KINDS[k].color : ""}"><canvas width="144" height="144" data-k="${k}"></canvas><b>${he ? P.KINDS[k].he : P.KINDS[k].en}</b>${{ sporty: T("Sports games", "משחקי ספורט"), brainy: T("Puzzles & brain games", "פאזלים וחשיבה"), zappy: T("Arcade games", "משחקי ארקייד"), artsy: T("Word & creative", "מילים ויצירה") }[k]}</div>`).join("");
             $("kinds").querySelectorAll("[data-k]").forEach((c) => { const x = c.getContext("2d"); P.draw(x, 72, 80, 0.8, 1, { xp: 600, kind: c.dataset.k, food: 90, love: 90, hat: "none" }, {}); });
             if (grown) $("kindNote").textContent = T(`Your pet evolved into a ${P.KINDS[mine].en}, because of the games you play most.`, `חיית המחמד שלכם התפתחה ל${P.KINDS[mine].he}, בגלל המשחקים שאתם משחקים הכי הרבה.`);
         }
+        function renderHow() {
+            $("dailyH").textContent = T("🎁 Daily fun", "🎁 כיף יומי"); $("wheelH").textContent = T("🎡 Daily wheel", "🎡 הגלגל היומי"); $("boxH").textContent = T("📦 Mystery box", "📦 קופסת הפתעה"); $("codeH").textContent = T("🔑 Secret code", "🔑 קוד סודי");
+            $("boxP").textContent = T("A random item you don't have yet. Some items only come from boxes!", "פריט אקראי שעוד אין לכם. יש פריטים שמגיעים רק מקופסאות!");
+            $("codeP").textContent = T("Heard a secret code? Type it here. (Hint: try a word you see a lot on this site…)", "שמעתם על קוד סודי? הקלידו אותו כאן. (רמז: נסו מילה שרואים הרבה באתר…)");
+            $("codeIn").placeholder = T("CODE", "קוד"); $("wardH").textContent = T("👗 Wardrobe", "👗 ארון בגדים"); $("howH").textContent = T("🐾 How it works", "🐾 איך זה עובד");
+            $("howList").innerHTML = (he ? [
+                "<b>כל משחק שמסיימים מאכיל את החיה</b> ונותן 10 XP ו־5 🪙. המשחק הראשון בוקע את הביצה.",
+                "היא גדלה מתינוק לילד, נער, בוגר ובסוף אגדה. כל פעם שהיא גדלה מקבלים 50 🪙.",
+                "כנער היא מתפתחת: ספורט ← <b>ספורטאי</b>, פאזלים וחשיבה ← <b>גאון</b>, ארקייד ← <b>זאפי</b>, מילים ויצירה ← <b>אמן</b>.",
+                "<b>ארון בגדים:</b> כובעים, צבעים, דוגמאות, עיניים, פנים, צוואר, חפצים ביד, אפקטים וחדרים. לחצו על פריט נעול כדי למדוד אותו!",
+                "<b>דרכים לפתוח פריטים:</b> לקנות במטבעות, הישגים, לשחק במשחק מסוים, לשחק הרבה משחקים מסוג מסוים, רצף ימים, ליטופים וחטיפים, הגלגל היומי, קופסת הפתעה, קודים סודיים, ביקור בלילה או מוקדם בבוקר, פריטים עונתיים, לגדול, ופרימיום.",
+                "<b>מטבעות:</b> מסיימים משחקים, נכנסים כל יום (רצף = יותר!), נותנים חטיפים, משחקים בתפיסת חטיפים ומסובבים את הגלגל.",
+                "שמרו עד 3 לוקים, או לחצו 🎲 ללוק אקראי.",
+                "התחברו, וחיית המחמד נשמרת בחשבון שלכם."
+            ] : [
+                "<b>Every game you finish feeds your pet</b> and gives it 10 XP and 5 🪙. Your first game hatches the egg.",
+                "It grows from Baby to Kid, Teen, Grown-up and finally Legend. Every time it grows you get 50 🪙.",
+                "As a Teen it evolves: sports → <b>Sporty</b>, puzzles and brain games → <b>Brainy</b>, arcade → <b>Zappy</b>, word and creative games → <b>Artsy</b>.",
+                "<b>Wardrobe:</b> hats, colours, patterns, eyes, faces, neckwear, things to hold, effects and rooms. Tap a locked item to try it on!",
+                "<b>Ways to unlock:</b> buy with coins, achievements, playing a certain game, playing lots of one kind of game, daily streaks, pats and treats, the daily wheel, mystery boxes, secret codes, visiting at night or early in the morning, seasonal items, growing up, and Premium.",
+                "<b>Coins:</b> finish games, visit every day (streaks give more!), give treats, play Treat Catch and spin the wheel.",
+                "Save up to 3 looks, or tap 🎲 for a random one.",
+                "Log in and your pet is saved to your account, so it follows you to other devices."
+            ]).map((x) => `<li>${x}</li>`).join("");
+        }
 
         cv.addEventListener("pointerdown", (e) => {
+            if (mini) { const r = cv.getBoundingClientRect(); mini.tx = (e.clientX - r.left) * 560 / r.width; return; }
             const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * 560 / r.width, y = (e.clientY - r.top) * 440 / r.height;
             if (P.stageOf().id === "egg") { say(T("Play a game to hatch me! 🥚", "שחקו משחק כדי שאבקע! 🥚")); return; }
             P.pat(); fx.pat = true; fx.jump = -12; setTimeout(() => { fx.pat = false; fx.jump = 0; }, 350);
             for (let i = 0; i < 3; i++) hearts.push({ x: x - 10 + Math.random() * 30, y, a: 1, e: "❤️", s: 18 + Math.random() * 12 });
-            render();
+            render(); checkNew();
         });
         $("patBtn").onclick = () => cv.dispatchEvent(new PointerEvent("pointerdown", { clientX: cv.getBoundingClientRect().left + cv.getBoundingClientRect().width / 2, clientY: cv.getBoundingClientRect().top + cv.getBoundingClientRect().height * 0.45 }));
         $("treatBtn").onclick = () => {
             if (P.stageOf().id === "egg") { say(T("Eggs don't eat yet! Play a game to hatch me.", "ביצים עוד לא אוכלות! שחקו משחק כדי שאבקע.")); return; }
             if (P.treat()) { for (let i = 0; i < 14; i++) crumbs.push({ x: 280, y: 230, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 6 }); say(T("Yum! Thank you! 😋", "יאמי! תודה! 😋")); }
-            render();
+            render(); checkNew();
         };
+        $("miniBtn").onclick = startMini;
         $("renameBtn").onclick = () => {
             const h = $("pname"); h.contentEditable = "true"; h.focus();
             document.getSelection().selectAllChildren(h);
             const done = () => { h.contentEditable = "false"; P.rename(h.textContent); render(); };
             h.onblur = done; h.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); h.blur(); } };
         };
-        $("hats").addEventListener("click", (e) => { const b = e.target.closest("[data-h]"); if (!b || b.disabled) return; P.wear(b.dataset.h); render(); say(T("Do I look good? ✨", "אני נראה טוב? ✨")); });
         $("shareBtn").onclick = async () => {
             const blob = await P.petCard();
             const file = new File([blob], "my-hub-pet.png", { type: "image/png" });
@@ -193,22 +483,27 @@
             const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "my-hub-pet.png"; a.click();
             toast(T("🖼️ Picture saved. Send it to a friend!", "🖼️ התמונה נשמרה. שלחו לחבר!"));
         };
-        // suggest a game that fits the pet's kind
         function suggest() {
             const kind = P.kindOf(), tags = kind === "blob" ? ["arcade", "puzzle", "sports"] : P.KINDS[kind].tags;
             const list = Object.entries(GAMES).filter(([id, g]) => g.tags.some((t) => tags.includes(t)));
             const [id, g] = list[Math.floor(Math.random() * list.length)];
             $("playBtn").href = g.path; $("playBtn").textContent = T(`🎮 Play ${g.name}`, `🎮 שחקו ${NAMES[g.name] || g.name}`);
         }
-        render(); renderKinds(); suggest();
+
+        const today = P.checkIn();
+        renderHow(); render(); renderKinds(); suggest();
+        requestAnimationFrame(frame);
+        if (today.daily) setTimeout(() => toast(T(`☀️ Daily visit: +${today.daily} 🪙 · 🔥 ${today.streak}-day streak`, `☀️ ביקור יומי: +${today.daily} 🪙 · 🔥 רצף ${today.streak} ימים`), 4000), 400);
         const st = P.stageOf().id, md = P.mood();
         setTimeout(() => say(st === "egg" ? T("Play any game to hatch me! 🥚", "שחקו משחק כלשהו כדי שאבקע! 🥚") : md === "sad" ? T("I missed you! I'm hungry… 🥺", "התגעגעתי! אני רעב… 🥺") : T(`Hi! Let's play ${$("playBtn").textContent.replace(/^🎮 (Play |שחקו )/, "")}! 🎮`, `היי! בואו נשחק ${$("playBtn").textContent.replace(/^🎮 (Play |שחקו )/, "")}! 🎮`), 3500), 600);
+        setTimeout(checkNew, 1500);
         await ready;
         if (state.user) {
             try { const g = await getMyGames(state.user.uid); ach = new Set(achievementsFor(g, state.profile).filter((a) => a.done).map((a) => a.id)); } catch (e) {}
-            render(); renderKinds();
         }
-        setInterval(render, 30000);
+        C = P.unlockCtx(ach);
+        render(); renderKinds(); setTimeout(checkNew, 1600);
+        setInterval(render, 60000);
     </script>
     <script type="module" src="/hub.js"></script>
 </body>

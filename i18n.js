@@ -765,4 +765,4 @@ export function addLangButton(lang) {
     const b = make(); b.classList.add("float"); document.body.appendChild(b);
 }
 
-export { NAMES };
+export { NAMES, TEXT };

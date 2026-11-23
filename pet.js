@@ -3,7 +3,11 @@
 // (it never dies), and wears accessories you unlock with achievements.
 // Saved in the browser, and on your account when you're logged in.
 
-import { GAMES, state, ready, LANG, toast } from "./hub.js";
+import { GAMES, state, ready, LANG, toast, isPremium } from "./hub.js";
+import * as PI from "./pet-items.js";
+import { ACHIEVEMENTS } from "./progress.js";
+import { TEXT, NAMES } from "./i18n.js";
+export { PI };
 
 const he = LANG === "he";
 const T = (en, hw) => (he ? hw : en);
@@ -41,10 +45,23 @@ export const HATS = [
 
 const now = () => Date.now();
 function blank() { return { name: T("Bloop", "בלופ"), born: now(), xp: 0, food: 80, love: 60, last: now(), hat: "none", plays: {}, treatAt: 0, v: 1 }; }
+const OUTFIT0 = { hat: "none", color: "default", pattern: "none", eyes: "normal", face: "none", neck: "none", held: "none", aura: "none", room: "default" };
+// older pets only had a hat: give them the new wardrobe fields
+function migrate(p) {
+    p.outfit = { ...OUTFIT0, ...(p.outfit || {}) };
+    if (p.hat && p.hat !== "none" && p.outfit.hat === "none" && !p.migrated) p.outfit.hat = p.hat;
+    p.migrated = 1;
+    p.owned = Array.isArray(p.owned) ? p.owned : [];
+    p.coins = p.coins || 0;
+    p.stats = p.stats || {};
+    p.outfits = Array.isArray(p.outfits) ? p.outfits : [];
+    p.seen = Array.isArray(p.seen) ? p.seen : [];
+    return p;
+}
 function load() {
     let p = null;
     try { p = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
-    return p && p.v ? p : blank();
+    return migrate(p && p.v ? p : blank());
 }
 let pet = load();
 function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(pet)); } catch (e) {} }
@@ -99,7 +116,11 @@ async function sync() {
 // on login, keep whichever pet has grown more (account or this browser)
 ready.then(() => {
     const acc = state.profile && state.profile.pet;
-    if (acc && acc.v && (acc.xp || 0) > (pet.xp || 0)) { pet = { ...acc, last: pet.last }; decay(); saveLocal(); }
+    if (acc && acc.v && (acc.xp || 0) > (pet.xp || 0)) {
+        const mine = pet; pet = migrate({ ...acc, last: pet.last });
+        pet.owned = [...new Set([...pet.owned, ...mine.owned])]; pet.coins = Math.max(pet.coins, mine.coins);
+        decay(); saveLocal();
+    }
     else if (state.user && pet.xp > 0 && (!acc || acc.xp !== pet.xp)) sync();
 });
 
@@ -117,6 +138,7 @@ function grow(xp, food, love) {
             : after.id === "teen" ? T(`✨ Your pet evolved into a ${k.en}!`, `✨ חיית המחמד התפתחה ל${k.he}!`)
             : T(`⬆️ Your pet grew up: ${after.en}!`, `⬆️ חיית המחמד גדלה: ${after.he}!`);
         toast(`${msg} · <a href="/pet">${T("See it", "לצפייה")}</a>`, 5000);
+        if (before.id !== "egg") earn(50);
     }
     sync();
 }
@@ -127,18 +149,115 @@ export function fed(game) {
     pet.plays[game] = (pet.plays[game] || 0) + 1;
     const first = pet.xp === 0;
     grow(10, 12, 4);
+    earn(5);
     if (!first && Math.random() < 0.25) toast(T(`🍪 Your pet ate a snack (+10 XP)`, `🍪 חיית המחמד אכלה חטיף (+10 XP)`), 1800);
 }
 export function bonus(xp, why) { grow(xp, 5, 5); if (why) toast(`🐾 ${why} (+${xp} XP)`, 2200); }
 
 // pet page actions
-export function pat() { pet.love = Math.min(100, pet.love + 4); pet.last = now(); sync(); }
+export function pat() {
+    pet.love = Math.min(100, pet.love + 4); pet.last = now();
+    pet.stats.pats = (pet.stats.pats || 0) + 1;
+    if (pet.stats.pats % 25 === 0) earn(5);
+    sync();
+}
 export function treat() {
     if (now() - (pet.treatAt || 0) < 3600000) return false;
-    pet.treatAt = now(); pet.food = Math.min(100, pet.food + 25); grow(5, 0, 6); return true;
+    pet.treatAt = now(); pet.food = Math.min(100, pet.food + 25);
+    pet.stats.treats = (pet.stats.treats || 0) + 1; earn(3);
+    grow(5, 0, 6); return true;
 }
 export function rename(n) { pet.name = String(n).replace(/[<>]/g, "").trim().slice(0, 16) || pet.name; sync(); }
-export function wear(id) { pet.hat = id; sync(); }
+export function wear(slot, id) {
+    if (id === undefined) { id = slot; slot = "hat"; }
+    pet.outfit[slot] = id; if (slot === "hat") pet.hat = id; sync();
+}
+
+// ---------- Coins, unlocks, shop, wheel, mystery box, codes ----------
+export function earn(n) {
+    pet.coins = (pet.coins || 0) + n;
+    pet.stats.coinsEarned = (pet.stats.coinsEarned || 0) + n;
+    sync();
+}
+const DAY = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
+// call once per page visit: daily coins + streak + "visit at night" style unlocks. Returns what happened.
+export function checkIn() {
+    const out = {}, d = new Date(), h = d.getHours(), s = pet.stats;
+    if (h >= 21 || h < 5) s.time_night = 1;
+    if (h >= 5 && h < 8) s.time_early = 1;
+    if (d.getDay() === 5 || d.getDay() === 6) s.time_weekend = 1;
+    const today = DAY();
+    if (pet.lastDay !== today) {
+        const y = new Date(Date.now() - 864e5); const yest = y.getFullYear() + "-" + (y.getMonth() + 1) + "-" + y.getDate();
+        pet.streak = pet.lastDay === yest ? (pet.streak || 0) + 1 : 1;
+        pet.lastDay = today;
+        s.bestStreak = Math.max(s.bestStreak || 0, pet.streak);
+        out.daily = 20 + Math.min(30, (pet.streak - 1) * 5);
+        earn(out.daily);
+        // seasonal items: you get them just for visiting during that month
+        const m = d.getMonth();
+        out.seasonal = PI.ITEMS.filter((it) => it.u.t === "month" && it.u.v.includes(m) && give(it));
+    }
+    out.streak = pet.streak || 1;
+    sync();
+    return out;
+}
+function give(it) { const k = PI.key(it); if (pet.owned.includes(k)) return false; pet.owned.push(k); return true; }
+export function unlockCtx(ach = new Set()) {
+    const tagCount = (tag) => Object.entries(pet.plays || {}).reduce((n, [g, c]) => n + ((GAMES[g] && GAMES[g].tags || []).includes(tag) ? c : 0), 0);
+    let premium = false; try { premium = !!isPremium(); } catch (e) {}
+    return { pet, ach, premium, stage: stageOf().id, kind: kindOf(), tagCount,
+        gameName: (g) => (GAMES[g] ? (he && NAMES[GAMES[g].name]) || GAMES[g].name : g),
+        achName: (id) => { const a = ACHIEVEMENTS.find((x) => x.id === id); return a ? (he ? TEXT[a.name] || a.name : a.name) : id; },
+        tagName: (g) => ({ arcade: "ארקייד", puzzle: "פאזל", brain: "חשיבה", sports: "ספורט", word: "מילים", music: "מוזיקה", creative: "יצירה" }[g] || g) };
+}
+export const has = (it, c) => PI.owned(it, c);
+export function buy(it) {
+    if (it.u.t !== "coins" || pet.coins < it.u.v || pet.owned.includes(PI.key(it))) return false;
+    pet.coins -= it.u.v; give(it); sync(); return true;
+}
+// mystery box: a random item you don't have yet, preferring box-only items
+export function openBox(c) {
+    if (pet.coins < PI.BOX_PRICE) return null;
+    const missing = PI.ITEMS.filter((it) => !PI.owned(it, c) && ["box", "coins", "spin"].includes(it.u.t));
+    if (!missing.length) return null;
+    const boxOnly = missing.filter((it) => it.u.t === "box");
+    const pool = boxOnly.length && Math.random() < 0.6 ? boxOnly : missing;
+    const it = pool[Math.floor(Math.random() * pool.length)];
+    pet.coins -= PI.BOX_PRICE; give(it); sync(); return it;
+}
+export const canSpin = () => pet.spinDay !== DAY();
+export function spin(c) {
+    if (!canSpin()) return null;
+    pet.spinDay = DAY();
+    const i = Math.floor(Math.random() * PI.WHEEL.length), w = PI.WHEEL[i];
+    const res = { i, ...w };
+    if (w.kind === "coins") earn(w.v);
+    if (w.kind === "xp") grow(w.v, 0, 5);
+    if (w.kind === "item") {
+        const pool = PI.ITEMS.filter((it) => !PI.owned(it, c) && (it.u.t === "spin" || it.u.t === "coins"));
+        const spinOnly = pool.filter((it) => it.u.t === "spin");
+        const p2 = spinOnly.length ? spinOnly : pool;
+        if (p2.length) { res.item = p2[Math.floor(Math.random() * p2.length)]; give(res.item); } else { res.kind = "coins"; res.v = 40; earn(40); }
+    }
+    sync(); return res;
+}
+export function redeem(text) {
+    const it = PI.ITEMS.find((x) => PI.codeMatches(x, text));
+    if (!it) return null;
+    if (!give(it)) return { it, already: true };
+    sync(); return { it };
+}
+export function miniScore(n) {
+    pet.stats.mini = Math.max(pet.stats.mini || 0, n);
+    const c = Math.min(30, Math.floor(n / 3)); if (c) earn(c);
+    grow(Math.min(15, Math.floor(n / 4)), 3, 8);
+    return c;
+}
+export function saveOutfit(i) { pet.outfits[i] = { ...pet.outfit }; sync(); }
+export function loadOutfit(i) { if (pet.outfits[i]) { pet.outfit = { ...OUTFIT0, ...pet.outfits[i] }; pet.hat = pet.outfit.hat; sync(); } }
+export function setOutfit(o) { pet.outfit = { ...OUTFIT0, ...o }; pet.hat = pet.outfit.hat; sync(); }
+export function markSeen(keys) { pet.seen = [...new Set([...pet.seen, ...keys])]; saveLocal(); }
 
 // ---------- Drawing ----------
 // draw(ctx, cx, cy, scale, t) draws the pet centred at cx,cy. t = time in seconds (for animation).
@@ -146,11 +265,15 @@ export function draw(ctx, cx, cy, s, t, p = pet, fx = {}) {
     const st = stageOf(p);
     ctx.save(); ctx.translate(cx, cy);
     if (st.id === "egg") { drawEgg(ctx, s, t, p); ctx.restore(); return; }
-    const k = KINDS[kindOf(p)], md = mood(p);
+    const k0 = KINDS[kindOf(p)], md = mood(p), o = (p.outfit) || { ...OUTFIT0, hat: p.hat || "none" };
+    const pal = PI.PALETTE[o.color];
+    const k = pal ? { ...k0, color: pal[0], belly: pal[1] } : ["rainbow", "galaxy", "lava"].includes(o.color) ? { ...k0, color: { rainbow: "#ff8a3d", galaxy: "#3a2a8f", lava: "#d6401a" }[o.color], belly: { rainbow: "#fff0b8", galaxy: "#7c5cff", lava: "#ffcf3d" }[o.color] } : k0;
     const bounce = Math.abs(Math.sin(t * (md === "happy" ? 3.2 : md === "ok" ? 2.2 : 1.2))) * 8 * s;
     const squash = 1 + Math.sin(t * 6.4) * 0.03;
     const r = 60 * s * st.size;
     ctx.translate(0, -bounce + (fx.jump || 0));
+    PI.drawAura(ctx, o.aura, r, t, "back");
+    PI.drawBack(ctx, o, r, t);
     // shadow
     ctx.save(); ctx.translate(0, bounce - (fx.jump || 0)); ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(0, r * 0.95, r * 0.75 * (1 - bounce / 120), r * 0.16, 0, 0, 7); ctx.fill(); ctx.restore();
     // feet
@@ -166,14 +289,21 @@ export function draw(ctx, cx, cy, s, t, p = pet, fx = {}) {
     // body
     ctx.save(); ctx.scale(1 / squash, squash);
     const bg = ctx.createRadialGradient(-r * 0.3, -r * 0.4, r * 0.1, 0, 0, r * 1.1); bg.addColorStop(0, shade(k.color, 35)); bg.addColorStop(1, k.color);
-    ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.92, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = PI.bodyFill(ctx, o.color, k.color, r, t) || bg; ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.92, 0, 0, 7); ctx.fill();
+    if (o.color === "ghost") { ctx.globalAlpha = 0.75; }
     ctx.fillStyle = k.belly; ctx.beginPath(); ctx.ellipse(0, r * 0.32, r * 0.58, r * 0.5, 0, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+    PI.drawPattern(ctx, o.pattern, r, t, k.color);
+    if (o.color === "neon") { ctx.strokeStyle = "#39ff88"; ctx.lineWidth = 3; ctx.shadowColor = "#39ff88"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.92, 0, 0, 7); ctx.stroke(); ctx.shadowBlur = 0; }
+    if (o.color === "galaxy") for (let i = 0; i < 12; i++) { ctx.fillStyle = `rgba(255,255,255,${0.4 + 0.5 * Math.abs(Math.sin(t * 2 + i))})`; ctx.fillRect(Math.sin(i * 7.1) * r * 0.7, Math.cos(i * 3.3) * r * 0.6, 2, 2); }
     ctx.restore();
     // kind extras
-    kindExtras(ctx, kindOf(p), r, t, k);
+    if (!o.hat || o.hat === "none" || kindOf(p) === "artsy") kindExtras(ctx, kindOf(p), r, t, k);
     // eyes (blink every few seconds)
     const blink = (t % 4) > 3.86 || fx.happyEyes;
-    for (const sd of [-1, 1]) {
+    const custom = o.eyes && o.eyes !== "normal" && !fx.happyEyes;
+    if (custom) PI.drawEyes(ctx, o.eyes, r, s, t, fx.look || 0);
+    if (!custom) for (const sd of [-1, 1]) {
         const ex = sd * r * 0.32, ey = -r * 0.18;
         if (blink || (md === "happy" && fx.pat)) { ctx.strokeStyle = "#0b0d1a"; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.arc(ex, ey + 2, r * 0.1, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); continue; }
         ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.17, r * 0.2, 0, 0, 7); ctx.fill();
@@ -189,10 +319,15 @@ export function draw(ctx, cx, cy, s, t, p = pet, fx = {}) {
     else if (md === "ok") { ctx.moveTo(-r * 0.1, r * 0.14); ctx.lineTo(r * 0.1, r * 0.14); }
     else { ctx.arc(0, r * 0.28, r * 0.13, 1.15 * Math.PI, 1.85 * Math.PI); }
     ctx.stroke();
+    PI.drawFace(ctx, o.face, r, s, t);
+    PI.drawNeck(ctx, o.neck, r, s, t);
     if (md === "sad") { ctx.fillStyle = "#7cc8ff"; ctx.beginPath(); ctx.ellipse(r * 0.42, r * 0.02 + (t * 30 % 20) * s, r * 0.04, r * 0.07, 0, 0, 7); ctx.fill(); }
     // legend sparkle
     if (st.id === "legend") for (let i = 0; i < 5; i++) { const a = t * 0.8 + i * 1.256; ctx.fillStyle = "#ffc94d"; star(ctx, Math.cos(a) * r * 1.35, Math.sin(a) * r * 1.1, r * 0.07 * (1 + Math.sin(t * 4 + i) * 0.3)); }
-    hat(ctx, p.hat, r, t, s);
+    hat(ctx, o.hat, r, t, s);
+    PI.drawHat(ctx, o.hat, r, t, s);
+    PI.drawHeld(ctx, o.held, r, s, t);
+    PI.drawAura(ctx, o.aura, r, t, "front");
     ctx.restore();
 }
 function drawEgg(ctx, s, t, p) {
@@ -232,6 +367,7 @@ export async function petCard(p = pet) {
     const ctx = c.getContext("2d");
     const k = KINDS[kindOf(p)], st = stageOf(p);
     const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#1b1440"); g.addColorStop(1, "#0b0d1a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (p.outfit && p.outfit.room && p.outfit.room !== "default") { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 640, H); ctx.clip(); ctx.translate(20, 0); PI.drawRoom(ctx, p.outfit.room, 600, H, 0.5); ctx.restore(); }
     const rg = ctx.createRadialGradient(330, 300, 0, 330, 300, 320); rg.addColorStop(0, k.color + "55"); rg.addColorStop(1, "transparent"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
     draw(ctx, 330, 300, 2.3, 0.5, p, {});
     const f = (w, s) => `${w} ${s}px Inter, Rubik, system-ui, sans-serif`;
