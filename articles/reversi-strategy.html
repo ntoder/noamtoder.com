@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Corners, the dangerous squares next to them, and why fewer discs often means you&#x27;re winning. A beginner&#x27;s guide to Reversi.">
+    <title>Reversi strategy: why grabbing the most discs is a mistake · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">⚫</div>
+        <h1 class="t">Reversi strategy: why grabbing the most discs is a mistake</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 25 November 2026 · 6 min read</div>
+        
+<p>Reversi has been played since the 1880s in England, and a modern version called Othello was published in Japan in the 1970s. The rules take a minute to learn: place a disc so that it traps a line of your opponent's discs between two of yours, and the trapped discs flip to your colour. Whoever has the most discs when the board is full wins. The surprise is that the obvious strategy, flipping as many discs as you can every turn, usually loses.</p>
+
+<h2>Why "most discs" is a trap</h2>
+<p>Discs can flip back and forth all game, so having lots of them early doesn't mean much. What matters is how many good moves you have left. If you own most of the board, your opponent often has plenty of choices while you have only a few, and some of those few are bad. Strong players often have fewer discs in the middle of the game and then take over at the end.</p>
+
+<h2>1. Corners are gold</h2>
+<p>A disc in a corner can never be flipped, because there's no way to trap it. Even better, discs next to a corner along the edge become safe once the corner is yours. Grabbing a corner is usually the best move on the board.</p>
+
+<h2>2. Avoid the squares next to empty corners</h2>
+<p>The square diagonally next to a corner is called the <b>X-square</b>, and the two squares beside a corner on the edges are <b>C-squares</b>. Playing on one of these while the corner is still empty often lets your opponent take the corner. Unless you can see that it's safe, keep away from them.</p>
+
+<h2>3. Keep your options open (mobility)</h2>
+<p>Try to make moves that leave you with lots of choices next turn and leave your opponent with few. One simple way: prefer moves that flip only a disc or two and keep your discs grouped in the middle, rather than moves that spread your colour all over the edges. When your opponent runs out of good moves, they'll be forced into an X-square or a bad edge.</p>
+
+<h2>4. Be careful with edges</h2>
+<p>Edges feel safe because they're harder to flip than middle squares, but they aren't corners. An edge disc can still be flipped along the edge. Before taking an edge square, check whether it gives your opponent a way into the corner.</p>
+
+<h2>5. Quiet moves are strong</h2>
+<p>A "quiet" move flips few discs and doesn't open new squares for your opponent. Beginners love big, noisy moves that flip ten discs. Experienced players look for quiet ones, because they give the opponent nothing new to play with.</p>
+
+<h2>6. Count at the end</h2>
+<p>In the last ten or so moves the game becomes a counting race. Now flipping lots of discs really does matter, and so does who gets the very last move. If you've kept the corners, the edges next to them will be yours and the final count usually goes your way.</p>
+
+<h2>Try it</h2>
+<p><a href="/Reversi/reversi">Reversi</a> on the Hub shows you every legal move, so you can concentrate on choosing well. Play a few games where your only goal is to never touch an X-square while the corner is empty, and see how often the corners end up yours.</p>
+
+        <div class="cta"><a class="btn" href="/Reversi/reversi">▶ Play Reversi</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/connect-four-strategy">🔴 How to win at Four in a Row: centre columns, traps and odd rows<span>Why the middle column matters, how to build two threats at once, and the odd/even row rule that strong players use.</span></a><a href="/articles/tower-of-hanoi">🗼 The Tower of Hanoi: the puzzle that teaches recursion<span>Where the puzzle comes from, the trick to solving any size, why 64 discs would take billions of years, and what it has to do with programming.</span></a><a href="/articles/mancala-strategy">🪨 Mancala tips: free turns, captures and counting stones<span>Mancala is one of the oldest kinds of board game in the world. Here&#x27;s how the popular two-row version works and how to play it well.</span></a><a href="/articles/nine-mens-morris">⚪ Nine Men&#x27;s Morris: an ancient game and how to win it<span>A board game scratched into Roman stones and mentioned by Shakespeare. Here are the rules and the strategy for all three phases.</span></a><a href="/articles/dots-and-boxes-strategy">🔳 Dots and Boxes: the chain trick that wins almost every game<span>Why giving away boxes can win you the game. The long-chain rule and the &#x27;double-cross&#x27; explained simply.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Why giving away boxes can win you the game. The long-chain rule and the &#x27;double-cross&#x27; explained simply.">
+    <title>Dots and Boxes: the chain trick that wins almost every game · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🔳</div>
+        <h1 class="t">Dots and Boxes: the chain trick that wins almost every game</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 25 November 2026 · 6 min read</div>
+        
+<p>Dots and Boxes is the paper-and-pencil game where players take turns drawing a line between two dots. Close the fourth side of a box and you claim it and draw again. It was described by the French mathematician Édouard Lucas (the same person who invented the Tower of Hanoi) in 1889. Most people play it by grabbing every box they can, but strong players know a trick that wins game after game.</p>
+
+<h2>The beginning: don't give anything away</h2>
+<p>Early on, the rule is simple: never draw the third side of a box, because your opponent will just take it. Players keep drawing "safe" lines until there are none left. At that point the board is full of <b>chains</b>: corridors of boxes where drawing one line lets the other player take the whole corridor.</p>
+
+<h2>Chains decide the game</h2>
+<p>When the safe lines run out, someone has to open a chain. Whoever opens it gives the boxes away. So the real game is about who will be forced to open the long chains at the end. Short chains (one or two boxes) don't matter much. Long chains (three or more) are where the points are.</p>
+
+<h2>The double-cross</h2>
+<p>Here's the trick. When your opponent opens a long chain for you, take all the boxes except the last two. Instead of closing those two, draw the line that leaves them as a pair for your opponent. They get two boxes, but now they have to move again, and the only moves left open the next chain, which you take. Giving away two boxes to win the next chain is usually a great deal. This move is called a double-cross.</p>
+
+<h2>The long-chain rule</h2>
+<p>There's a counting rule that tells you, early in the game, whether you're on track to be the one in control at the end. On a board with an even number of dots, the first player wants an odd number of long chains; the second player wants an even number. You don't need to memorise it to get better. Just start noticing chains as they form, and try to make or break them so you're not the one forced to open the last long one.</p>
+
+<h2>Simple habits that help</h2>
+<ul>
+<li>Never draw the third side of a box unless you have no choice.</li>
+<li>Late in the game, if you must give something away, give the smallest chain.</li>
+<li>When you're handed a long chain, remember the double-cross: leave the last two boxes.</li>
+</ul>
+
+<h2>Play it</h2>
+<p><a href="/DotsBoxes/dotsboxes">Dots and Boxes</a> on the Hub lets you play the computer or a friend. Try the double-cross the next time the computer opens a long chain for you, and watch the score swing.</p>
+
+        <div class="cta"><a class="btn" href="/DotsBoxes/dotsboxes">▶ Play Dots and Boxes</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/connect-four-strategy">🔴 How to win at Four in a Row: centre columns, traps and odd rows<span>Why the middle column matters, how to build two threats at once, and the odd/even row rule that strong players use.</span></a><a href="/articles/reversi-strategy">⚫ Reversi strategy: why grabbing the most discs is a mistake<span>Corners, the dangerous squares next to them, and why fewer discs often means you&#x27;re winning. A beginner&#x27;s guide to Reversi.</span></a><a href="/articles/tower-of-hanoi">🗼 The Tower of Hanoi: the puzzle that teaches recursion<span>Where the puzzle comes from, the trick to solving any size, why 64 discs would take billions of years, and what it has to do with programming.</span></a><a href="/articles/mancala-strategy">🪨 Mancala tips: free turns, captures and counting stones<span>Mancala is one of the oldest kinds of board game in the world. Here&#x27;s how the popular two-row version works and how to play it well.</span></a><a href="/articles/nine-mens-morris">⚪ Nine Men&#x27;s Morris: an ancient game and how to win it<span>A board game scratched into Roman stones and mentioned by Shakespeare. Here are the rules and the strategy for all three phases.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

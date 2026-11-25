@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple &#x27;chase the lights&#x27; method that solves almost any board, plus why the order of your presses doesn&#x27;t matter.">
+    <title>How to solve Lights Out (and the maths behind it) · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">💡</div>
+        <h1 class="t">How to solve Lights Out (and the maths behind it)</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 25 November 2026 · 6 min read</div>
+        
+<p>Lights Out is a grid of lights. Pressing a light switches it and its neighbours (above, below, left and right) between on and off. The goal is to turn every light off. It became popular as a handheld electronic game in the 1990s, and it hides some neat maths that makes it much easier to solve.</p>
+
+<h2>Two facts that change everything</h2>
+<p><b>Pressing a light twice does nothing.</b> The second press undoes the first. So in any solution, each light is pressed either once or not at all.</p>
+<p><b>Order doesn't matter.</b> Every press just flips the same five lights no matter when you do it. Pressing A then B gives exactly the same result as B then A. So a solution is really just a set of squares to press, not a sequence.</p>
+<p>These two facts mean you can stop worrying about "undoing" moves and think about which squares belong in your set.</p>
+
+<h2>The chase-the-lights method</h2>
+<ol>
+<li>Look at the top row. For every light that is on in the top row, press the light directly <b>below</b> it in the second row. This turns off the top row.</li>
+<li>Now do the same for the second row: for every light still on, press the one below it in the third row.</li>
+<li>Keep going down the board, row by row. You'll end up with all rows off except, possibly, the bottom row.</li>
+</ol>
+<p>If the bottom row is off too, you've won. If not, the pattern left on the bottom row tells you which squares to press in the <b>top</b> row before chasing again. Every board size has its own small table of bottom-row patterns and matching top-row presses. With a bit of practice you can work them out by experimenting: press a top-row light, chase all the way down, and see what bottom pattern it creates.</p>
+
+<h2>Why this works</h2>
+<p>Once the top row's presses are decided, every other press is forced: there's only one way to clear each row using the row below. So the whole puzzle comes down to choosing the top row. On a 5 by 5 board there are only 32 possible top rows, which is why the method always gets there.</p>
+
+<h2>The maths name for it</h2>
+<p>Mathematicians solve Lights Out with <b>linear algebra over two numbers</b>, 0 and 1, where 1 + 1 = 0 (two presses cancel). Each light becomes an equation and each button a variable. That sounds advanced, but it's the same idea as the chase method, written down in a way computers can solve instantly. It also proves that some starting patterns can never be solved, which is why puzzle makers generate boards by pressing random buttons on a dark board instead of switching random lights on.</p>
+
+<h2>Practise</h2>
+<p>In <a href="/LightsOut/lightsout">Lights Out</a> on the Hub, the grid grows from 3 by 3 up to 5 by 5. Try the chase method on the small boards first and you'll find the bigger ones much less scary.</p>
+
+        <div class="cta"><a class="btn" href="/LightsOut/lightsout">▶ Play Lights Out</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/connect-four-strategy">🔴 How to win at Four in a Row: centre columns, traps and odd rows<span>Why the middle column matters, how to build two threats at once, and the odd/even row rule that strong players use.</span></a><a href="/articles/reversi-strategy">⚫ Reversi strategy: why grabbing the most discs is a mistake<span>Corners, the dangerous squares next to them, and why fewer discs often means you&#x27;re winning. A beginner&#x27;s guide to Reversi.</span></a><a href="/articles/tower-of-hanoi">🗼 The Tower of Hanoi: the puzzle that teaches recursion<span>Where the puzzle comes from, the trick to solving any size, why 64 discs would take billions of years, and what it has to do with programming.</span></a><a href="/articles/mancala-strategy">🪨 Mancala tips: free turns, captures and counting stones<span>Mancala is one of the oldest kinds of board game in the world. Here&#x27;s how the popular two-row version works and how to play it well.</span></a><a href="/articles/nine-mens-morris">⚪ Nine Men&#x27;s Morris: an ancient game and how to win it<span>A board game scratched into Roman stones and mentioned by Shakespeare. Here are the rules and the strategy for all three phases.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

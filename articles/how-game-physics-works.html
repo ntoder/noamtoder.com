@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Why a jumping character falls back down, how balls bounce, and how games know two things touched. The simple maths behind most browser game physics.">
+    <title>How game physics works: gravity, bouncing and collisions in a few lines of code · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🍎</div>
+        <h1 class="t">How game physics works: gravity, bouncing and collisions in a few lines of code</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 25 November 2026 · 8 min read</div>
+        
+<p>When a character jumps and lands, a ball bounces off a wall, or a tower of blocks falls over, the game is doing physics. You might expect that to need hard maths, but most games use a few simple rules, repeated many times a second. Here's how they work, with small pieces of JavaScript you can try.</p>
+
+<h2>Position and velocity</h2>
+<p>Every moving object has a position (<code>x</code>, <code>y</code>) and a velocity (<code>vx</code>, <code>vy</code>): how far it moves each frame. Each frame, the game adds the velocity to the position:</p>
+<pre><code>ball.x += ball.vx;
+ball.y += ball.vy;</code></pre>
+<p>That's all that's needed for something to move in a straight line. On a screen, <code>y</code> usually gets bigger as you go <i>down</i>, so a positive <code>vy</code> means falling.</p>
+
+<h2>Gravity</h2>
+<p>Gravity doesn't change where something is; it changes how fast it's moving. So each frame, we add a little to the downward velocity:</p>
+<pre><code>const GRAVITY = 0.5;
+ball.vy += GRAVITY;   // speed up downwards a bit every frame
+ball.y  += ball.vy;</code></pre>
+<p>A jump is just giving the character a big upward velocity once (for example <code>vy = -10</code>). Gravity then slows it down, stops it at the top and pulls it back. That's why game jumps make a curved arc, the same shape as a thrown ball in real life.</p>
+
+<h2>Bouncing</h2>
+<p>To bounce off the floor, check whether the ball went below it, put it back on the floor, and flip its vertical velocity:</p>
+<pre><code>if (ball.y + ball.r > floorY) {
+  ball.y = floorY - ball.r;
+  ball.vy = -ball.vy * 0.8;   // 0.8 = loses some energy each bounce
+}</code></pre>
+<p>The 0.8 is called the <b>restitution</b>. With 1 the ball bounces forever; with 0 it just stops. Real balls are somewhere in between, which is why each bounce is a bit lower.</p>
+
+<h2>Friction and air resistance</h2>
+<p>To make things slow down naturally, multiply the velocity by a number just under 1 each frame:</p>
+<pre><code>ball.vx *= 0.99;</code></pre>
+<p>This one line is how ice levels feel slippery (0.995) and mud levels feel sticky (0.8).</p>
+
+<h2>Collisions</h2>
+<p>Games need to know when two things touch. The two most common checks are very short.</p>
+<p><b>Two circles</b> touch when the distance between their centres is less than their two radiuses added together:</p>
+<pre><code>const dx = a.x - b.x, dy = a.y - b.y;
+const touching = Math.hypot(dx, dy) &lt; a.r + b.r;</code></pre>
+<p><b>Two rectangles</b> (often called boxes) overlap when neither one is completely to the left, right, above or below the other:</p>
+<pre><code>const touching = a.x &lt; b.x + b.w &amp;&amp; a.x + a.w &gt; b.x &amp;&amp;
+                 a.y &lt; b.y + b.h &amp;&amp; a.y + a.h &gt; b.y;</code></pre>
+<p>Many games use simple boxes and circles even for complicated-looking characters, because these checks are fast and players rarely notice.</p>
+
+<h2>Frames and time</h2>
+<p>Browsers usually draw about 60 frames a second, but some screens run faster. To keep the game the same speed everywhere, careful games multiply movement by the time since the last frame (often called <code>dt</code>). Otherwise a game could run twice as fast on a 120 Hz screen.</p>
+
+<h2>Bigger physics engines</h2>
+<p>Games with piles of blocks that topple and spin, like Castle Smash, add rotation, mass and lots of collisions solved together. Programmers often use a ready-made physics engine for that. But every engine is built on the same ideas as the few lines above: move by velocity, change velocity with forces, and fix things up when objects overlap.</p>
+
+<h2>See it in action</h2>
+<p>Watch for these rules next time you play: the arc of a shot in <a href="/HoopShot/hoopshot">Hoop Shot</a>, the bounces in <a href="/Breakout/breakout">Brick Smash</a>, or blocks tumbling in <a href="/CastleSmash/castlesmash">Castle Smash</a>. If you want to try writing your own, our guide to <a href="/articles/first-game">making your first game</a> is a good place to start.</p>
+
+        <div class="cta"><a class="btn" href="/CastleSmash/castlesmash">▶ Play Castle Smash</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/connect-four-strategy">🔴 How to win at Four in a Row: centre columns, traps and odd rows<span>Why the middle column matters, how to build two threats at once, and the odd/even row rule that strong players use.</span></a><a href="/articles/reversi-strategy">⚫ Reversi strategy: why grabbing the most discs is a mistake<span>Corners, the dangerous squares next to them, and why fewer discs often means you&#x27;re winning. A beginner&#x27;s guide to Reversi.</span></a><a href="/articles/tower-of-hanoi">🗼 The Tower of Hanoi: the puzzle that teaches recursion<span>Where the puzzle comes from, the trick to solving any size, why 64 discs would take billions of years, and what it has to do with programming.</span></a><a href="/articles/mancala-strategy">🪨 Mancala tips: free turns, captures and counting stones<span>Mancala is one of the oldest kinds of board game in the world. Here&#x27;s how the popular two-row version works and how to play it well.</span></a><a href="/articles/nine-mens-morris">⚪ Nine Men&#x27;s Morris: an ancient game and how to win it<span>A board game scratched into Roman stones and mentioned by Shakespeare. Here are the rules and the strategy for all three phases.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
