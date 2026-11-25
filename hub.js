@@ -180,7 +180,8 @@ const domReady = new Promise((r) => (document.readyState === "loading" ? addEven
 ready.then(async () => {
     await domReady;
     if (isPremium()) document.querySelectorAll("[data-ad]").forEach((el) => el.remove());
-    else { loadAds(); placeAds(); }
+    // no ads on app-style pages with little text (AdSense "low value content" policy); they're noindex too
+    else if (!document.querySelector('meta[name="robots"][content*="noindex"]')) { loadAds(); placeAds(); }
     showAnnouncement();
     if (isBanned()) toast("⛔ Your account has been suspended, so scores aren't being saved. Ask Noam if you think this is a mistake.", 8000);
 });

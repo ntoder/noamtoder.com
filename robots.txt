@@ -3,5 +3,6 @@ Disallow: /admin
 Disallow: /profile
 Disallow: /login
 Disallow: /zohoverify/
+Disallow: /_mac-app/
 
 Sitemap: https://noamtoder.com/sitemap.xml
