@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="How computers make &#x27;random&#x27; numbers, why the same seed gives the same game, and how to shuffle a deck fairly in code.">
+    <title>How games use random numbers (and why they&#x27;re not really random) · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🎲</div>
+        <h1 class="t">How games use random numbers (and why they&#x27;re not really random)</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 7 min read</div>
+        
+<p>Almost every game uses randomness: shuffling cards, placing mines, choosing the next falling block, deciding where food appears in Snake. But computers follow exact instructions, so how can they do anything random? The answer is that most of the time, they don't, and they don't need to.</p>
+
+<h2>Pseudo-random numbers</h2>
+<p>Most games use a <b>pseudo-random number generator</b> (PRNG). It's a formula that takes a number, scrambles it with some maths, and produces a new number that looks random. Then it uses that number to make the next one, and so on. The results pass lots of tests for randomness, but they're completely predictable if you know the formula and the starting number.</p>
+<p>In JavaScript, <code>Math.random()</code> gives a number between 0 and 1. To roll a dice:</p>
+<pre><code>const roll = Math.floor(Math.random() * 6) + 1;   // 1 to 6</code></pre>
+
+<h2>Seeds</h2>
+<p>The starting number of a PRNG is called the <b>seed</b>. The same seed always produces the same sequence. That sounds like a problem, but games use it on purpose:</p>
+<ul>
+<li><b>Daily puzzles:</b> use the date as the seed and everyone in the world gets the same puzzle that day.</li>
+<li><b>Sharing worlds:</b> games that generate whole worlds let players share a seed so friends can explore the same world.</li>
+<li><b>Replays:</b> recording the seed and the player's inputs is enough to replay a whole game exactly.</li>
+</ul>
+
+<h2>Shuffling fairly</h2>
+<p>Shuffling looks easy, but many simple methods are secretly unfair, making some orders more likely than others. The standard fair method is the <b>Fisher–Yates shuffle</b>: go through the deck from the end, and swap each card with a random card at or before it.</p>
+<pre><code>function shuffle(deck) {
+  for (let i = deck.length - 1; i &gt; 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}</code></pre>
+<p>Every possible order comes out equally likely. A deck of 52 cards has so many possible orders (a number with 68 digits) that a well-shuffled deck is almost certainly in an order no deck has ever been in before.</p>
+
+<h2>Random isn't always fun</h2>
+<p>Pure randomness can feel unfair. Ten bad results in a row can happen by chance, and players hate it. So many games bend the rules a little:</p>
+<ul>
+<li>Falling-block games often use a "bag": all seven piece shapes are shuffled, dealt out, then reshuffled, so you never wait too long for the piece you need.</li>
+<li>Mine-finding games usually make sure your first click is safe.</li>
+<li>Some games secretly raise your chances after a run of bad luck.</li>
+</ul>
+
+<h2>Truly random numbers</h2>
+<p>When randomness really matters, like for passwords and security, computers collect unpredictability from the real world: tiny timing differences, electrical noise and other physical sources. Browsers provide this through <code>crypto.getRandomValues()</code>. For games, <code>Math.random()</code> is perfectly fine.</p>
+
+<h2>Try it</h2>
+<p>Every new game of <a href="/Solitaire/solitaire">Solitaire</a> starts with a shuffle like the one above. If you're learning to code, try writing a dice-rolling program that rolls 6,000 times and counts each number. Each should come up close to 1,000 times.</p>
+
+        <div class="cta"><a class="btn" href="/Solitaire/solitaire">▶ Play Solitaire</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/pinball-tips">🪩 Pinball tips: how to trap the ball, aim your shots and score more<span>Stop flailing at the flippers. Learn to catch the ball, aim with the flipper, pass it between flippers and use nudges, plus a bit of pinball history.</span></a><a href="/articles/snake-strategy">🐍 Snake strategy: how to get a really long snake<span>Hug the walls, sweep in zig-zags and never trap yourself. Simple strategies for the classic Snake game, plus where Snake came from.</span></a><a href="/articles/bowling-tips-and-scoring">🎳 Bowling tips and how bowling scoring really works<span>Why strikes and spares are worth extra, how a 300 game works, and where to aim to knock down all ten pins.</span></a><a href="/articles/breakout-history-and-tips">🧱 Brick-breaking games: the story of Breakout and how to clear every level<span>How a 1976 arcade game built by two future Apple founders created a whole genre, and how to control the ball&#x27;s angle to clear bricks faster.</span></a><a href="/articles/falling-block-puzzle-tips">🟦 Falling-block puzzle tips: keep your stack flat and clear more lines<span>Flat stacks, a well for the long piece, using Hold and Next, and staying calm at high speed. How to get better at falling-block puzzles like Block Drop.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

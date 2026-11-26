@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Why screens mix red, green and blue, how hex colour codes work, and how to choose colours that look good together in pixel art.">
+    <title>Colour mixing for pixel art: RGB, hex codes and colour palettes · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🎨</div>
+        <h1 class="t">Colour mixing for pixel art: RGB, hex codes and colour palettes</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 6 min read</div>
+        
+<p>If you've mixed paint, you know blue and yellow make green. On a screen, colours work differently. Understanding how is useful for pixel art, web design and any game you make.</p>
+
+<h2>Paint: mixing makes darker</h2>
+<p>Paint absorbs some light and reflects the rest. The more paints you mix, the more light gets absorbed, and the darker and muddier the colour becomes. This is called <b>subtractive</b> mixing. Printers use cyan, magenta and yellow ink for the same reason.</p>
+
+<h2>Screens: mixing makes lighter</h2>
+<p>A screen gives off light. Each tiny pixel is made of red, green and blue lights, and every colour you see is a mix of those three. The more light you add, the brighter it gets. Red and green light together make yellow, all three at full strength make white, and all three off make black. This is <b>additive</b> mixing, and it's why computers describe colours as <b>RGB</b>.</p>
+
+<h2>Hex codes</h2>
+<p>In web pages and many art tools, colours are written as hex codes like <code>#FF8800</code>. The six characters are three pairs: red, green and blue. Each pair goes from 00 (none) to FF (full), using the numbers 0 to 9 and letters A to F. So:</p>
+<ul>
+<li><code>#FF0000</code> is pure red.</li>
+<li><code>#00FF00</code> is pure green.</li>
+<li><code>#FFFF00</code> is red plus green: yellow.</li>
+<li><code>#FF8800</code> is full red with half green: orange.</li>
+<li><code>#808080</code> is all three at half: grey.</li>
+</ul>
+<p>Once you know this, you can guess a colour just by reading its code.</p>
+
+<h2>Choosing colours that work together</h2>
+<p>Pixel art usually uses a small set of colours, called a <b>palette</b>. A few ideas for choosing one:</p>
+<ul>
+<li><b>Shades:</b> for each main colour, pick a darker version for shadows and a lighter one for highlights.</li>
+<li><b>Warm shadows, cool shadows:</b> artists often make shadows slightly bluer or purpler instead of just darker, which looks more natural.</li>
+<li><b>Complementary colours:</b> colours opposite each other on a colour wheel (blue and orange, purple and yellow) make each other stand out.</li>
+<li><b>Fewer is better:</b> many famous pixel-art games used tiny palettes. Limits force clever choices.</li>
+</ul>
+
+<h2>Contrast matters</h2>
+<p>The most important thing in a game sprite isn't colour, it's <b>contrast</b>: light against dark. A character should stand out from the background even if you squint. Try turning your art black and white: if you can still see the shape clearly, the contrast is good.</p>
+
+<h2>Try it</h2>
+<p>Make a sprite in <a href="/PixelPaint/pixelpaint">Pixel Paint</a> using just four colours: an outline, a main colour, a shadow and a highlight. For more, read <a href="/articles/pixel-art-for-beginners">pixel art for beginners</a>.</p>
+
+        <div class="cta"><a class="btn" href="/PixelPaint/pixelpaint">▶ Open Pixel Paint</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/pinball-tips">🪩 Pinball tips: how to trap the ball, aim your shots and score more<span>Stop flailing at the flippers. Learn to catch the ball, aim with the flipper, pass it between flippers and use nudges, plus a bit of pinball history.</span></a><a href="/articles/snake-strategy">🐍 Snake strategy: how to get a really long snake<span>Hug the walls, sweep in zig-zags and never trap yourself. Simple strategies for the classic Snake game, plus where Snake came from.</span></a><a href="/articles/bowling-tips-and-scoring">🎳 Bowling tips and how bowling scoring really works<span>Why strikes and spares are worth extra, how a 300 game works, and where to aim to knock down all ten pins.</span></a><a href="/articles/breakout-history-and-tips">🧱 Brick-breaking games: the story of Breakout and how to clear every level<span>How a 1976 arcade game built by two future Apple founders created a whole genre, and how to control the ball&#x27;s angle to clear bricks faster.</span></a><a href="/articles/falling-block-puzzle-tips">🟦 Falling-block puzzle tips: keep your stack flat and clear more lines<span>Flat stacks, a well for the long piece, using Hold and Next, and staying calm at high speed. How to get better at falling-block puzzles like Block Drop.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
