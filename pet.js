@@ -392,6 +392,8 @@ export function mountBuddy() {
     c.width = 92 * dpr; c.height = 92 * dpr; c.style.cssText = "width:92px;height:92px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.45))";
     const b = document.createElement("div");
     b.style.cssText = `position:absolute;bottom:88px;left:6px;background:#fff;color:#0b0d1a;border-radius:12px;padding:7px 11px;font:700 13px Inter,Rubik,system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;transition:opacity .3s;pointer-events:none;direction:${he ? "rtl" : "ltr"}`;
+    // smaller on phones so it doesn't cover the games
+    if (innerWidth < 600) { wrap.style.width = wrap.style.height = c.style.width = c.style.height = "64px"; wrap.style.left = "8px"; wrap.style.bottom = "8px"; b.style.bottom = "60px"; b.style.fontSize = "12px"; }
     wrap.append(b, c); document.body.appendChild(wrap);
     wrap.onmouseenter = () => (wrap.style.transform = "scale(1.1)"); wrap.onmouseleave = () => (wrap.style.transform = "");
     const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);

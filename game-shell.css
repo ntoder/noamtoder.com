@@ -70,3 +70,5 @@ canvas { display: block; max-width: 100%; touch-action: none; }
 .hint { font-size: 14.5px; }
 .seg button { font-size: 15px; padding: 9px 16px; }
 @media (max-width: 520px) { .stats { flex-wrap: wrap; justify-content: center; } .stat { min-width: 62px; padding: 6px 9px; } .stat b { font-size: 17px; } }
+
+@media (max-width: 600px) { .stage { padding: 8px 8px 12px; } .frame { border-radius: 12px; } .gbar { padding: 8px 10px; gap: 8px; } .gbar h1 { font-size: 13px; } .hint { font-size: 12.5px; padding: 0 12px 12px; } .touch button { width: 70px; height: 60px; } }

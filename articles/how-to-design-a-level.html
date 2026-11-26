@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Teach one idea at a time, make it fair, add a twist and test with real players. Simple level-design advice for anyone making their first games.">
+    <title>How to design a good game level: 8 tips for young game makers · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🛠️</div>
+        <h1 class="t">How to design a good game level: 8 tips for young game makers</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 7 min read</div>
+        
+<p>Making a game is one thing. Making levels that are fun to play is another skill altogether, and professional game studios have people whose whole job is level design. If you're building your own game, or making levels in a level editor, these ideas will help your levels feel fair, clear and exciting.</p>
+
+<h2>1. Teach one idea at a time</h2>
+<p>Every new thing in your game (a jump pad, a moving enemy, a key that opens a door) should be introduced on its own, in a safe place, before you combine it with anything else. Many famous games teach without any text at all: the first time a new object appears, the level is shaped so the player has to use it, and failing isn't dangerous.</p>
+
+<h2>2. Then test it, then twist it</h2>
+<p>A classic pattern for designing with a new idea is: <b>introduce</b> it safely, <b>test</b> it with a bit of danger, <b>twist</b> it (combine it with something else or use it in an unexpected way), and finally <b>finish</b> with a harder challenge. This rhythm keeps levels feeling fresh.</p>
+
+<h2>3. Make it fair</h2>
+<p>Players accept losing when they understand why. They get annoyed when they're killed by something they couldn't see, or a jump that only works with pixel-perfect timing. Some rules that help:</p>
+<ul>
+<li>Let the player see danger before it hurts them.</li>
+<li>Give a little extra room on jumps and hit boxes. Being slightly generous makes games feel better.</li>
+<li>Put checkpoints before hard sections, so a mistake doesn't send the player back too far.</li>
+</ul>
+
+<h2>4. Difficulty should go up and down</h2>
+<p>A level that gets harder and harder with no rest is exhausting. Good levels follow a wave: a hard bit, then an easier bit to breathe, then something harder. The overall difficulty goes up, but not in a straight line.</p>
+
+<h2>5. Guide with design, not arrows</h2>
+<p>Players look at bright things, moving things and open spaces. Use light, colour and shape to show the way. A coin or star placed along the right path quietly tells players where to go.</p>
+
+<h2>6. Reward curiosity</h2>
+<p>Hidden areas, secret paths and bonus items make players feel clever. They don't need to be big. A single extra star behind a waterfall is enough to make someone explore every corner of your next level.</p>
+
+<h2>7. Keep levels short</h2>
+<p>Especially for first games, short levels are better than long ones. A level that takes 30 to 90 seconds to finish once you know it is easy to retry and easy to test. You can always make more levels.</p>
+
+<h2>8. Watch someone play</h2>
+<p>This is the most important tip. Sit next to a friend or family member while they play your level, and <i>don't help them</i>. Watch where they get stuck, what they miss and where they smile. You'll learn more from five minutes of watching than from an hour of playing it yourself, because you already know the solution.</p>
+
+<h2>Try it yourself</h2>
+<p>On this site you can make your own <a href="/Noametry/noametry">Noametry</a> levels in the Level Maker, or code a whole game in Game Studio and share it with other players. If you're just starting out, read our guide to <a href="/articles/first-game">making your first game</a> first.</p>
+
+        <div class="cta"><a class="btn" href="/Noametry/noametry">▶ Play Noametry</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/tic-tac-toe-never-lose">❌ How to never lose at Tic-Tac-Toe<span>Tic-Tac-Toe is a solved game: with good play it always ends in a draw. Here are the simple rules that make sure you never lose, and the traps that beat beginners.</span></a><a href="/articles/sea-battle-strategy">🚢 Sea Battle strategy: how to find ships faster<span>Use a checkerboard search pattern, hunt smartly after a hit, and place your own ships where they&#x27;re hard to find. Strategy for Battleship-style games.</span></a><a href="/articles/solitaire-strategy">🃏 Solitaire strategy: how to win more games of Klondike<span>Turn over hidden cards first, think before you empty a column, and don&#x27;t rush cards to the foundations. Tips for classic Klondike solitaire.</span></a><a href="/articles/gomoku-strategy">⚫ Five in a Row (Gomoku) strategy: open threes, fours and forks<span>Learn the shapes that win Gomoku: open threes, fours and the double threat. How to attack, when to defend, and why the first move matters.</span></a><a href="/articles/penalty-kick-game-theory">⚽ Penalty kicks and game theory: why being unpredictable wins<span>Where should you shoot, and which way should the keeper dive? The surprising maths of penalties, and how it helps you in the Penalty Shootout game.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

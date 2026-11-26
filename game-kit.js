@@ -126,8 +126,9 @@
             let side = 0;
             if (wrap && innerWidth > 760) wrap.querySelectorAll(":scope > .side").forEach((s) => { side += s.getBoundingClientRect().width + 14; });
             const bar = document.querySelector(".gbar"), touch = document.querySelector(".touch");
-            const used = (bar ? bar.offsetHeight : 60) + 70 + (touch && getComputedStyle(touch).display !== "none" ? touch.offsetHeight + 10 : 0);
-            const availW = Math.min(innerWidth - 56, 1700) - side, availH = Math.max(260, innerHeight - used);
+            const phone = innerWidth < 600;
+            const used = (bar ? bar.offsetHeight : 60) + (phone ? 34 : 70) + (touch && getComputedStyle(touch).display !== "none" ? touch.offsetHeight + 10 : 0);
+            const availW = Math.min(innerWidth - (phone ? 18 : 56), 1700) - side, availH = Math.max(260, innerHeight - used);
             return Math.max(0.3, Math.min(availW / w, availH / h, 1.9));
         };
         const s0 = fit();

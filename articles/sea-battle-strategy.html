@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Use a checkerboard search pattern, hunt smartly after a hit, and place your own ships where they&#x27;re hard to find. Strategy for Battleship-style games.">
+    <title>Sea Battle strategy: how to find ships faster · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">🚢</div>
+        <h1 class="t">Sea Battle strategy: how to find ships faster</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 6 min read</div>
+        
+<p>In Sea Battle (the classic "Battleship" game), each player hides a fleet on a grid and takes turns guessing squares to shoot at. It feels like pure luck, but it isn't. Good shooting can find a fleet in far fewer shots than random guessing, and good hiding makes your fleet much harder to find.</p>
+
+<h2>Two modes: hunting and targeting</h2>
+<p>Every shot is either <b>hunting</b> (looking for a new ship) or <b>targeting</b> (finishing off a ship you've already hit). Treat them very differently.</p>
+
+<h2>Hunting: use a checkerboard</h2>
+<p>The smallest ship is 2 squares long, so it always covers one light and one dark square of a checkerboard pattern. That means you only need to shoot at half the squares (say, just the "dark" ones) to be sure of hitting every ship at least once. Shooting in a checkerboard pattern can cut your hunting shots roughly in half.</p>
+<p>Once the small patrol boat is sunk, the smallest remaining ship is 3 long, and you can spread your shots out even more, for example every third square in each row, shifting the pattern on each row.</p>
+
+<h2>Hunt where ships fit</h2>
+<p>A ship can only be in a place big enough to hold it. Corners and edges have fewer ways for a ship to fit through them, and so do squares surrounded by misses. Squares in open areas, with lots of space in every direction, are the most likely to hide a ship. When you're not sure where to shoot next, pick the square with the most room around it.</p>
+
+<h2>Targeting: finish the ship</h2>
+<ul>
+<li>After a first hit, try the four squares around it (up, down, left, right).</li>
+<li>After a second hit, you know which way the ship is pointing. Keep shooting along that line in both directions until it sinks.</li>
+<li>If you get hits that don't line up, you've probably found two ships touching each other. Finish one, then come back for the other.</li>
+</ul>
+<p>In the Hub's version a hit lets you fire again, so targeting well is even more valuable: one good hit can turn into a whole sunk ship in a single turn.</p>
+
+<h2>Hiding your own fleet</h2>
+<ul>
+<li><b>Don't make patterns.</b> Ships all in a row, or all on one side, are easy to find once one is hit.</li>
+<li><b>Mix directions.</b> Use both horizontal and vertical ships.</li>
+<li><b>Avoid obvious spots.</b> Many players think the edges are safe, so experienced players check them. There is no perfectly safe spot, which is the point: be unpredictable.</li>
+<li><b>Touching ships confuse people.</b> Two ships side by side can make an opponent think they've found one big ship.</li>
+</ul>
+
+<h2>A bit of history</h2>
+<p>Guessing games like this were played with pencil and paper in the early 20th century, long before the plastic board game version became popular in the 1960s. Early home computers had versions too, because the game is simple to program but fun to play against a computer.</p>
+
+<h2>Try it</h2>
+<p>In <a href="/SeaBattle/seabattle">Sea Battle</a> on the Hub you can shuffle your fleet or place it yourself. Try one game shooting only on a checkerboard pattern and count how many shots it takes compared with your usual game.</p>
+
+        <div class="cta"><a class="btn" href="/SeaBattle/seabattle">▶ Play Sea Battle</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/tic-tac-toe-never-lose">❌ How to never lose at Tic-Tac-Toe<span>Tic-Tac-Toe is a solved game: with good play it always ends in a draw. Here are the simple rules that make sure you never lose, and the traps that beat beginners.</span></a><a href="/articles/solitaire-strategy">🃏 Solitaire strategy: how to win more games of Klondike<span>Turn over hidden cards first, think before you empty a column, and don&#x27;t rush cards to the foundations. Tips for classic Klondike solitaire.</span></a><a href="/articles/gomoku-strategy">⚫ Five in a Row (Gomoku) strategy: open threes, fours and forks<span>Learn the shapes that win Gomoku: open threes, fours and the double threat. How to attack, when to defend, and why the first move matters.</span></a><a href="/articles/penalty-kick-game-theory">⚽ Penalty kicks and game theory: why being unpredictable wins<span>Where should you shoot, and which way should the keeper dive? The surprising maths of penalties, and how it helps you in the Penalty Shootout game.</span></a><a href="/articles/word-search-tips">🔎 Word search tips: how to find words faster<span>Scan for rare letters, search one direction at a time and look for letter pairs. Simple tricks that make word searches quicker and more fun.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

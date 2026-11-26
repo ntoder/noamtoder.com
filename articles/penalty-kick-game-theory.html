@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Where should you shoot, and which way should the keeper dive? The surprising maths of penalties, and how it helps you in the Penalty Shootout game.">
+    <title>Penalty kicks and game theory: why being unpredictable wins · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">⚽</div>
+        <h1 class="t">Penalty kicks and game theory: why being unpredictable wins</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 6 min read</div>
+        
+<p>A penalty kick looks like a test of skill, and it is. But it's also a guessing game. The ball travels so fast that a goalkeeper usually has to choose which way to dive before seeing where the ball goes. That makes a penalty a perfect example of something mathematicians call <b>game theory</b>: the study of decisions where your best choice depends on what the other person chooses.</p>
+
+<h2>Why you can't have a favourite side</h2>
+<p>Imagine a striker who always shoots to the left because it's their strongest side. Soon every keeper knows, dives left, and saves it. Now imagine a keeper who always dives right. Strikers would just shoot left every time. Any fixed habit can be exploited. The only way to avoid being predictable is to <b>mix</b>: sometimes left, sometimes right, sometimes the middle, in a way the other player can't guess.</p>
+
+<h2>The best mix isn't 50/50</h2>
+<p>Most players have a stronger side. If you're more accurate shooting to your natural side, you should shoot there more often, but not always. The best mix is the one where the keeper gains nothing by guessing one way. Game theory calls this a <b>mixed strategy</b>, and the balanced point is called an equilibrium, named after the mathematician John Nash.</p>
+<p>Economists have studied thousands of professional penalties, and found that top players' choices come surprisingly close to the balance game theory predicts. Without doing any maths, the best players have learned to be just unpredictable enough.</p>
+
+<h2>What about the middle?</h2>
+<p>Goalkeepers dive to one side most of the time, because standing still and being beaten looks bad. That means shots straight down the middle are saved surprisingly rarely. But if everyone started shooting down the middle, keepers would stay put. The middle works best as an occasional surprise, which is exactly what game theory says.</p>
+
+<h2>Using this in the game</h2>
+<ul>
+<li><b>When you shoot:</b> don't fall into a pattern. If you've gone left twice, the computer may expect left again, or may expect you to switch. Keep it truly mixed.</li>
+<li><b>When you're in goal:</b> watch for patterns in the computer's shots, but don't overreact to one or two kicks. Random sequences often have runs that look like patterns.</li>
+<li><b>Aim for the corners.</b> Shots near the corners are hardest to save, but miss the goal more often. Balance accuracy against risk.</li>
+</ul>
+
+<h2>Game theory is everywhere</h2>
+<p>The same idea of mixing your choices shows up in Rock, Paper, Scissors, in tennis serves, in card games like poker, and in many computer games where the enemy tries to predict you. Whenever an opponent is trying to guess your next move, the safest plan is to be hard to guess.</p>
+
+<h2>Try it</h2>
+<p>In <a href="/Penalty/penalty">Penalty Shootout</a> on the Hub you take penalties and then dive to save them. Try keeping a written list of where you shoot for one game, and check afterwards whether you were as random as you thought.</p>
+
+        <div class="cta"><a class="btn" href="/Penalty/penalty">▶ Play Penalty Shootout</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/tic-tac-toe-never-lose">❌ How to never lose at Tic-Tac-Toe<span>Tic-Tac-Toe is a solved game: with good play it always ends in a draw. Here are the simple rules that make sure you never lose, and the traps that beat beginners.</span></a><a href="/articles/sea-battle-strategy">🚢 Sea Battle strategy: how to find ships faster<span>Use a checkerboard search pattern, hunt smartly after a hit, and place your own ships where they&#x27;re hard to find. Strategy for Battleship-style games.</span></a><a href="/articles/solitaire-strategy">🃏 Solitaire strategy: how to win more games of Klondike<span>Turn over hidden cards first, think before you empty a column, and don&#x27;t rush cards to the foundations. Tips for classic Klondike solitaire.</span></a><a href="/articles/gomoku-strategy">⚫ Five in a Row (Gomoku) strategy: open threes, fours and forks<span>Learn the shapes that win Gomoku: open threes, fours and the double threat. How to attack, when to defend, and why the first move matters.</span></a><a href="/articles/word-search-tips">🔎 Word search tips: how to find words faster<span>Scan for rare letters, search one direction at a time and look for letter pairs. Simple tricks that make word searches quicker and more fun.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

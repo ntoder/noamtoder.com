@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Learn the shapes that win Gomoku: open threes, fours and the double threat. How to attack, when to defend, and why the first move matters.">
+    <title>Five in a Row (Gomoku) strategy: open threes, fours and forks · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">⚫</div>
+        <h1 class="t">Five in a Row (Gomoku) strategy: open threes, fours and forks</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 6 min read</div>
+        
+<p>Five in a Row, also called Gomoku, is played on a 15 by 15 grid. Players take turns placing stones, and the first to get five in a straight line (across, down or diagonal) wins. It's like Tic-Tac-Toe on a huge board, but much deeper. The game is centuries old in Japan, and it's closely related to Renju, a version with extra rules to make it fairer.</p>
+
+<h2>The shapes to know</h2>
+<ul>
+<li><b>Open two:</b> two stones in a line with space on both sides. A starting point.</li>
+<li><b>Open three:</b> three in a line with both ends open. Very dangerous: if it isn't blocked, it becomes an open four.</li>
+<li><b>Four:</b> four in a line with one end open. Must be blocked immediately.</li>
+<li><b>Open four:</b> four in a line with both ends open. It can't be stopped, because blocking one end leaves the other.</li>
+</ul>
+
+<h2>Rule 1: block open threes</h2>
+<p>An open three is the most important thing to notice on the board. If your opponent makes one and you don't block an end, they'll turn it into an open four and win. Unless you can make a four yourself (which forces them to answer you first), block it.</p>
+
+<h2>Rule 2: attack with forcing moves</h2>
+<p>A move that makes a four or an open three forces your opponent to respond. Strong players chain forcing moves together, so the opponent spends every turn blocking and never gets to attack. If you can keep forcing, you control the game.</p>
+
+<h2>Rule 3: build a fork</h2>
+<p>The winning idea in Gomoku is the double threat: one stone that creates two threats at once, for example a four and an open three, or two open threes. Your opponent can only block one. Look for a spot where two of your lines cross; that's where forks come from.</p>
+
+<h2>Rule 4: stay connected</h2>
+<p>Stones placed close together support each other and can join several lines at once. Stones spread out across the board rarely help each other. Play near your existing stones, usually within one or two squares.</p>
+
+<h2>Rule 5: defend by attacking</h2>
+<p>When you have to block, choose the blocking square that also builds one of your own lines. The best defensive moves are also attacking moves.</p>
+
+<h2>Is it fair?</h2>
+<p>Going first is a big advantage. Computer research in the 1990s showed that on a standard board the first player can force a win with perfect play. That's why the professional version, Renju, gives the first player some restrictions. For a friendly game it doesn't matter much, but it's a good reason to take turns going first.</p>
+
+<h2>Practise</h2>
+<p><a href="/FiveInARow/fiveinarow">Five in a Row</a> on the Hub has a computer opponent and a two-player mode. Play a game where you say "open three!" every time either player makes one. You'll quickly start seeing the board the way strong players do.</p>
+
+        <div class="cta"><a class="btn" href="/FiveInARow/fiveinarow">▶ Play Five in a Row</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/tic-tac-toe-never-lose">❌ How to never lose at Tic-Tac-Toe<span>Tic-Tac-Toe is a solved game: with good play it always ends in a draw. Here are the simple rules that make sure you never lose, and the traps that beat beginners.</span></a><a href="/articles/sea-battle-strategy">🚢 Sea Battle strategy: how to find ships faster<span>Use a checkerboard search pattern, hunt smartly after a hit, and place your own ships where they&#x27;re hard to find. Strategy for Battleship-style games.</span></a><a href="/articles/solitaire-strategy">🃏 Solitaire strategy: how to win more games of Klondike<span>Turn over hidden cards first, think before you empty a column, and don&#x27;t rush cards to the foundations. Tips for classic Klondike solitaire.</span></a><a href="/articles/penalty-kick-game-theory">⚽ Penalty kicks and game theory: why being unpredictable wins<span>Where should you shoot, and which way should the keeper dive? The surprising maths of penalties, and how it helps you in the Penalty Shootout game.</span></a><a href="/articles/word-search-tips">🔎 Word search tips: how to find words faster<span>Scan for rare letters, search one direction at a time and look for letter pairs. Simple tricks that make word searches quicker and more fun.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>

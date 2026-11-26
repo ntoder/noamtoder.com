@@ -391,6 +391,49 @@
         .ns-card .ns-play { position: absolute; right: 14px; bottom: 16px; background: #7c5cff; border-radius: 999px; padding: 7px 14px; font: 800 14px Inter, sans-serif; }
         [dir="rtl"] .ns-card .ns-txt { right: 16px; left: 110px; } [dir="rtl"] .ns-card .ns-new { left: auto; right: 12px; } [dir="rtl"] .ns-card .ns-play { right: auto; left: 14px; }
         @media (max-width: 700px) { .ns-row { grid-auto-columns: 82%; } .ns-card .ns-txt { right: 16px; } [dir="rtl"] .ns-card .ns-txt { left: 16px; } .ns-arrows { display: none; } .ns-card .ns-play { display: none; } }
+
+        /* ---------- Phones: compact 2-column layout ---------- */
+        @media (max-width: 600px) {
+            body { font-size: 16px; }
+            .hero { padding-top: 24px; padding-bottom: 20px; }
+            .hero p { font-size: 15px; }
+            .btn { padding: 13px 22px; font-size: 16px; }
+            .section { padding-left: 12px; padding-right: 12px; }
+            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .card { border-radius: 14px; }
+            .card:hover, .card:focus-visible { transform: none; }
+            .card-body { padding: 9px 10px 11px; gap: 3px; }
+            .card h3 { font-size: 15px; line-height: 1.2; }
+            .card p { font-size: 12.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+            .card-meta { font-size: 11.5px; gap: 6px; padding-top: 2px; }
+            .tag { top: 6px; left: 6px; font-size: 9.5px; padding: 3px 7px; letter-spacing: .3px; }
+            .tag.prem { right: 6px; }
+            .heart { width: 30px; height: 30px; font-size: 14px; bottom: 5px; right: 5px; }
+            .thumb::after { display: none; }
+            .filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; scrollbar-width: none; margin-inline: -12px; padding-inline: 12px; }
+            .filters::-webkit-scrollbar { display: none; }
+            .chip { flex: none; font-size: 14px; padding: 8px 14px; }
+            .tools { width: 100%; }
+            .search { flex: 1; min-width: 0; }
+            .search input { font-size: 16px; padding: 11px 0; }
+            .cx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .cx { padding: 12px; border-radius: 14px; }
+            .cx .e { font-size: 26px; }
+            .cx b { font-size: 15px; }
+            .cx .d { font-size: 12px; }
+            .featured { margin-bottom: 28px; border-radius: 16px; }
+            .featured .f-img { min-height: 150px; max-height: 190px; }
+            .featured .f-body { padding: 18px; gap: 10px; }
+            .featured p { font-size: 15px; }
+            .daily-card { padding: 16px; gap: 12px; }
+            .dc-icon { font-size: 38px; }
+            .dc-body b { font-size: 17px; }
+            .dc-body span { font-size: 14px; }
+            .mini-card { width: 112px; }
+            .about-card { padding: 18px; }
+            .about-card h2 { font-size: 22px; }
+            .section-head h2 { font-size: 22px; }
+        }
     </style>
 </head>
 <body>
@@ -448,7 +491,7 @@
     <header class="hero">
         <div class="badge">🎮 <span id="gameCount">16</span> games · no downloads · free account saves your scores</div>
         <h1>Welcome to<br>Noam's Game Hub!</h1>
-        <p>A collection of my favorite games and websites that I've created or enjoy. Pick a game, hit play, and have fun!</p>
+        <p>137 free games I built myself: arcade, puzzles, board games, sports and more. They run right in your browser on a phone, tablet or computer. Pick one and press play!</p>
         <div class="hero-actions">
             <a class="btn btn-primary" href="#games">▶ Browse games</a>
             <a class="btn btn-ghost" id="surpriseBtn" href="#games" role="button">🎲 Surprise me</a>
@@ -545,7 +588,7 @@
                 </div>
                 <div class="about-card">
                     <h3>👨‍👩‍👧 Made for kids</h3>
-                    <p>Every game is safe for all ages. There's no chat, no violence and no in-game shop. Ads are set to child-safe mode.</p>
+                    <p>Every game is safe for all ages, with no violence and nothing to buy inside the games. Ads are set to child-safe mode.</p>
                 </div>
                 <div class="about-card">
                     <h3>★ Premium</h3>
@@ -691,7 +734,7 @@
         }
         function renderToday() {
             const c = todayChallenge(), done = dailyDone(c.day);
-            $("dailyCard").innerHTML = `<div class="dc-icon">📅</div>
+            $("dailyCard").innerHTML = `<div class="dc-icon">🎯</div>
                 <div class="dc-body"><small>DAILY CHALLENGE</small>
                     <b>Score ${c.target.toLocaleString()} ${c.unit} in ${esc(GAMES[c.game].name)}</b>
                     <span>${done ? "✅ Done for today! A new challenge comes tomorrow." : "Finish it today for +40 XP and keep your streak going."}</span></div>

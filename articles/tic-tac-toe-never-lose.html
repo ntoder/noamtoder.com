@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX7DB1FEWY"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH']});gtag('consent','default',{ad_user_data:'denied',ad_personalization:'denied',ad_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})(),analytics_storage:(function(){try{return localStorage.getItem('gh_cookies')==='necessary'?'denied':'granted'}catch(e){return 'granted'}})()});gtag('js',new Date());gtag('config','G-RX7DB1FEWY');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Tic-Tac-Toe is a solved game: with good play it always ends in a draw. Here are the simple rules that make sure you never lose, and the traps that beat beginners.">
+    <title>How to never lose at Tic-Tac-Toe · Noam's Game Hub</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/game-shell.css">
+    <style>
+        body { -webkit-user-select: auto; user-select: auto; }
+        article { max-width: 760px; margin: 0 auto; padding: 40px 16px 40px; line-height: 1.75; width: 100%; }
+        .crumbs { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+        .crumbs a { color: var(--accent-2); text-decoration: none; }
+        .emoji { font-size: 54px; }
+        h1.t { font-size: clamp(26px, 5vw, 38px); font-weight: 800; line-height: 1.25; margin: 8px 0 10px; }
+        .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+        article h2 { font-size: 22px; margin: 30px 0 8px; color: var(--accent-2); }
+        article p, article li { color: #cfd3f5; font-size: 17px; }
+        article p { margin-bottom: 14px; }
+        article ol, article ul { padding-left: 24px; margin-bottom: 14px; display: grid; gap: 6px; }
+        article a { color: var(--accent-2); }
+        code { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; }
+        pre { background: #0f1124; border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; margin: 10px 0 20px; }
+        pre code { background: none; border: 0; padding: 0; font-size: 14px; line-height: 1.6; color: #d9dcff; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); }
+        .cta a { text-decoration: none; }
+        .more { max-width: 760px; margin: 0 auto 60px; padding: 0 16px; width: 100%; }
+        .more h3 { margin-bottom: 12px; }
+        .more a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+                  color: var(--text); text-decoration: none; font-weight: 700; }
+        .more a:hover { border-color: var(--accent); }
+        .more span { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="gbar">
+        <a class="back" href="/">← Games</a>
+        <h1>Game Hub <span>Articles</span></h1>
+        <a class="back" href="/articles/">All articles</a>
+    </div>
+    <article>
+        <div class="crumbs"><a href="/">Home</a> › <a href="/articles/">Articles</a></div>
+        <div class="emoji">❌</div>
+        <h1 class="t">How to never lose at Tic-Tac-Toe</h1>
+        <div class="meta">By <a href="/about" style="color:inherit">Noam</a> · 26 November 2026 · 5 min read</div>
+        
+<p>Tic-Tac-Toe (noughts and crosses) is so small that every possible game can be checked, and the answer is known: if both players play well, the game is always a draw. That means you should never lose. It also means that when you play someone who doesn't know the rules below, you can often win.</p>
+
+<h2>The priority list</h2>
+<p>On every turn, go down this list and play the first move that applies:</p>
+<ol>
+<li><b>Win:</b> if you have two in a line and the third square is empty, take it.</li>
+<li><b>Block:</b> if your opponent has two in a line, take the third square.</li>
+<li><b>Fork:</b> make a move that creates two lines of two at once. Your opponent can only block one.</li>
+<li><b>Block a fork:</b> if your opponent could make a fork next turn, stop it, ideally by making two in a row yourself so they're forced to block you instead.</li>
+<li><b>Centre:</b> take the middle if it's free.</li>
+<li><b>Opposite corner:</b> if your opponent is in a corner, take the corner opposite.</li>
+<li><b>Any corner,</b> then <b>any edge.</b></li>
+</ol>
+<p>Following this list exactly is enough to never lose a game. Computer programs that play perfect Tic-Tac-Toe use almost exactly these rules.</p>
+
+<h2>Why corners are strong</h2>
+<p>The centre is part of four lines, corners are part of three, and edges only two. So the centre is the best single square, but corners are where forks come from. Most winning traps start with a corner.</p>
+
+<h2>The corner trap (when you go first)</h2>
+<p>Start in a corner. If your opponent replies anywhere except the centre, you can almost always win. For example, if they play an edge, take another corner so you threaten a line, and after they block you'll usually be able to fork. Even when they take the centre, taking the opposite corner sets a few traps for beginners.</p>
+
+<h2>The mistake to avoid when you go second</h2>
+<p>If your opponent starts in a corner, <b>take the centre</b>. Any other reply can be beaten. And if they then take the opposite corner (so they have two corners on a diagonal with you in the middle), don't take a corner yourself: play an edge. Taking a corner here lets them fork. This one rule wins a surprising number of games for people who know it.</p>
+
+<h2>Why the game is a draw</h2>
+<p>There are only 9 squares, and once you remove games that are just rotations or mirror images, there are only a few hundred essentially different ways a game can go. That's small enough for people (and early computers) to check every one. In fact, one of the first computer games ever, OXO, was a Tic-Tac-Toe program written in 1952 on a Cambridge University computer.</p>
+
+<h2>Make it harder</h2>
+<p>Once Tic-Tac-Toe always ends in a draw for you, try a bigger cousin. <a href="/UltimateTicTacToe/ultimatettt">Ultimate Tic-Tac-Toe</a> is nine small boards inside one big board, and <a href="/FiveInARow/fiveinarow">Five in a Row</a> (Gomoku) uses a 15 by 15 grid where you need five in a line.</p>
+
+<h2>Practise</h2>
+<p><a href="/TicTacToe/tictactoe">Tic-Tac-Toe</a> on the Hub has a computer opponent and a two-player mode. Play the computer with the priority list next to you, and see if it can ever beat you.</p>
+
+        <div class="cta"><a class="btn" href="/TicTacToe/tictactoe">▶ Play Tic-Tac-Toe</a><a class="btn ghost" href="/">All games</a></div>
+    </article>
+    <div data-ad="banner"></div>
+    <section class="more"><h3>More articles</h3><a href="/articles/sea-battle-strategy">🚢 Sea Battle strategy: how to find ships faster<span>Use a checkerboard search pattern, hunt smartly after a hit, and place your own ships where they&#x27;re hard to find. Strategy for Battleship-style games.</span></a><a href="/articles/solitaire-strategy">🃏 Solitaire strategy: how to win more games of Klondike<span>Turn over hidden cards first, think before you empty a column, and don&#x27;t rush cards to the foundations. Tips for classic Klondike solitaire.</span></a><a href="/articles/gomoku-strategy">⚫ Five in a Row (Gomoku) strategy: open threes, fours and forks<span>Learn the shapes that win Gomoku: open threes, fours and the double threat. How to attack, when to defend, and why the first move matters.</span></a><a href="/articles/penalty-kick-game-theory">⚽ Penalty kicks and game theory: why being unpredictable wins<span>Where should you shoot, and which way should the keeper dive? The surprising maths of penalties, and how it helps you in the Penalty Shootout game.</span></a><a href="/articles/word-search-tips">🔎 Word search tips: how to find words faster<span>Scan for rare letters, search one direction at a time and look for letter pairs. Simple tricks that make word searches quicker and more fun.</span></a></section>
+    <script type="module" src="/hub.js"></script>
+</body>
+</html>
