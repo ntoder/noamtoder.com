@@ -60,7 +60,8 @@
             cells[b][i] = turn; last = [b, i]; beep(turn === 1 ? 520 : 390, 0.06, "triangle", 0.04);
             const w = win3(cells[b]); if (w && !big[b]) { big[b] = w; if (w !== 3) tune([659, 880], 0.06, "square", 0.04); }
             forced = big[i] ? -1 : i; turn = -turn;
-            if (real || !legal().length) return finish(real);
+            const real = winBig();
+            if (real || !legal().length) return finish(real || 3);
             if (!two && turn === -1) { busy = true; setTimeout(cpu, 450); }
         }
         function winBig() { for (const [x, y, z] of LINES) if ((big[x] === 1 || big[x] === -1) && big[x] === big[y] && big[y] === big[z]) return big[x]; if (big.every((v) => v)) { const a = big.filter((v) => v === 1).length, c = big.filter((v) => v === -1).length; return a > c ? 1 : c > a ? -1 : 3; } return 0; }
